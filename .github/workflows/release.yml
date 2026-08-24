@@ -147,6 +147,8 @@ jobs:
           remote_refs="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")"
           if [ -z "$remote_refs" ]; then
             manifest_sha="$(sha256sum "$BUNDLE_DIR/yufeng-$RELEASE_TAG-release-manifest.json" | awk '{print $1}')"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             printf -v tag_message 'YuFeng %s software release\n\nsource-commit=%s\nworkflow-run=%s\nmanifest-sha256=%s' \
               "$RELEASE_TAG" "$SOURCE_COMMIT" "$BUNDLE_RUN_ID" "$manifest_sha"
             git tag -a "$RELEASE_TAG" "$SOURCE_COMMIT" -m "$tag_message"
