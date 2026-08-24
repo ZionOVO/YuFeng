@@ -1,6 +1,6 @@
-# 御锋部署场景
+# 部署与上线
 
-> 本文给出部署选型、边界和验收口径。架构与技术选型以 [architecture.md](architecture.md) 为准，网络行为以 [api.md](api.md) 为准，线上字段以 `proto/` 为准；本文不另立协议。仓库目标版本只读取根目录 [`VERSION`](../VERSION)，已发布状态只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest)。客户现场仍须填写真实上游、精确代理网段、证书与网络核对结果，以及切换、回退、密钥轮换和备份恢复责任人。
+> 本文给出部署选型、边界和验收口径。架构与技术选型以 [`architecture.md`](../architecture.md) 为准，网络行为以 [`api.md`](../api.md) 为准，线上字段以 `proto/` 为准；本文不另立协议。仓库声明版本只读取根目录 [`VERSION`](../../VERSION)，已发布状态只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest)。客户现场仍须填写真实上游、精确代理网段、证书与网络核对结果，以及切换、回退、密钥轮换和备份恢复责任人。
 
 ## 1. 交付结论
 
@@ -40,7 +40,7 @@
                                └────────▶ yufeng-brain ◀──────────┘
 ```
 
-技术人员先启动 `deploy/compose.yaml` 控制面，再把 `deploy/compose.edge-modelside.yaml` 合并到同一 Docker Compose 项目并显式启动 `edge modelside`。Edge 与 ModelSide 共享权限受限的 Unix 域套接字；Brain 和贾维斯不调用 Docker。
+技术人员先启动 `deploy/compose.yaml` 控制面，再把 `deploy/compose.edge-modelside.yaml` 合并到同一 Docker Compose 项目并显式启动 `edge modelside`。Edge 与 ModelSide 共享权限受限的 Unix 域套接字；Brain 和贾维斯不调用 Docker。具体命令见 [`deploy/README.md`](../../deploy/README.md)。
 
 ### 3.2 Edge 与 ModelSide 独立主机，连接远端 Brain
 
@@ -64,7 +64,7 @@
 客户端 --HTTPS--> 客户入口 --HTTP--> yufeng-edge --HTTP/HTTPS--> 业务应用
 ```
 
-客户入口保留原始 `Host`，追加 `X-Forwarded-For`，透传升级连接；入口地址所属精确网段写入签名监听计划。生产回源不得使用内置演示上游。回退只恢复客户入口上一版回源池配置，不调用 Brain、ModelSide 或智能代理。参考配置见 [`deploy/reverse-proxy/`](../deploy/reverse-proxy/)。
+客户入口保留原始 `Host`，追加 `X-Forwarded-For`，透传升级连接；入口地址所属精确网段写入签名监听计划。生产回源不得使用内置演示上游。回退只恢复客户入口上一版回源池配置，不调用 Brain、ModelSide 或智能代理。参考配置见 [`deploy/reverse-proxy/`](../../deploy/reverse-proxy/README.md)。
 
 ### 4.2 Envoy 外部授权
 
@@ -74,7 +74,7 @@
                          └--HTTP 外部授权检查--> yufeng-edge
 ```
 
-网关提供方法、路径、查询、允许的请求头和约定范围内的请求体。未转发检查面必须标为覆盖不足，不能当作无发现。网关关闭故障放行；边缘明确拒绝或熔断时按签名策略和固定入口语义处理。参考配置见 [`deploy/envoy/`](../deploy/envoy/)。
+网关提供方法、路径、查询、允许的请求头和约定范围内的请求体。未转发检查面必须标为覆盖不足，不能当作无发现。网关关闭故障放行；边缘明确拒绝或熔断时按签名策略和固定入口语义处理。参考配置见 [`deploy/envoy/`](../../deploy/envoy/README.md)。
 
 ## 5. 异步模型数据边界
 
@@ -113,7 +113,7 @@ ModelSide 的模型版本、告警阈值、复核下限、窗口、每单元上�
 
 发布候选必须在固定硬件、Go 与 Python 版本、核心规则集、模型权重、请求分布和上游延迟下，以每秒 2000 个请求分别验证旁路关闭、ModelSide 空闲、ModelSide 满载、Brain 断连和 Brain 磁盘变慢。每个场景记录吞吐、请求路径第 99 百分位延迟、两条队列深度、普通旁路丢弃、高优先级告警丢弃和上报重试；第 99 百分位延迟不得超过关闭旁路基线加 `ModelBypassP99Budget`。
 
-软件门禁还必须通过 `make build test vet`、竞态、漏洞、静态分析、Protocol Buffers 消息契约、控制台、交叉编译、容器配置和安全负向检查。只有根目录 `VERSION`、同名公开 GitHub Release 与精确提交证据一致，才能声明软件版本和机器验收闭环；客户现场仍须填写 [`deploy/pilot-change-record.md`](../deploy/pilot-change-record.md)，关闭网络、证书、切换、回退、轮换与恢复记录。
+软件发布门禁及制品集合只由[软件发布与交付证据](release-and-delivery.md)维护，本文不重复发布清单。客户环境上线必须使用已公开且复核通过的 Release，并填写[现场变更记录](../../deploy/pilot-change-record.md)，关闭网络、证书、切换、回退、轮换与恢复记录。
 
 ## 9. 不在当前范围
 

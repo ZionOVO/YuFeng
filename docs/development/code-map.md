@@ -1,8 +1,8 @@
 # 代码地图
 
 > 目的：按架构概念快速找到代码位置。每完成一个里程碑更新本文件。
-> 术语含义见 [glossary.md](glossary.md)；架构全貌见 [architecture.md](architecture.md)。
-> 仓库目标版本只读取根目录 [`VERSION`](../VERSION)，对外已发布状态只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest)；只有同名非草稿 Release 的精确提交证据资产通过复核，才可宣称对应单站点企业试点软件版本和机器验收闭环。客户现场仍须记录真实上游、精确代理网段、证书核对、切换与回退责任人。版本历史和证据合同见 [delivery-evidence.md](delivery-evidence.md)。
+> 术语含义见[术语表](../glossary.md)；架构全貌见[架构设计](../architecture.md)。
+> 仓库声明版本只读取根目录 [`VERSION`](../../VERSION)，对外已发布状态只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest)；只有同名非草稿 Release 的精确提交证据资产通过复核，才可宣称对应单站点企业试点软件版本和机器验收闭环。客户现场仍须记录真实上游、精确代理网段、证书核对、切换与回退责任人。发布与部署证据边界见[软件发布与交付证据](../operations/release-and-delivery.md)。
 >
 > **本表所有路径都只是检索入口，不是修改闭集。** 开发时必须从协议消息、服务方法、数据库列、命令行参数和术语出发，用 `rg` 地毯式追踪生产者、消费者、生成代码、迁移、测试、部署与文档；不得只改表中列出的文件。
 
@@ -31,7 +31,7 @@
 | Edge 人工部署 | 契约 `docs/api.md` §19.3；Brain 签发 `lib/brain/onboarding_deployment_specification.go`、`baseline_generation.go`；原生交付 `deploy/edge/`；容器交付 `deploy/edge.Dockerfile`、`deploy/compose.edge-modelside.yaml` | Brain 在管理员规格事务中创建监听计划、基线世代、模型档案和预声明 ModelSide 身份；技术人员手动安装、启动、升级和卸载 Edge，Edge 主动注册、拉取与回执 |
 | 可选本机 Edge 监督器 | 入口 `cmd/yufeng-dataplane`；只读状态库 `lib/dataplane` | 仅供技术人员手动启动，读取本机服务状态；不持 Docker、不创建或重建 Edge，不接受 Brain 或 Agent 控制 |
 | 控制台托管 | `cmd/yufeng-brain` 托管 `/app`（`lib/brain` 的 `ConsoleHandler`）；开发与交付运行时只装配真实 `ConnectClient`，测试夹具只在 `console/src/test` | 已建：`/app/setup` 六步引导、授权、提案意图、案件人工处置、受管 Agent、Worker 加密激活投影、会话服务、资产写权限按钮和幂等键复用 |
-| 软件发布与部署资格证据 | 发布构建 `scripts/build-release-assets.sh`；制品封存和复核 `scripts/release-artifacts.py`、`scripts/verify-release-assets.sh`；持续集成 `.github/workflows/ci.yml`；一次构建发布 `.github/workflows/release.yml`；部署诊断入口 `scripts/delivery-evidence.sh`；合同 `docs/delivery-evidence.md` | 软件发布固定为 11 个归档、清单和校验和；实际文件通过复核后先存为不可变工作流制品，再提升为公开 Release，失败只从原制品恢复。客户部署资格另行验证，不反向修改软件发布状态 |
+| 软件发布与部署资格证据 | 发布构建 `scripts/build-release-assets.sh`；制品封存和复核 `scripts/release-artifacts.py`、`scripts/verify-release-assets.sh`；持续集成 `.github/workflows/ci.yml`；一次构建发布 `.github/workflows/release.yml`；部署诊断入口 `scripts/delivery-evidence.sh`；合同 `docs/operations/release-and-delivery.md` | 软件发布固定为 11 个归档、清单和校验和；实际文件通过复核后先存为不可变工作流制品，再提升为公开 Release，失败只从原制品恢复。客户部署资格另行验证，不反向修改软件发布状态 |
 | 数据面请求链 | `lib/edgecore/proxy.go`、`release_proxy.go`、`release_set.go`、`status.go`、`listen.go`、`external_authorization.go` 与 `generation.go` | 活路径由四种入口姿态的外壳、检查器与闸门构成。边缘只有持有已验证世代和监听计划才绑定业务服务器；反向代理与 Envoy 外部授权均有真实入口协议回归 |
 | 客户来源与边缘假名 | 策略 `UnitListenPlan.client_source`；解析 `lib/edgecore/source.go`；检测 `lib/edgecore/inspector.go` `coraza.go`；事件编译 `lib/edgecore/telemetry.go` `cmd/yufeng-edge/brain.go` | 已建：默认使用直接对端；处于可信代理网段时，按右向左顺序解析 `X-Forwarded-For`；Coraza 使用解析后的来源，上行事件只填部署作用域内的基于哈希的消息认证码假名 |
 | 中台资源投影与路由 | 权威语义 `docs/architecture.md` §4.4、`docs/api.md` §21.5；事件入口 `lib/brain/telemetry.go`，投影与冻结 `lib/brain/check_ticket.go`、`lib/edgecore/digest.go`，发件箱 `lib/brain/outbox.go` | 已建：中台按已接受事件与钉死历史世代单点冻结不可变检查票据；事件、票据和完整票据消息同事务提交，缺材料按闭集原因隔离；消费者不再按事件标识回库补票或采用默认车道 |
@@ -67,6 +67,6 @@
 ## 变更纪律
 
 - 改网络行为或状态语义：先改 `docs/api.md`，再改 proto service；改数据消息字段或编码：先改 `proto/`，再同步文档。两者冲突时阻止合入并人工对齐；需要生成代码时执行 `make generate`，产物随仓库提交；
-- 新术语：先入 [glossary.md](glossary.md)（含英文锚点）再使用；
+- 新术语：先入[术语表](../glossary.md)（含英文锚点）再使用；
 - 按本图实施：以列出的路径打开第一处代码后，继续全仓检索同一服务方法、消息类型、表列、配置键和序列化字段，覆盖生产者、消费者、回放、部署与测试；文件清单永远不表示“只改这些”；
 - 本地图与实现不一致时，视为实现未完成。

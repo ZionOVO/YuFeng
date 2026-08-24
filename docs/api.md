@@ -1372,7 +1372,7 @@ Edge 首次启动后主动调用 `Register`，随后拉取已签名监听计划�
 
 **原则**：`yufeng-jarvis` 与认知型 `yufeng-run` 共用一种逻辑认知循环、账本和工具语义；网络身份不同。贾维斯主动长轮询 brain，`yufeng-agentd` 代表 run 主动长轮询 brain，`yufeng-run` 只连接 agentd 的本地监督代理且没有网络对等体。brain 负责排队、授权、审计、模型出网与工具执行；**后端永不向 Agent 拨号**。对中台的写只有两条路：经 `ToolGatewayService.InvokeTool`，或持能力令牌调用 **Tools 已列出** 且 Scopes 允许的受控应用程序编程接口（API）；Scopes 不得单独放出 Tools 里没有的写动作。
 
-本节记录现有接口及其扩展约束。新增字段必须先按第 20 节同步 Protocol Buffers 消息契约与生成代码；不得用临时 JSON、环境变量或第四条队列绕过。实现状态只看 [`code-map.md`](code-map.md)，不能因本节写入目标语义就宣称已交付。
+本节记录现有接口及其扩展约束。新增字段必须先按第 20 节同步 Protocol Buffers 消息契约与生成代码；不得用临时 JSON、环境变量或第四条队列绕过。实现状态只看 [`development/code-map.md`](development/code-map.md)，不能因本节写入目标语义就宣称已交付。
 
 ### 18.1 AgentControlService（贾维斯；RUN_SUPERVISOR 代表 run 推进 Turn）
 
@@ -1476,7 +1476,9 @@ Edge 首次启动后主动调用 `Register`，随后拉取已签名监听计划�
 |---|---|
 | `TRIAGE_REASON_DETECTED_UNMITIGATED` | 同步存在检测键，当前资产世代无对应该键的 enforce 策略 |
 | `TRIAGE_REASON_DETECTED_UNMAPPED` | 存在原始规则发现，但不属于自动治理五类；入队后默认只出 L0，不得自动晋升 |
-| `TRIAGE_REASON_SUSPECTED_MISS` | 同步无发现，且具备 design.md §4.2.2 所列独立证据之一 |
+| `TRIAGE_REASON_SUSPECTED_MISS` | 同步无发现，且具备下述一种独立证据 |
+
+`TRIAGE_REASON_SUSPECTED_MISS` 的独立证据类型只认 `proto/yufeng/common/v1/v1.proto` 中的 `MissEvidenceType` 闭集：人工报告；漏洞回放或复现；附带请求复现的可信情报；同步无发现且达到已签名模型档案告警阈值的模型结果。模型分数、普通无发现、覆盖不足或检测器失败都不能脱离对应类型和可信账本记录自行构成漏检证据。上游应用防护、运行时防护、蜜罐或资产侧异常若要进入本闭集，必须先冻结为人工、复现或情报证据，不能新增临时字符串。
 
 入队前必须按 `asset_id` + 路由模板 + 方法 + 检测键或漏检证据类型聚合（覆盖度与时间窗不进身份）；每个聚类至多一条未完成（`pending`/`leased`）指令。brain 创建或复用来源为该 `cluster_id` 的 AgentThread，再创建钉死 `cluster_version` 或 `event_cutoff` 的 AgentTurn；`payload_ref=turn_id`。无目标 Agent 注册公钥则不得入队，事件仍为 `accepted`。演示 §18.1.1 谓词只在测试或带 `yufeng_dev` 构建标签的目标中存在，正式构建不注册其开关。
 
@@ -2002,7 +2004,7 @@ L3 执行前对完整修复计划/Procedure 的审批，与程序执行中单个
 
 ## 21. 数据面入口、覆盖度与证据
 
-本节是数据面升级后的网络与状态语义。字段已进 `proto/`（`IngressPosture`、`UnitListenPlan`、`EvidencePolicy`、`EvidenceDigest`、`ForwardPolicy`、`CheckTicket`）。活路径已按 Inspect/Gate 与覆盖度状态码落地；转发策略 `AGENT_INVESTIGATE` 由中台创建短命调查执行实例，不回改本次请求。术语见 [glossary.md](glossary.md) 的检测器、闸、入口姿态、单元监听计划、证据策略、证据摘要、转发策略、检查票据。
+本节定义数据面入口、覆盖度、证据与异步模型旁路的网络和状态语义。字段已进 `proto/`（`IngressPosture`、`UnitListenPlan`、`EvidencePolicy`、`EvidenceDigest`、`ForwardPolicy`、`CheckTicket`）。活路径已按 Inspect/Gate 与覆盖度状态码落地；转发策略 `AGENT_INVESTIGATE` 由中台创建短命调查执行实例，不回改本次请求。术语见[术语表](glossary.md)中的检测器、闸、入口姿态、单元监听计划、证据策略、证据摘要、转发策略和检查票据。
 
 ### 21.1 入口姿态与单元监听计划
 
@@ -2038,9 +2040,18 @@ L3 执行前对完整修复计划/Procedure 的审批，与程序执行中单个
 
 心跳在已声明流量键上连续两个周期无请求、同键拦截单元在跑 → 资产健康 `tap_silent`。已声明跟随关系的观察流与拦截流，方法×路由模板 Top-N 集合 Jaccard < 0.5 且双方请求数都 ≥ 100 → `tap_skew`。镜像单元 `body_full_rate` 长期为 0 却报 HTTP `FULL` → 该面强制 `UNSUPPORTED`。控制台必须展示「执行面可能看不见」，不得写成「很安全」。
 
-### 21.2 覆盖度 → 状态码
+### 21.2 边缘观察、研判映射与覆盖度状态码
 
-检查覆盖度五态见 §18.1.2 与术语表。拦截姿态采用严格规范：覆盖不足不当 503，不当「无发现放行」。
+边缘观察与中台研判不是同一套枚举。线上只使用 `proto/yufeng/common/v1/v1.proto` 中的全名：
+
+| 边缘观察 | 中台研判 |
+|---|---|
+| 存在检测键 | 主观察为 `OBSERVATION_STATE_SYNC_DETECTED`；无对应 enforce 策略时为 `TRIAGE_REASON_DETECTED_UNMITIGATED`，检测键不属自动治理五类时为 `TRIAGE_REASON_DETECTED_UNMAPPED`。检测键优先于覆盖不足，但覆盖度仍须随事件记录 |
+| 无检测键，检测器加载、超时或执行失败 | `OBSERVATION_STATE_INSPECTION_ERROR` → `TRIAGE_REASON_DETECTOR_FAILURE`，不创建 Agent 指令 |
+| 无检测键，必查面截断、部分解析或不受支持 | `OBSERVATION_STATE_INSPECTION_PARTIAL` → `TRIAGE_REASON_INSPECTION_INCOMPLETE`，不创建 Agent 指令 |
+| 无检测键，配置要求的检查面均完整或不存在 | `OBSERVATION_STATE_SYNC_NO_DETECTION`；进入签名统计与代表选择，不创建 Agent 指令 |
+
+`InspectionCoverage` 对路径、查询、请求体和请求头分别使用五态：`COVERAGE_STATUS_FULL` 表示完整检查，`COVERAGE_STATUS_PARTIAL` 表示截断或部分解析，`COVERAGE_STATUS_ABSENT` 表示该面不存在，`COVERAGE_STATUS_UNSUPPORTED` 表示引擎不支持，`COVERAGE_STATUS_ERROR` 表示解析或执行失败。`ABSENT`、`UNSUPPORTED` 和 `ERROR` 都不得伪装成“完整检查且无发现”。拦截姿态采用严格规范：覆盖不足不当 503，不当“无发现放行”。
 
 | 覆盖情况 | 反代拦截 | 外部授权拦截 | 侧载只告警 | 镜像/SPAN |
 |---|---|---|---|---|

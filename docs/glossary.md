@@ -287,7 +287,7 @@ brain 对模型上下文协议（Model Context Protocol，MCP）服务器的受�
 
 <a id="triage-reason"></a>
 ### 研判原因
-中台对边缘观察的解释，与边缘观察状态、检查覆盖度五态都不是同一套枚举。**线上 / JSON 只许 proto 全名** `TRIAGE_REASON_*`。边缘观察：`SYNC_DETECTED` / `SYNC_NO_DETECTION` / `INSPECTION_PARTIAL` / `INSPECTION_ERROR`（可叠加）。中台研判：`TRIAGE_REASON_DETECTED_UNMITIGATED`（有键无闸）、`TRIAGE_REASON_DETECTED_UNMAPPED`（有键但不属五类，默认只出报告）、`TRIAGE_REASON_SUSPECTED_MISS`（无键但有独立证据）、`TRIAGE_REASON_INSPECTION_INCOMPLETE` / `TRIAGE_REASON_DETECTOR_FAILURE`。散文可省略前缀，门禁与代码不得用短名。有键时 `SYNC_DETECTED` 优先于覆盖度。普通 `SYNC_NO_DETECTION` 只采样入账，不创建 Agent 指令。映射见 design.md §4.2.2。
+中台对边缘观察的解释，与边缘观察状态、检查覆盖度五态都不是同一套枚举。**线上 / JSON 只许 proto 全名** `TRIAGE_REASON_*`。边缘观察：`SYNC_DETECTED` / `SYNC_NO_DETECTION` / `INSPECTION_PARTIAL` / `INSPECTION_ERROR`（可叠加）。中台研判：`TRIAGE_REASON_DETECTED_UNMITIGATED`（有键无闸）、`TRIAGE_REASON_DETECTED_UNMAPPED`（有键但不属五类，默认只出报告）、`TRIAGE_REASON_SUSPECTED_MISS`（无键但有独立证据）、`TRIAGE_REASON_INSPECTION_INCOMPLETE` / `TRIAGE_REASON_DETECTOR_FAILURE`。散文可省略前缀，门禁与代码不得用短名。有键时 `SYNC_DETECTED` 优先于覆盖度。普通 `SYNC_NO_DETECTION` 只采样入账，不创建 Agent 指令。映射与独立证据闭集见 [`api.md`](api.md) 第 18.1.2 节。
 
 <a id="evidence-class"></a>
 ### 证据类（evidence_class）
