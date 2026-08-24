@@ -71,7 +71,7 @@ func NormalizeModelProfile(profile *artifactv1.ModelProfile) (*artifactv1.ModelP
 	return out, nil
 }
 
-// DefaultModelProfile 返回由 Brain 签发的 0.2.0 基线模型档案。
+// DefaultModelProfile 返回由 Brain 签发的 0.1.0 基线模型档案。
 func DefaultModelProfile() *artifactv1.ModelProfile {
 	return &artifactv1.ModelProfile{
 		ProfileId:                  "http-threat-model/default",

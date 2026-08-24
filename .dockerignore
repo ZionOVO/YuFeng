@@ -4,6 +4,11 @@
 .demo
 .tmp
 .env
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+deploy/secrets
 console/node_modules
 console/dist
 research

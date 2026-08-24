@@ -1,5 +1,5 @@
 #!/bin/sh
-# 企业试点交付证据入口；static 完整验证候选 Git 树，live 只复用已完成引导的真实目标。
+# 客户部署资格诊断入口；static 检查本机源码，live 只复用已完成引导的真实目标。
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -57,7 +57,7 @@ static_evidence() {
     target_arch=${target#*/}
     CGO_ENABLED=0 GOOS=$target_os GOARCH=$target_arch go build ./cmd/yufeng-jarvis ./cmd/yufeng-agentd ./cmd/yufeng-run
   done
-  echo "delivery static evidence passed"
+  echo "deployment static diagnostics passed"
 }
 
 live_evidence() {
@@ -76,7 +76,7 @@ live_evidence() {
   sh scripts/performance-live.sh live
   sh deploy/envoy/run-integration.sh
   sh scripts/backup-restore-live.sh live
-  echo "delivery live evidence passed"
+  echo "deployment live qualification passed"
 }
 
 case "$mode" in

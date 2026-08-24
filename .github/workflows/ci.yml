@@ -1,63 +1,146 @@
-name: develop-integration-confirmation
+name: continuous-integration
 
 on:
+  pull_request:
+    branches: [main]
   push:
-    branches: [develop]
+    branches: [main]
 
 permissions:
-  actions: read
   contents: read
 
 concurrency:
-  group: develop-integration-confirmation
-  cancel-in-progress: true
+  group: continuous-integration-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  confirm:
+  go:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: yufeng_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d yufeng_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      YUFENG_TEST_DSN: postgres://postgres@localhost:5432/yufeng_test?sslmode=disable
+      YUFENG_TRAFFIC_TEST_DSN: postgres://yufeng_traffic:integration-only@localhost:5432/yufeng_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+      - name: Create restricted traffic writer role
+        run: psql "$YUFENG_TEST_DSN" -v ON_ERROR_STOP=1 -c "CREATE ROLE yufeng_traffic LOGIN PASSWORD 'integration-only'"
+      - run: make build test vet
+
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l $(git ls-files '*.go'))"
+      - name: Run consolidated static analysis
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1 run ./...
+      - name: Check reachable Go vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+  proto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Confirm the exact merge tree and successful pull request gate
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+      - run: go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+      - run: go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.20.0
+      - run: buf lint
+        working-directory: proto
+      - run: buf format --diff --exit-code
+        working-directory: proto
+      - name: Select the exact comparison commit
         env:
-          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
         run: |
-          read -r commit base_parent source_parent extra <<< "$(git rev-list --parents -n 1 "$GITHUB_SHA")"
-          test "$commit" = "$GITHUB_SHA"
-          test -n "$base_parent"
-          test -n "$source_parent"
-          test -z "${extra:-}"
-
-          pushed_base=$(jq -r .before "$GITHUB_EVENT_PATH")
-          test "$base_parent" = "$pushed_base"
-          git diff --quiet "$source_parent" "$GITHUB_SHA"
-          test "$(git rev-parse "${source_parent}^{tree}")" = "$(git rev-parse "${GITHUB_SHA}^{tree}")"
-
-          run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/pull-request.yml/runs?event=pull_request&head_sha=${source_parent}&status=completed&per_page=20")
-          conclusion=$(jq -r --arg repository "$GITHUB_REPOSITORY" --arg source "$source_parent" '
-            [.workflow_runs[] | select(
-              .head_sha == $source and
-              .head_repository.full_name == $repository and
-              .conclusion == "success"
-            )][0].conclusion // ""
-          ' <<< "$run_json")
-          run_url=$(jq -r --arg repository "$GITHUB_REPOSITORY" --arg source "$source_parent" '
-            [.workflow_runs[] | select(
-              .head_sha == $source and
-              .head_repository.full_name == $repository and
-              .conclusion == "success"
-            )][0].html_url // ""
-          ' <<< "$run_json")
-          if [[ "$conclusion" != "success" || -z "$run_url" ]]; then
-            echo "source pull request gate is not successful" >&2
-            exit 1
+          comparison_commit="$PULL_REQUEST_BASE"
+          if [ -z "$comparison_commit" ]; then comparison_commit="$PUSH_BASE"; fi
+          if [ -z "$comparison_commit" ] || [ "$comparison_commit" = "0000000000000000000000000000000000000000" ]; then
+            comparison_commit="$(git rev-list --max-parents=0 HEAD)"
           fi
+          git branch --force buf-breaking-baseline "$comparison_commit"
+      - run: buf breaking proto --against '.git#branch=buf-breaking-baseline,subdir=proto'
+      - run: buf generate
+        working-directory: proto
+      - run: git diff --exit-code -- proto/gen
 
-          {
-            echo "develop commit: $GITHUB_SHA"
-            echo "develop tree: $(git rev-parse "${GITHUB_SHA}^{tree}")"
-            echo "base parent: $base_parent"
-            echo "source parent: $source_parent"
-            echo "source pull request gate: $run_url"
-          } >> "$GITHUB_STEP_SUMMARY"
+  console:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+      - run: npm ci
+        working-directory: console
+      - run: npm test
+        working-directory: console
+      - run: npm run lint
+        working-directory: console
+      - run: npm run typecheck
+        working-directory: console
+      - run: npm run build
+        working-directory: console
+
+  cross-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+      - run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./cmd/yufeng-edge ./cmd/yufeng-host
+      - run: CGO_ENABLED=0 GOOS=linux GOARCH=mips go build ./cmd/yufeng-edge ./cmd/yufeng-host
+      - name: Build distributed Agent processes
+        run: |
+          for target in linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64; do
+            target_os="${target%/*}"
+            target_arch="${target#*/}"
+            CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" go build ./cmd/yufeng-jarvis ./cmd/yufeng-agentd ./cmd/yufeng-run
+          done
+
+  required:
+    name: required
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [go, quality, proto, console, cross-compile]
+    steps:
+      - name: Require every finite continuous integration check
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          test "$(wc -w <<< "$RESULTS" | tr -d '[:space:]')" = "5"
+          for result in $RESULTS; do test "$result" = "success"; done

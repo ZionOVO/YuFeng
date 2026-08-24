@@ -173,7 +173,7 @@ Signer / 密钥管理服务
 | ④ | 指令 | 中台→host | `CommandService` | 回执断流视为失败 |
 | ⑤ | 会话 | 人↔贾维斯 | `SessionService` | 即时通讯不是传输 |
 
-`AgentControlService` / `RunService` / `WorkerService` / `ToolGatewayService` 是 Agent 控制面，不计入五契约。`WorkerService` 在 0.2.0 只承载 agentd 的 run 工作项；历史分析车道只保留线缆编码，Brain 不再创建、租赁或完成该类工作。流量模型只走 Edge 邻近 ModelSide 专用契约。
+`AgentControlService` / `RunService` / `WorkerService` / `ToolGatewayService` 是 Agent 控制面，不计入五契约。`WorkerService` 在 0.1.0 只承载 agentd 的 run 工作项；历史分析车道只保留线缆编码，Brain 不再创建、租赁或完成该类工作。流量模型只走 Edge 邻近 ModelSide 专用契约。
 
 六个数据消息（`proto/yufeng/*/v1/v1.proto`）：事件、资产、制品、修复计划、修复程序、工具描述。另加共享枚举 `common/v1`。进程内数据面接口 = Inspector + Gate（均不进 proto）+ 能力令牌声明（`kernel.Claims`）。`Detector.Evaluate` 返回 `Action` 只留给演示规则编译单测，不是目标同步口。
 

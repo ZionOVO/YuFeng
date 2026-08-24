@@ -85,7 +85,7 @@ func TestImplementedCapabilitiesNotDescribedAsMissing(t *testing.T) {
 	}
 }
 
-func TestReleaseDocumentationSeparatesCurrentPointerFromHistoricalEvidence(t *testing.T) {
+func TestReleaseDocumentationSeparatesSoftwareReleaseFromDeploymentEvidence(t *testing.T) {
 	readme := readRepoFile(t, "README.md")
 	delivery := readDoc(t, "delivery-evidence.md")
 	codeMap := readDoc(t, "code-map.md")
@@ -110,37 +110,33 @@ func TestReleaseDocumentationSeparatesCurrentPointerFromHistoricalEvidence(t *te
 		}
 	}
 	if strings.Contains(readme, "| 发布版本 | `v0.0.2`") {
-		t.Fatal("README.md must not hard-code the historical v0.0.2 release as current")
-	}
-	for _, version := range []string{"v0.0.2", "v0.0.3", "v0.0.4", "v0.0.5", "v0.1.0", "v0.2.0"} {
-		if !strings.Contains(delivery, version) {
-			t.Errorf("delivery-evidence.md must explain %s", version)
-		}
+		t.Fatal("README.md must not hard-code a historical release as current")
 	}
 	for _, asset := range []string{
-		"yufeng-v0.2.0-live-evidence.tar.gz",
-		"yufeng-v0.2.0-live-evidence.tar.gz.sha256",
-		"yufeng-v0.2.0-live-evidence.json",
-		"yufeng.release-preflight/v1",
-		"yufeng.release-evidence/v2",
+		"yufeng-v0.1.0-linux-amd64.tar.gz",
+		"yufeng-v0.1.0-modelside-image-linux-amd64.tar.gz",
+		"yufeng-v0.1.0-release-manifest.json",
+		"yufeng-v0.1.0-checksums.txt",
+		"yufeng.software-release/v1",
 	} {
 		if !strings.Contains(delivery, asset) {
-			t.Errorf("delivery-evidence.md must define release evidence asset or schema %q", asset)
+			t.Errorf("delivery-evidence.md must define software release asset or schema %q", asset)
 		}
 	}
-	for _, field := range []string{
-		"release-version=",
-		"evidence-commit=",
-		"evidence-tree=",
-		"evidence-sha256=",
-		"evidence-result=passed",
+	for _, phrase := range []string{
+		"一次",
+		"不可变工作流制品",
+		"禁止覆盖",
+		"重新下载",
+		"部署验收证据",
+		"不撤销或改写已经公开的软件 Release",
 	} {
-		if !strings.Contains(delivery, field) {
-			t.Errorf("delivery-evidence.md must define release metadata field %q", field)
+		if !strings.Contains(delivery, phrase) {
+			t.Errorf("delivery-evidence.md must preserve release convergence rule %q", phrase)
 		}
 	}
-	if !strings.Contains(delivery, "Draft Release") || !strings.Contains(delivery, "不得宣称") {
-		t.Fatal("delivery-evidence.md must keep v0.2.0 conditional until the Draft Release is verified and published")
+	if strings.Contains(delivery, "live-evidence.tar.gz") || strings.Contains(delivery, "release-preflight") {
+		t.Fatal("software Release must not depend on retired deployment evidence archives")
 	}
 	for name, document := range map[string]string{
 		"README.md":                    readme,

@@ -50,7 +50,7 @@
 | UTF-8 / ASCII | 八位统一码转换格式 / 美国信息交换标准代码 | 接口文本编码与审计标签字符范围 |
 | RFC | 互联网征求意见文档（Request for Comments） | 协议规范及其编号的权威来源 |
 | ADR | 架构决策记录（Architecture Decision Record） | `architecture.md` 中按顺序保存的稳定设计决定 |
-| PR | 拉取请求（Pull Request） | 工作分支合入 `develop` 或 `main` 的受审合并单元 |
+| PR | 拉取请求（Pull Request） | 短命工作分支合入 `main` 的受审合并单元 |
 | TLCP | 传输层密码协议（Transport Layer Cryptography Protocol） | 政企入口可先终止的国密传输协议 |
 | SOC | 安全运营中心（Security Operations Center） | 控制台视觉主题和运营使用场景 |
 | KEV / EPSS | 已知被利用漏洞清单 / 漏洞利用预测评分系统 | 历史产品构想中的漏洞情报来源与风险评分 |
@@ -425,27 +425,23 @@ Edge 亲和的独立 `yufeng-modelside` Python 服务：从 Edge 接收[规范�
 
 <a id="adr"></a>
 ### ADR（架构决策记录）
-Architecture Decision Record：架构决策记录，按编号存档决策与一句话理由，见 [architecture.md](architecture.md) 附录（当前 001–037）。
+Architecture Decision Record：架构决策记录，按编号存档决策与一句话理由，见 [architecture.md](architecture.md) 附录（当前 001–038）。
 
 <a id="git-tree-identity"></a>
 ### Git 树内容身份（Git tree identity）
-Git 提交中由根树对象摘要标识的完整文件内容，不包含提交消息、作者、时间和父提交谱系。两次提交的根树摘要完全相同时，仓库受版本控制的文件逐字节相同；软件发布用它判断是否可以复用已经完成的昂贵验证，但仍须单独验证最终提交的父提交和远端持续集成。
+Git 提交中由根树对象摘要标识的完整文件内容，不包含提交消息、作者、时间和父提交谱系。两次提交的根树摘要完全相同时，仓库受版本控制的文件逐字节相同；软件发布只把它作为源码来源记录，不能用它代替最终上传文件的摘要。
 
-<a id="release-stabilization-branch"></a>
-### 发布稳定分支（Release stabilization branch）
-从冻结的 `develop` 精确提交创建、命名为 `release/vX.Y.Z` 的短期工作分支。发布问题只在该分支集中修复；准备合并前以它和冻结基线计算预期合并 Git 树。它只能通过一次拉取请求合入 `develop`，不能绕过日常快速门禁或成为长期集成分支。
+<a id="release-acceptance-contract"></a>
+### 发布验收合同（release acceptance contract）
+版本变更拉取请求中冻结的有限阻断条件集合。条件只覆盖已声明的安全边界、数据完整性、网络契约、构建失败与制品不可用；智能代理后来发现但未违反这些条件的问题必须报告并延期，不能自行把它升级为当前版本的发布阻断项。
 
-<a id="release-preflight"></a>
-### 发布预检（Release preflight）
-在临时工作树中对发布稳定分支与冻结 `develop` 的预期合并 Git 树执行的一次完整本机静态验收。归档绑定版本、基线提交、发布分支提交、Git 树、环境指纹、有效期、普通与竞态语义、构建标签、格式化、综合静态分析、漏洞、消息契约、控制台、交叉编译和热路径基准；不启动 Docker 活栈。修复期间可以只重跑失败项，准备合并前必须完整运行一次。
+<a id="software-release-artifact-set"></a>
+### 软件发布制品集（software release artifact set）
+发布工作流从持续集成成功的精确 `main` 提交一次构建出的全部二进制、控制台、Python 包、部署包和容器镜像归档。清单记录每个文件的名称、字节数与安全哈希算法 256 位摘要；验证、恢复上传和公开 Release 必须复用同一批文件，禁止重建或覆盖同名资产。
 
-<a id="evidence-promotion"></a>
-### 证据提升（Evidence promotion）
-发布稳定分支合入 `develop` 后，把已经绑定 Git 树的发布预检归档绑定到最终 `develop` 合并提交的装配步骤。它先验证最终 Git 树、两个父提交、环境指纹、有效期和精确提交远端持续集成，再只补一次 Docker 活栈、数据库源备份与恢复、五场景性能和秘密扫描，最后生成提交谱系、发布元数据与公开证据清单；不重跑任何静态套件或热路径基准。
-
-<a id="release-environment-fingerprint"></a>
-### 发布环境指纹（Release environment fingerprint）
-对发布预检所依赖的 Apple 硬件、操作系统、Go / Node.js / npm / Buf / Docker / Docker Compose 工具链、Compose 配置以及本地模型权重摘要进行确定性编码后取得的安全哈希算法 256 位摘要。证据提升时必须重新计算并完全相同；任何差异都会使预检失效。
+<a id="deployment-qualification-evidence"></a>
+### 部署验收证据（deployment qualification evidence）
+把已公开软件发布清单中的制品摘要绑定到某个试点或客户环境的活栈、恢复、容量、安全与变更责任记录。它证明该批制品在该环境中的运行结果，不改变软件版本的发布状态，也不能作为覆盖 GitHub Release 资产的理由。
 
 <a id="modelgateway"></a>
 ### 模型网关（modelgateway）

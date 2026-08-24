@@ -1,14 +1,11 @@
-name: tagged-release
+name: software-release
 
 on:
-  push:
-    tags:
-      - "v[0-9]*.[0-9]*.[0-9]*"
   workflow_dispatch:
     inputs:
-      release_version:
-        description: VERSION 中已创建 Draft Release 的注解标签
-        required: true
+      bundle_run_id:
+        description: 仅恢复中断发布时填写原始工作流运行标识；留空会执行唯一一次构建
+        required: false
         type: string
 
 permissions:
@@ -16,60 +13,79 @@ permissions:
   contents: write
 
 concurrency:
-  group: tagged-release-${{ github.event_name == 'push' && github.ref_name || inputs.release_version }}
+  group: software-release
   cancel-in-progress: false
 
 jobs:
-  draft-release:
-    if: github.event_name == 'push'
+  release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
-      - name: Require the VERSION annotation and increasing semantic version
+
+      - name: Select a fresh main commit or the original immutable bundle source
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          REQUESTED_BUNDLE_RUN: ${{ inputs.bundle_run_id }}
         run: |
-          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
-          test "$RELEASE_TAG" = "$(tr -d '[:space:]' < VERSION)"
-          # checkout 会把本地标签引用改写为剥离后的提交，注解标签必须通过远端的标签对象与剥离引用共同确认。
-          remote_tag_refs="$(git ls-remote --tags origin "refs/tags/${RELEASE_TAG}" "refs/tags/${RELEASE_TAG}^{}")"
-          remote_tag_object="$(awk '$2 !~ /\^\{\}$/ { print $1 }' <<<"$remote_tag_refs")"
-          remote_tag_commit="$(awk '$2 ~ /\^\{\}$/ { print $1 }' <<<"$remote_tag_refs")"
-          test -n "$remote_tag_object"
-          test "$remote_tag_commit" = "$GITHUB_SHA"
-          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/release-evidence-${GITHUB_RUN_ID}"
-          git for-each-ref --format='%(contents)' "refs/tags/release-evidence-${GITHUB_RUN_ID}" > "$RUNNER_TEMP/release-tag-message.txt"
-          previous_tag="$(git tag --merged "$GITHUB_SHA" --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | awk -v current="$RELEASE_TAG" '$0 != current { print; exit }')"
-          if [ -n "$previous_tag" ]; then
-            greatest_tag="$(printf '%s\n%s\n' "$previous_tag" "$RELEASE_TAG" | sort -V | tail -n 1)"
-            test "$greatest_tag" = "$RELEASE_TAG"
+          set -euo pipefail
+          git fetch --force origin main
+          source_commit=""
+          effective_run="$GITHUB_RUN_ID"
+          recovery=false
+          if [ -n "$REQUESTED_BUNDLE_RUN" ]; then
+            [[ "$REQUESTED_BUNDLE_RUN" =~ ^[0-9]+$ ]]
+            test "$REQUESTED_BUNDLE_RUN" != "$GITHUB_RUN_ID"
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${REQUESTED_BUNDLE_RUN}" > "$RUNNER_TEMP/source-run.json"
+            test "$(jq -r '.repository.full_name' "$RUNNER_TEMP/source-run.json")" = "$GITHUB_REPOSITORY"
+            test "$(jq -r '.path' "$RUNNER_TEMP/source-run.json")" = ".github/workflows/release.yml"
+            test "$(jq -r '.event' "$RUNNER_TEMP/source-run.json")" = "workflow_dispatch"
+            test "$(jq -r '.head_branch' "$RUNNER_TEMP/source-run.json")" = "main"
+            test "$(jq -r '.status' "$RUNNER_TEMP/source-run.json")" = "completed"
+            source_commit="$(jq -r '.head_sha' "$RUNNER_TEMP/source-run.json")"
+            git cat-file -e "${source_commit}^{commit}"
+            git checkout --detach "$source_commit"
+            effective_run="$REQUESTED_BUNDLE_RUN"
+            recovery=true
+          else
+            source_commit="$(git rev-parse HEAD)"
+            test "$source_commit" = "$GITHUB_SHA"
+            test "$source_commit" = "$(git rev-parse origin/main)"
           fi
-      - name: Require the current main merge of the evidenced develop commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          git fetch origin main develop
-          test "$GITHUB_SHA" = "$(git rev-parse origin/main)"
-          read -r -a parents <<<"$(git rev-list --parents -n 1 "$GITHUB_SHA")"
-          test "${#parents[@]}" -eq 3
-          develop_parent="${parents[2]}"
-          git merge-base --is-ancestor "$develop_parent" origin/develop
-          read -r -a evidence_parents <<<"$(git rev-list --parents -n 1 "$develop_parent")"
-          test "${#evidence_parents[@]}" -eq 3
-          test "$(git rev-parse "${evidence_parents[2]}^{tree}")" = "$(git rev-parse "${develop_parent}^{tree}")"
-          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=develop&event=push&head_sha=${develop_parent}&per_page=1" --jq '.workflow_runs[0].conclusion // ""')"
-          if [ "$conclusion" != "success" ]; then
-            echo "develop continuous integration has not succeeded for ${develop_parent}" >&2
-            exit 1
+
+          version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          plain_version="${version#v}"
+          test "$plain_version" = "$(node -p "require('./console/package.json').version")"
+          test "$plain_version,$plain_version" = "$(node -p "[require('./console/package-lock.json').version, require('./console/package-lock.json').packages[''].version].join(',')")"
+          test "$plain_version" = "$(python3 -c 'import tomllib; print(tomllib.load(open("components/modelside/pyproject.toml", "rb"))["project"]["version"])')"
+          test "$plain_version" = "$(python3 -c 'import sys; sys.path.insert(0, "components/modelside"); import yufeng_modelside; print(yufeng_modelside.__version__)')"
+
+          successful_ci="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&head_sha=${source_commit}&per_page=20" --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')"
+          test "$successful_ci" -ge 1
+          if [ "$recovery" = false ]; then
+            if git ls-remote --exit-code --tags origin "refs/tags/$version" >/dev/null 2>&1; then
+              echo "release tag already exists: $version" >&2
+              exit 1
+            fi
+            if gh release view "$version" >/dev/null 2>&1; then
+              echo "release already exists: $version" >&2
+              exit 1
+            fi
           fi
-          python3 scripts/release-metadata.py verify \
-            --file "$RUNNER_TEMP/release-tag-message.txt" \
-            --expected-version "$RELEASE_TAG" \
-            --expected-commit "$develop_parent" \
-            --expected-tree "$(git rev-parse "${develop_parent}^{tree}")"
+
+          echo "RELEASE_TAG=$version" >> "$GITHUB_ENV"
+          echo "SOURCE_COMMIT=$source_commit" >> "$GITHUB_ENV"
+          echo "BUNDLE_RUN_ID=$effective_run" >> "$GITHUB_ENV"
+          echo "RECOVERY=$recovery" >> "$GITHUB_ENV"
+          echo "BUNDLE_DIR=$RUNNER_TEMP/release-bundle" >> "$GITHUB_ENV"
+          echo "STORED_BUNDLE_DIR=$RUNNER_TEMP/stored-release-bundle" >> "$GITHUB_ENV"
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.27.0"
@@ -78,196 +94,125 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: console/package-lock.json
-      - name: Build Linux release binaries
+
+      - name: Build and seal the software artifact set exactly once
+        if: inputs.bundle_run_id == ''
+        run: ./scripts/build-release-assets.sh "$BUNDLE_DIR"
+
+      - name: Download the original immutable bundle without rebuilding
+        if: inputs.bundle_run_id != ''
+        run: gh run download "$BUNDLE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "yufeng-$RELEASE_TAG-release-bundle" --dir "$BUNDLE_DIR"
+
+      - name: Validate the exact files before storing or publishing them
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}
+          RELEASE_WORKFLOW_RUN: ${{ env.BUNDLE_RUN_ID }}
+        run: ./scripts/verify-release-assets.sh "$BUNDLE_DIR"
+
+      - name: Store the immutable release bundle before creating a tag
+        if: inputs.bundle_run_id == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: yufeng-${{ env.RELEASE_TAG }}-release-bundle
+          path: ${{ env.BUNDLE_DIR }}/*
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
+          retention-days: 90
+
+      - name: Download the just-stored workflow bundle to a new directory
+        if: inputs.bundle_run_id == ''
+        uses: actions/download-artifact@v4
+        with:
+          name: yufeng-${{ env.RELEASE_TAG }}-release-bundle
+          path: ${{ env.STORED_BUNDLE_DIR }}
+
+      - name: Prove the workflow bundle is byte-identical
+        if: inputs.bundle_run_id == ''
         run: |
-          mkdir -p release/linux-amd64/bin release/linux-arm64/bin release/linux-mips/bin \
-            release/windows-amd64/bin release/darwin-amd64/bin release/darwin-arm64/bin
-          built_at="$(git show -s --format=%cI "$GITHUB_SHA")"
-          linker_flags="-X main.version=${RELEASE_TAG} -X main.sha=${GITHUB_SHA} -X main.builtAt=${built_at}"
-          commands=(yfctl yufeng-agentd yufeng-brain yufeng-dataplane yufeng-edge yufeng-host yufeng-jarvis yufeng-run)
-          for command in "${commands[@]}"; do
-            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$linker_flags" -o "release/linux-amd64/bin/${command}" "./cmd/${command}"
-          done
-          for architecture in arm64 mips; do
-            for command in yufeng-edge yufeng-host; do
-              CGO_ENABLED=0 GOOS=linux GOARCH="$architecture" go build -trimpath -ldflags "$linker_flags" -o "release/linux-${architecture}/bin/${command}" "./cmd/${command}"
-            done
-          done
-          for command in yufeng-jarvis yufeng-agentd yufeng-run; do
-            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$linker_flags" -o "release/linux-arm64/bin/${command}" "./cmd/${command}"
-            CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$linker_flags" -o "release/windows-amd64/bin/${command}.exe" "./cmd/${command}"
-            CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "$linker_flags" -o "release/darwin-amd64/bin/${command}" "./cmd/${command}"
-            CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "$linker_flags" -o "release/darwin-arm64/bin/${command}" "./cmd/${command}"
-          done
-      - name: Build console release
+          set -euo pipefail
+          expected="$(find "$BUNDLE_DIR" -maxdepth 1 -type f -exec basename {} \; | sort)"
+          actual="$(find "$STORED_BUNDLE_DIR" -maxdepth 1 -type f -exec basename {} \; | sort)"
+          test "$expected" = "$actual"
+          while IFS= read -r asset; do
+            cmp "$BUNDLE_DIR/$asset" "$STORED_BUNDLE_DIR/$asset"
+          done <<< "$expected"
+          RELEASE_WORKFLOW_RUN="$BUNDLE_RUN_ID" python3 scripts/release-artifacts.py verify \
+            --directory "$STORED_BUNDLE_DIR" --version "$RELEASE_TAG" \
+            --source-commit "$SOURCE_COMMIT" --workflow-run "$BUNDLE_RUN_ID"
+
+      - name: Create or verify the annotated tag after bundle preservation
         run: |
-          npm ci
-          npm run build
-        working-directory: console
-      - name: Add native service installers and ModelSide Python package
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          for directory in linux-amd64 linux-arm64 windows-amd64 darwin-amd64 darwin-arm64; do
-            mkdir -p "release/${directory}/agentd"
-            cp deploy/agentd/README.md "release/${directory}/agentd/"
-          done
-          cp deploy/agentd/install-linux.sh release/linux-amd64/agentd/
-          cp deploy/agentd/install-linux.sh release/linux-arm64/agentd/
-          cp deploy/agentd/install-macos.sh release/darwin-amd64/agentd/
-          cp deploy/agentd/install-macos.sh release/darwin-arm64/agentd/
-          cp deploy/agentd/Install-Windows.ps1 release/windows-amd64/agentd/
-          chmod +x release/linux-amd64/agentd/install-linux.sh release/linux-arm64/agentd/install-linux.sh \
-            release/darwin-amd64/agentd/install-macos.sh release/darwin-arm64/agentd/install-macos.sh
-          for directory in linux-amd64 linux-arm64 linux-mips; do
-            mkdir -p "release/${directory}/edge"
-            cp deploy/edge/README.md deploy/edge/edge.env.example deploy/edge/yufeng-edge.service \
-              deploy/edge/install-linux.sh "release/${directory}/edge/"
-            chmod +x "release/${directory}/edge/install-linux.sh"
-          done
-          mkdir -p release/modelside-python/wheels release/modelside-python/service release/deployment
-          python3 -m pip wheel --no-deps --wheel-dir release/modelside-python/wheels components/modelside
-          test "${RELEASE_TAG#v}" = "$(python3 -c 'import tomllib; print(tomllib.load(open("components/modelside/pyproject.toml", "rb"))["project"]["version"])')"
-          cp components/modelside/README.md release/modelside-python/
-          cp deploy/modelside/README.md deploy/modelside/modelside.env.example deploy/modelside/yufeng-modelside.service \
-            release/modelside-python/service/
-          cp deploy/compose.yaml deploy/compose.edge-modelside.yaml deploy/.env.example deploy/README.md release/deployment/
-          cp -R deploy/edge deploy/modelside deploy/secrets release/deployment/
-      - name: Build deliverable Edge and ModelSide container images
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          built_at="$(git show -s --format=%cI "$GITHUB_SHA")"
-          docker build --platform linux/amd64 \
-            --build-arg VERSION="$RELEASE_TAG" --build-arg SHA="$GITHUB_SHA" --build-arg BUILT_AT="$built_at" \
-            -f deploy/edge.Dockerfile -t "yufeng-edge:${RELEASE_TAG}" .
-          docker build --platform linux/amd64 \
-            --build-arg VERSION="$RELEASE_TAG" --build-arg SHA="$GITHUB_SHA" --build-arg BUILT_AT="$built_at" \
-            -f components/modelside/Dockerfile -t "yufeng-modelside:${RELEASE_TAG}" .
-          docker save "yufeng-edge:${RELEASE_TAG}" | gzip -n > "release/yufeng-${RELEASE_TAG}-edge-image-linux-amd64.tar.gz"
-          docker save "yufeng-modelside:${RELEASE_TAG}" | gzip -n > "release/yufeng-${RELEASE_TAG}-modelside-image-linux-amd64.tar.gz"
-      - name: Package release artifacts
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          cp -R console/dist release/console
-          for directory in linux-amd64 linux-arm64 linux-mips windows-amd64 darwin-amd64 darwin-arm64 console modelside-python deployment; do
-            tar -czf "release/yufeng-${RELEASE_TAG}-${directory}.tar.gz" -C release "$directory"
-          done
-          cd release
-          sha256sum ./*.tar.gz > "yufeng-${RELEASE_TAG}-checksums.txt"
-      - name: Create or refresh the Draft Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = "true"
-            gh release upload "$RELEASE_TAG" release/*.tar.gz release/*-checksums.txt --clobber
-            gh release edit "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-tag-message.txt"
+          set -euo pipefail
+          remote_refs="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")"
+          if [ -z "$remote_refs" ]; then
+            manifest_sha="$(sha256sum "$BUNDLE_DIR/yufeng-$RELEASE_TAG-release-manifest.json" | awk '{print $1}')"
+            printf -v tag_message 'YuFeng %s software release\n\nsource-commit=%s\nworkflow-run=%s\nmanifest-sha256=%s' \
+              "$RELEASE_TAG" "$SOURCE_COMMIT" "$BUNDLE_RUN_ID" "$manifest_sha"
+            git tag -a "$RELEASE_TAG" "$SOURCE_COMMIT" -m "$tag_message"
+            git push origin "refs/tags/$RELEASE_TAG"
           else
-            gh release create "$RELEASE_TAG" release/*.tar.gz release/*-checksums.txt \
-              --verify-tag --draft --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-tag-message.txt"
+            test "$RECOVERY" = "true"
+            tag_object="$(awk '$2 !~ /\^\{\}$/ {print $1}' <<< "$remote_refs")"
+            tag_commit="$(awk '$2 ~ /\^\{\}$/ {print $1}' <<< "$remote_refs")"
+            test -n "$tag_object"
+            test "$tag_commit" = "$SOURCE_COMMIT"
+            git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/release-verify-$GITHUB_RUN_ID"
+            test "$(git cat-file -t "refs/tags/release-verify-$GITHUB_RUN_ID")" = "tag"
           fi
 
-  publish-release:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    env:
-      RELEASE_TAG: ${{ inputs.release_version }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: refs/tags/${{ inputs.release_version }}
-      - name: Recheck VERSION, annotation, main and evidenced develop parent
+      - name: Create or resume the Draft Release without overwriting assets
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/release-notes.md"
+          printf '# YuFeng %s\n\nSource commit: `%s`\n\nThe release manifest is the authority for this fixed software artifact set. Deployment qualification is recorded separately.\n' \
+            "$RELEASE_TAG" "$SOURCE_COMMIT" > "$notes"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$RECOVERY" = "true"
+            test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = "true"
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes-file "$notes"
+          fi
+
+          expected_assets="$RUNNER_TEMP/expected-assets.txt"
+          existing_assets="$RUNNER_TEMP/existing-assets.txt"
+          find "$BUNDLE_DIR" -maxdepth 1 -type f -exec basename {} \; | sort > "$expected_assets"
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort > "$existing_assets"
+          if comm -13 "$expected_assets" "$existing_assets" | grep -q .; then
+            echo "Draft Release contains an unexpected asset" >&2
+            comm -13 "$expected_assets" "$existing_assets" >&2
+            exit 1
+          fi
+
+          existing_dir="$RUNNER_TEMP/existing-release-assets"
+          mkdir -p "$existing_dir"
+          while IFS= read -r asset; do
+            [ -n "$asset" ] || continue
+            gh release download "$RELEASE_TAG" --pattern "$asset" --dir "$existing_dir"
+            cmp "$BUNDLE_DIR/$asset" "$existing_dir/$asset"
+          done < "$existing_assets"
+          while IFS= read -r asset; do
+            if ! grep -Fxq "$asset" "$existing_assets"; then
+              gh release upload "$RELEASE_TAG" "$BUNDLE_DIR/$asset"
+            fi
+          done < "$expected_assets"
+
+      - name: Redownload and verify every Draft Release byte
         env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_SOURCE_COMMIT: ${{ env.SOURCE_COMMIT }}
+          RELEASE_WORKFLOW_RUN: ${{ env.BUNDLE_RUN_ID }}
         run: |
-          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
-          test "$RELEASE_TAG" = "$(tr -d '[:space:]' < VERSION)"
-          git fetch origin main develop
-          remote_tag_refs="$(git ls-remote --tags origin "refs/tags/${RELEASE_TAG}" "refs/tags/${RELEASE_TAG}^{}")"
-          remote_tag_object="$(awk '$2 !~ /\^\{\}$/ { print $1 }' <<<"$remote_tag_refs")"
-          release_commit="$(awk '$2 ~ /\^\{\}$/ { print $1 }' <<<"$remote_tag_refs")"
-          test -n "$remote_tag_object"
-          test "$release_commit" = "$(git rev-parse origin/main)"
-          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/release-publish-${GITHUB_RUN_ID}"
-          git for-each-ref --format='%(contents)' "refs/tags/release-publish-${GITHUB_RUN_ID}" > "$RUNNER_TEMP/release-tag-message.txt"
-          read -r -a parents <<<"$(git rev-list --parents -n 1 "$release_commit")"
-          test "${#parents[@]}" -eq 3
-          develop_parent="${parents[2]}"
-          git merge-base --is-ancestor "$develop_parent" origin/develop
-          read -r -a evidence_parents <<<"$(git rev-list --parents -n 1 "$develop_parent")"
-          test "${#evidence_parents[@]}" -eq 3
-          evidence_base_parent="${evidence_parents[1]}"
-          evidence_source_parent="${evidence_parents[2]}"
-          test "$(git rev-parse "${evidence_source_parent}^{tree}")" = "$(git rev-parse "${develop_parent}^{tree}")"
-          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=develop&event=push&head_sha=${develop_parent}&per_page=1" --jq '.workflow_runs[0].conclusion // ""')"
-          test "$conclusion" = "success"
-          python3 scripts/release-metadata.py verify \
-            --file "$RUNNER_TEMP/release-tag-message.txt" \
-            --expected-version "$RELEASE_TAG" \
-            --expected-commit "$develop_parent" \
-            --expected-tree "$(git rev-parse "${develop_parent}^{tree}")"
-          evidence_sha256="$(python3 scripts/release-metadata.py get --file "$RUNNER_TEMP/release-tag-message.txt" --field evidence-sha256)"
-          echo "EVIDENCE_COMMIT=${develop_parent}" >> "$GITHUB_ENV"
-          echo "EVIDENCE_TREE=$(git rev-parse "${develop_parent}^{tree}")" >> "$GITHUB_ENV"
-          echo "EVIDENCE_SHA256=${evidence_sha256}" >> "$GITHUB_ENV"
-          echo "EVIDENCE_BASE_PARENT=${evidence_base_parent}" >> "$GITHUB_ENV"
-          echo "EVIDENCE_SOURCE_PARENT=${evidence_source_parent}" >> "$GITHUB_ENV"
-      - name: Require the exact Draft Release asset set
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = "true"
-          test "$(gh release view "$RELEASE_TAG" --json tagName --jq .tagName)" = "$RELEASE_TAG"
-          gh release view "$RELEASE_TAG" --json body --jq .body > "$RUNNER_TEMP/release-body.txt"
-          python3 scripts/release-metadata.py verify \
-            --file "$RUNNER_TEMP/release-body.txt" \
-            --expected-version "$RELEASE_TAG" \
-            --expected-commit "$EVIDENCE_COMMIT" \
-            --expected-tree "$EVIDENCE_TREE" \
-            --expected-sha256 "$EVIDENCE_SHA256" \
-            --expected-base-commit "$EVIDENCE_BASE_PARENT" \
-            --expected-source-commit "$EVIDENCE_SOURCE_PARENT"
-          mkdir -p "$RUNNER_TEMP/release-assets"
-          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/release-assets"
-          expected_assets=(
-            "yufeng-${RELEASE_TAG}-linux-amd64.tar.gz"
-            "yufeng-${RELEASE_TAG}-linux-arm64.tar.gz"
-            "yufeng-${RELEASE_TAG}-linux-mips.tar.gz"
-            "yufeng-${RELEASE_TAG}-windows-amd64.tar.gz"
-            "yufeng-${RELEASE_TAG}-darwin-amd64.tar.gz"
-            "yufeng-${RELEASE_TAG}-darwin-arm64.tar.gz"
-            "yufeng-${RELEASE_TAG}-console.tar.gz"
-            "yufeng-${RELEASE_TAG}-modelside-python.tar.gz"
-            "yufeng-${RELEASE_TAG}-deployment.tar.gz"
-            "yufeng-${RELEASE_TAG}-edge-image-linux-amd64.tar.gz"
-            "yufeng-${RELEASE_TAG}-modelside-image-linux-amd64.tar.gz"
-            "yufeng-${RELEASE_TAG}-checksums.txt"
-            "yufeng-${RELEASE_TAG}-live-evidence.tar.gz"
-            "yufeng-${RELEASE_TAG}-live-evidence.tar.gz.sha256"
-            "yufeng-${RELEASE_TAG}-live-evidence.json"
-          )
-          printf '%s\n' "${expected_assets[@]}" | sort > "$RUNNER_TEMP/expected-assets.txt"
-          find "$RUNNER_TEMP/release-assets" -maxdepth 1 -type f -exec basename {} \; | sort > "$RUNNER_TEMP/actual-assets.txt"
-          diff -u "$RUNNER_TEMP/expected-assets.txt" "$RUNNER_TEMP/actual-assets.txt"
-          (cd "$RUNNER_TEMP/release-assets" && sha256sum --check "yufeng-${RELEASE_TAG}-checksums.txt")
-      - name: Recheck the uploaded live evidence archive
-        run: |
-          assets="$RUNNER_TEMP/release-assets"
-          python3 scripts/release-evidence.py verify \
-            --manifest "$assets/yufeng-${RELEASE_TAG}-live-evidence.json" \
-            --archive "$assets/yufeng-${RELEASE_TAG}-live-evidence.tar.gz" \
-            --checksum "$assets/yufeng-${RELEASE_TAG}-live-evidence.tar.gz.sha256" \
-            --expected-version "$RELEASE_TAG" \
-            --expected-commit "$EVIDENCE_COMMIT" \
-            --expected-tree "$EVIDENCE_TREE" \
-            --expected-sha256 "$EVIDENCE_SHA256"
+          set -euo pipefail
+          downloaded="$RUNNER_TEMP/downloaded-release-assets"
+          mkdir -p "$downloaded"
+          gh release download "$RELEASE_TAG" --dir "$downloaded"
+          expected="$(find "$BUNDLE_DIR" -maxdepth 1 -type f -exec basename {} \; | sort)"
+          actual="$(find "$downloaded" -maxdepth 1 -type f -exec basename {} \; | sort)"
+          test "$expected" = "$actual"
+          while IFS= read -r asset; do
+            cmp "$BUNDLE_DIR/$asset" "$downloaded/$asset"
+          done <<< "$expected"
+          ./scripts/verify-release-assets.sh "$downloaded"
+
       - name: Publish the verified Release
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: gh release edit "$RELEASE_TAG" --draft=false --latest
