@@ -22,6 +22,8 @@ func TestReleaseWorkflowPromotesOneImmutableBundle(t *testing.T) {
 		"actions/download-artifact@v4",
 		"gh run download \"$BUNDLE_RUN_ID\"",
 		"cmp \"$BUNDLE_DIR/$asset\"",
+		"git config user.name \"github-actions[bot]\"",
+		"git config user.email \"41898282+github-actions[bot]@users.noreply.github.com\"",
 		"git tag -a \"$RELEASE_TAG\"",
 		"--verify-tag --draft",
 		"gh release upload \"$RELEASE_TAG\" \"$BUNDLE_DIR/$asset\"",
