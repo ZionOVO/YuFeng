@@ -2109,10 +2109,10 @@ Envoy 的授权服务超时必须大于 `ExtAuthzTimeout`，参考配置为 100m
 | `profile_id` / `model_group` / `model_type` / `model_version` | 均非空；结果必须原样引用 |
 | `alert_threshold` | `[0,1]`，且严格大于 `review_floor` |
 | `review_floor` | `[0,1]` |
-| `review_window_seconds` | 正整数；0.2.0 基线由 Brain 签为 300 秒 |
-| `max_review_per_unit` | 正整数；0.2.0 基线为每单元每窗 4 个代表 |
-| `max_review_per_route` | 正整数；0.2.0 基线为同方法与路由每窗 1 个最高风险代表 |
-| `dedupe_rule` | 0.2.0 只许 `MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE` |
+| `review_window_seconds` | 正整数；0.1.0 基线由 Brain 签为 300 秒 |
+| `max_review_per_unit` | 正整数；0.1.0 基线为每单元每窗 4 个代表 |
+| `max_review_per_route` | 正整数；0.1.0 基线为同方法与路由每窗 1 个最高风险代表 |
+| `dedupe_rule` | 0.1.0 只许 `MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE` |
 | `allowed_headers` | 规范化小写、去重升序；未列出的请求头禁止进入模型 |
 | `max_body_bytes` | 正整数且不超过 Edge 同路由检查正文上限 |
 | `review_new_routes` / `review_insufficient_coverage` | 是否因新路由或检查覆盖不足产生复核样本 |
@@ -2139,7 +2139,7 @@ Envoy 的授权服务超时必须大于 `ExtAuthzTimeout`，参考配置为 100m
 - `review_floor <= score < alert_threshold`，或签名档案启用且命中新路由、检查覆盖不足条件：生成 `REVIEW_SAMPLE`；
 - 其余结果只计推理指标，不上报。
 
-复核采样按签名 `review_window_seconds` 使用事件时间窗。每个单元每窗最多 `max_review_per_unit` 个代表；同一 `method + route` 最多 `max_review_per_route` 个，0.2.0 的唯一去重规则只保留风险最高者。较高风险结果可在尚未发送前替换较低风险代表。ModelSide 负责第一层有界采样，Brain 在接收事务中按同一签名档案再次校验窗口、上限与去重，防止被篡改客户端放大。
+复核采样按签名 `review_window_seconds` 使用事件时间窗。每个单元每窗最多 `max_review_per_unit` 个代表；同一 `method + route` 最多 `max_review_per_route` 个，0.1.0 的唯一去重规则只保留风险最高者。较高风险结果可在尚未发送前替换较低风险代表。ModelSide 负责第一层有界采样，Brain 在接收事务中按同一签名档案再次校验窗口、上限与去重，防止被篡改客户端放大。
 
 ModelSide 将结果写入独立有界内存队列，由后台批量调用 `ModelResultService.UploadResults`。Brain 断连不停止本地推理；发送器指数退避，队列满时按上述优先级丢弃并计数。标准路径不把原始流量、结果队列或重试状态同步写磁盘，因此磁盘变慢不会反压 Edge；进程崩溃允许丢失尚未上报的旁路结果，不能为追求持久化破坏请求延迟边界。
 

@@ -65,7 +65,7 @@ func TestDataPlaneDocumentationAligned(t *testing.T) {
 	}
 
 	requireContains(t, "implementation-plan.md Edge 模型旁路", implementationPlan,
-		"0.2.0 Edge 人工生命周期", "components/modelside", "五种异步旁路场景")
+		"0.1.0 Edge 人工生命周期", "components/modelside", "五种异步旁路场景")
 	requireContains(t, "AGENTS.md 项目速览", section(agents, "## 0. ", "## 1. "),
 		"流量拦截层的生产语义", "客户上线")
 

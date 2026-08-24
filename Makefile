@@ -1,4 +1,4 @@
-.PHONY: build test test-development vet tidy generate demo-init run up compose-up compose-down compose-live compose-live-reset resilience-live security-live traffic-review-live performance-live backup-restore-live envoy-live delivery-evidence preflight-release-evidence archive-live-evidence
+.PHONY: build test test-development vet tidy generate demo-init run up compose-up compose-down compose-live compose-live-reset resilience-live security-live traffic-review-live performance-live backup-restore-live envoy-live delivery-evidence release-assets verify-release-assets
 
 build:
 	go build ./...
@@ -85,22 +85,14 @@ backup-restore-live:
 envoy-live:
 	./deploy/envoy/run-integration.sh
 
-# 企业试点交付证据：默认跑无容器的完整静态门禁。
+# 客户部署资格诊断：默认跑无容器的完整静态检查，不参与软件 Release 身份。
 delivery-evidence:
 	./scripts/delivery-evidence.sh static
 
-# 对发布稳定分支的预期合并 Git 树归档完整本机静态预检。
-preflight-release-evidence:
-	./scripts/preflight-release-evidence.sh
+# 从当前提交构建并封存一次软件发布制品集。
+release-assets:
+	./scripts/build-release-assets.sh "$${RELEASE_OUTPUT:-dist/release}"
 
-# 对精确 develop 合并提交只补活栈，并与静态预检装配最终发布证据。
-archive-live-evidence:
-	test -n "$(YUFENG_CI_URL)"
-	test -n "$(YUFENG_PREFLIGHT_MANIFEST)"
-	test -n "$(YUFENG_PREFLIGHT_ARCHIVE)"
-	test -n "$(YUFENG_PREFLIGHT_CHECKSUM)"
-	./scripts/archive-live-evidence.sh \
-		--ci-url "$(YUFENG_CI_URL)" \
-		--preflight-manifest "$(YUFENG_PREFLIGHT_MANIFEST)" \
-		--preflight-archive "$(YUFENG_PREFLIGHT_ARCHIVE)" \
-		--preflight-checksum "$(YUFENG_PREFLIGHT_CHECKSUM)"
+# 复核已经构建的软件发布制品集，不重新构建。
+verify-release-assets:
+	./scripts/verify-release-assets.sh "$${RELEASE_OUTPUT:-dist/release}"

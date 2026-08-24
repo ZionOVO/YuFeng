@@ -59,28 +59,23 @@ npm run typecheck
 npm run build
 ```
 
-准备发布时，从冻结的 `develop` 创建 `release/vX.Y.Z`。提交前先运行定向测试和 `make build test vet`；准备推送最终候选时，对预期合并 Git 树完整运行一次竞态、漏洞与静态分析、Protocol Buffers 消息契约、控制台交付构建、跨平台编译和 Apple M4 Pro 热路径基准：
+日常变更从短命工作分支向 `main` 提交拉取请求；`continuous-integration / required` 通过后合入。准备发布时，先在版本拉取请求里冻结有限验收合同，再对已经通过 `main` 持续集成的精确提交只构建一次软件制品集：
 
 ```sh
-export YUFENG_EDGE_UNIT=<unit-id>
-export YUFENG_MODELSIDE_ID=<modelside-id>
-export YUFENG_MODELSIDE_WEIGHTS_DIR=<absolute-weights-directory>
-make preflight-release-evidence
+make release-assets RELEASE_OUTPUT=dist/release
+make verify-release-assets RELEASE_OUTPUT=dist/release
 ```
 
-这三个环境设置必须在后续活栈归档中保持不变；该命令需要联网取得固定版本的检查工具和漏洞数据库。发布分支的拉取请求远端确认后只合入 `develop` 一次；`develop` 持续集成只记录最终合并提交、Git 树、父提交和已成功拉取请求，不重跑测试套件。
+正式发布由 `.github/workflows/release.yml` 手动启动：工作流构建并校验固定的 11 个归档，生成清单与校验和，把完整的 13 文件软件制品集先存为不可变工作流制品，再创建注解标签和草稿 Release。上传后重新下载并逐字节复核，成功才公开；任何失败都只能从原工作流制品恢复，禁止重新构建或覆盖上传。完整合同见 [交付证据](docs/delivery-evidence.md)。
 
-最终 `develop` 确认成功后，在相同环境和现有试点 Docker 数据卷上只补一次活栈、恢复和五场景性能，再与静态预检装配发布证据：
+客户部署资格验证与软件发布分离。需要验证具体部署环境时，按现场配置运行：
 
 ```sh
-YUFENG_CI_URL=https://github.com/ZionOVO/YuFeng/actions/runs/<run-id> \
-YUFENG_PREFLIGHT_MANIFEST=<preflight.json> \
-YUFENG_PREFLIGHT_ARCHIVE=<preflight.tar.gz> \
-YUFENG_PREFLIGHT_CHECKSUM=<preflight.tar.gz.sha256> \
-make archive-live-evidence
+make delivery-evidence
+make compose-live resilience-live security-live backup-restore-live performance-live
 ```
 
-归档命令先核对最终 Git 树、两个父提交、环境指纹、预检有效期和持续集成 URL，再备份源数据库并运行活栈；它不接受数据卷重置，也不重跑任何静态套件或热路径基准。输出合同见 [交付证据](docs/delivery-evidence.md)。
+部署验证失败会阻止该环境上线，但不会改变已经公开的软件 Release，也不要求修改代码、重打标签或反复合入主干。
 
 ## 本地纵切片演示
 

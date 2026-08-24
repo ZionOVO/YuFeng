@@ -304,12 +304,16 @@ AgentThread
 | 控制台 API 客户端 | Connect-ES 生成客户端（后接） | `@connectrpc/connect` + `@connectrpc/connect-web` | **本档不强制**。手写 `ConnectClient` 可交付；生成客户端落地后只替换适配层内部 |
 | 基础配置 | 命令行 flag + 环境变量 | Go 标准库 | 已落地 |
 | 文件配置 | 单 YAML 文件 | `yaml.v3` | 已选定未引入 |
-| 基础测试与持续集成 | build、test、race、vet、gofmt、staticcheck、buf 检查、零 cgo 交叉编译 | Go 与 buf 工具链 | 本机发布预检完整运行竞态、构建标签、格式化、综合静态检查、buf、控制台、交叉编译和基准；拉取请求快速门禁远端确认普通构建与测试、格式化、综合静态检查、buf、控制台和交叉编译；`develop` 推送只确认最终合并提交、Git 树、父提交与已成功拉取请求，不再执行测试套件 |
-| 生产测试工具 | govulncheck、golangci-lint、Docker Compose 活路径、故障脚本 | 测试与静态分析工具链 | govulncheck 只在本机发布预检运行；golangci-lint 在本机预检与拉取请求确认中统一承载 errcheck、govet、ineffassign 与 staticcheck。`production-end-to-end.sh`、`fault-injection-end-to-end.sh` 和 `*-live.sh static` 是完整 Go 套件的定向入口，不得在完整竞态后重复执行，也不得当作 Docker Compose 全栈与贾维斯证明；合入 `develop` 后的证据提升从 `onboarding-live.sh live` 开始，只运行各 `*-live.sh live` 路径 |
+| 基础测试与持续集成 | build、test、vet、gofmt、golangci-lint、govulncheck、buf 检查、控制台、零 cgo 交叉编译 | Go、Node.js 与 buf 工具链 | 所有工作分支通过拉取请求进入 `main`，统一持续集成执行有限清单；`main` 推送复验同一套清单并留下精确提交结论，发布任务只接受该结论成功的最新 `main` |
+| 生产测试工具 | 完整竞态、热路径基准、Docker Compose 活路径、故障脚本 | 测试与静态分析工具链 | golangci-lint 在持续集成中统一承载 errcheck、govet、ineffassign 与 staticcheck；完整竞态、热路径基准和 Docker Compose 活路径是可重复的部署验收与定向诊断入口，不参与 Git 分支合并谱系。`scripts/onboarding-live.sh`、`production-end-to-end.sh`、`fault-injection-end-to-end.sh` 和其它 `*-live.sh` 保留定向诊断职责 |
 | 制品与能力令牌签名 | Ed25519 | Go 标准库 | 已落地 |
 | JSON Web Token 编解码库 | `golang-jwt/jwt/v5` | 第三方令牌库 | 已选定未引入；当前能力令牌由标准库手写编解码 |
 
-**软件发布验收（架构决策记录 037）**：日常工作分支进入 `develop` 运行快速门禁；准备发布时从冻结的 `develop` 创建[发布稳定分支](glossary.md#release-stabilization-branch)，在临时工作树中对预期合并的 [Git 树内容身份](glossary.md#git-tree-identity)执行一次完整本机[发布预检](glossary.md#release-preflight)。预检用完整竞态覆盖普通测试，再补构建标签、格式化、综合静态分析、漏洞、Protocol Buffers、控制台、交叉编译和基准，不重复被覆盖的定向 Go 脚本。远端拉取请求只确认该提交具备可合入性；预检成功后该分支只合入 `develop` 一次，`develop` 持续集成只留下精确合并提交、Git 树、父提交和已成功拉取请求的远端确认。随后本机执行[证据提升](glossary.md#evidence-promotion)，核对 Git 树、两个父提交、[发布环境指纹](glossary.md#release-environment-fingerprint)、证据有效期与远端结论，只补一次活栈、恢复和性能并装配归档，绝不重跑静态套件。内容、谱系、环境或有效期任一不一致都失败关闭；分支名称本身不是信任依据。
+**软件发布验收（架构决策记录 038）**：仓库采用 `main` 单主干和短命工作分支。版本变更通过普通拉取请求冻结本次[发布验收合同](glossary.md#release-acceptance-contract)；合同只允许预先声明的安全边界、数据完整性、网络契约、构建失败和制品不可用问题阻断发布。智能代理后来发现但不违反冻结合同的问题必须报告并进入后续版本，不能自行扩大发布范围。
+
+发布任务只接受持续集成成功的最新 `main`，在一个工作流运行中构建一次[软件发布制品集](glossary.md#software-release-artifact-set)，对即将上传的精确文件执行结构、可执行性、容器元数据、归档安全与摘要复核，随后生成发布清单和校验文件。验证完成前不创建版本标签或 GitHub Release；验证完成后先把同一批文件保存为不可变工作流制品，再创建标签、装配 Draft Release，禁止覆盖同名资产，远端下载复核通过后才公开。发布中断时只能复用原工作流制品恢复上传，禁止重新构建后冒充同一候选。Git 提交和 [Git 树内容身份](glossary.md#git-tree-identity)只记录源码来源，发布信任根是实际上传文件的摘要。
+
+[部署验收证据](glossary.md#deployment-qualification-evidence)独立绑定公开 Release 的制品清单、部署环境和现场责任人；Docker Compose 活栈、数据库恢复与容量结果不能反向决定软件版本是否已经发布，也不能被上传后改写软件 Release。客户现场变更单仍是上线完成的必要条件。
 
 **零 cgo 政策**：`yufeng-edge` / `yufeng-host` 禁止 cgo（交叉编译 = `GOOS/GOARCH` 一行，OpenWrt/mips/arm64 全覆盖）；brain 可选 cgo 仅限 onnxruntime 构建标签，默认构建纯 Go 全功能。
 
@@ -429,7 +433,8 @@ L1 生产关闭的工作设计与审查采纳见 [`design.md`](design.md)。生�
 | 034 | 流量审查采用边缘有界证据、中央案件与跨平台执行池 | 完整计数与有界代表避免流量规模击穿 PostgreSQL；原文只在一次性资产审批后经内存中继进入无工具模型调用；外部 agentd 由用户安装并主动连接 brain |
 | 035 | 受管 Agent 是由 agentd 承载的短命分布式执行主体；正式构建无演示路径，账本与签名器按失败关闭边界交付 | Agent 获得独立身份、配置、run 与审计归属而不引入常驻智能进程；事件保存 30 天、审计保存 180 天且先检查点后删除；签名器只接受类型化对象；资产侧执行只交付 Linux/OpenWrt 白名单原语 |
 | 036 | Edge 生命周期归技术人员；Brain 只签发部署规格派生制品；深度学习下沉为 `edge → modelside → brain` 双队列旁路 | 基础设施权限不属于智能代理。原始流量必须留在入口附近，异步推理不能给当前请求施加背压或 Gate 权限；只有类型化无原文结果进入中台事务与案件 |
-| 037 | 软件发布静态预检绑定预期合并 Git 树，最终提交只补活栈并提升证据 | 可合入性先由本机完整静态清单保证，远端只确认精确提交谱系；最终 `develop` 必须证明相同 Git 树、精确两个父提交、相同环境指纹和未过期预检，归档不得重跑静态套件 |
+| 037 | 软件发布静态预检绑定预期合并 Git 树，最终提交只补活栈并提升证据 | 已由架构决策记录 038 取代；该流程把首次活栈反馈放在合入后，并把发布工具、源码谱系和部署环境绑定为一个失效域，形成无法稳定收敛的发布循环 |
+| 038 | `main` 单主干、冻结验收合同、一次构建并提升精确软件制品，部署证据独立 | 分支只管理源码；发布任务验证并上传同一批不可变文件。新发现不得由智能代理自动扩大发布范围；门禁缺陷先停止发布并作为独立变更修复 |
 
 ---
 

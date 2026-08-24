@@ -7,7 +7,7 @@
 ```sh
 sudo useradd --system --home /var/lib/yufeng --shell /usr/sbin/nologin yufeng
 sudo python3 -m venv /opt/yufeng/modelside
-sudo /opt/yufeng/modelside/bin/pip install './wheels/yufeng_modelside-0.2.0-py3-none-any.whl[tensorflow]'
+sudo /opt/yufeng/modelside/bin/pip install './wheels/yufeng_modelside-0.1.0-py3-none-any.whl[tensorflow]'
 sudo install -m 0644 deploy/modelside/yufeng-modelside.service /etc/systemd/system/
 sudo install -m 0640 -o root -g yufeng deploy/modelside/modelside.env.example /etc/yufeng/modelside.env
 sudo systemctl daemon-reload
