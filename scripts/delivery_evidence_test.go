@@ -85,7 +85,9 @@ func TestReleaseVersionSourcesAgree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(versionRaw) != "v0.1.0\n" {
+	version := strings.TrimSpace(string(versionRaw))
+	plainVersion := strings.TrimPrefix(version, "v")
+	if plainVersion == "" || plainVersion == version {
 		t.Fatalf("VERSION=%q", versionRaw)
 	}
 
@@ -100,7 +102,7 @@ func TestReleaseVersionSourcesAgree(t *testing.T) {
 		if err := json.Unmarshal(raw, &document); err != nil {
 			t.Fatal(err)
 		}
-		if document.Version != "0.1.0" {
+		if document.Version != plainVersion {
 			t.Errorf("%s version=%q", path, document.Version)
 		}
 		if path == "../console/package-lock.json" {
@@ -112,14 +114,14 @@ func TestReleaseVersionSourcesAgree(t *testing.T) {
 			if err := json.Unmarshal(raw, &lock); err != nil {
 				t.Fatal(err)
 			}
-			if lock.Packages[""].Version != "0.1.0" {
+			if lock.Packages[""].Version != plainVersion {
 				t.Errorf("%s root package version=%q", path, lock.Packages[""].Version)
 			}
 		}
 	}
 	for path, want := range map[string]string{
-		"../components/modelside/pyproject.toml":               `version = "0.1.0"`,
-		"../components/modelside/yufeng_modelside/__init__.py": `__version__ = "0.1.0"`,
+		"../components/modelside/pyproject.toml":               `version = "` + plainVersion + `"`,
+		"../components/modelside/yufeng_modelside/__init__.py": `__version__ = "` + plainVersion + `"`,
 	} {
 		raw, err := os.ReadFile(path)
 		if err != nil {

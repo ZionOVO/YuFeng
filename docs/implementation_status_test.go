@@ -79,12 +79,16 @@ func TestReleaseDocumentationSeparatesSoftwareReleaseFromDeploymentEvidence(t *t
 		}
 	}
 	requireContains(t, "operations/release-and-delivery.md", releaseDelivery,
-		"v0.1.0", "2026-08-24", "正式公开")
+		"v0.1.0", "2026-08-24", "正式公开", "v0.1.1", "冻结发布验收合同")
 	for _, asset := range []string{
 		"yufeng-v0.1.0-linux-amd64.tar.gz",
 		"yufeng-v0.1.0-modelside-image-linux-amd64.tar.gz",
 		"yufeng-v0.1.0-release-manifest.json",
 		"yufeng-v0.1.0-checksums.txt",
+		"yufeng-v0.1.1-linux-amd64.tar.gz",
+		"yufeng-v0.1.1-modelside-image-linux-amd64.tar.gz",
+		"yufeng-v0.1.1-release-manifest.json",
+		"yufeng-v0.1.1-checksums.txt",
 		"yufeng.software-release/v1",
 	} {
 		if !strings.Contains(releaseDelivery, asset) {
@@ -96,6 +100,7 @@ func TestReleaseDocumentationSeparatesSoftwareReleaseFromDeploymentEvidence(t *t
 		"不可变工作流制品",
 		"禁止覆盖",
 		"重新下载",
+		"正常成功路径不追加重复测试",
 		"部署验收证据",
 		"不撤销或改写已经公开的软件 Release",
 	} {
