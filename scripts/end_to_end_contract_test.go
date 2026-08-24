@@ -140,21 +140,27 @@ func TestTrafficReviewLiveReachesShadowAndCleansTemporaryCapability(t *testing.T
 func TestPerformanceLiveMeasuresFrozenDeploymentBudgets(t *testing.T) {
 	body := readScript(t, "performance-live.sh")
 	for _, want := range []string{
-		`TestModelBypassFiveScenarioCapacity`,
+		`TestModelIngressWindowCapacityMatrix`,
 		`YUFENG_RUN_MODEL_BYPASS_PERFORMANCE=1`,
-		`model-bypass-capacity/v1`,
+		`model-ingress-window-capacity/v2`,
 		`model_bypass_p99_micros`,
+		`model_bypass_cpu_percent`,
 		`target != 2000`,
 		`p99_budget != 1000`,
 		`bypass_disabled`,
 		`modelside_idle`,
-		`modelside_saturated`,
-		`brain_disconnected`,
-		`brain_disk_slow`,
-		`ingress_dropped`,
-		`result_upload_retries`,
+		`modelside_stable`,
+		`modelside_full`,
+		`modelside_unreachable`,
+		`near_inspection_limit`,
+		`local_hard_limit`,
+		`modelside_rejected`,
+		`transport_failed`,
+		`load_generator_dropped`,
 		`throughput_budget_met`,
 		`p99_budget_met`,
+		`cpu_budget_met`,
+		`resident_memory_budget_met`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("performance live script missing %q", want)

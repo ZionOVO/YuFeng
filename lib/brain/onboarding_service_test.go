@@ -15,11 +15,13 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"yufeng/lib/kernel"
 	"yufeng/lib/store"
 
 	agentv1 "yufeng/proto/gen/agentv1"
+	artifactv1 "yufeng/proto/gen/artifactv1"
 	authv1 "yufeng/proto/gen/authv1"
 	commonv1 "yufeng/proto/gen/commonv1"
 	grantv1 "yufeng/proto/gen/grantv1"
@@ -458,6 +460,20 @@ func TestDeploymentSpecificationAndManualEdgeReadinessCompleteOnboarding(t *test
 		firstSpecification.Msg.GetGenerationId() != secondSpecification.Msg.GetGenerationId() ||
 		firstSpecification.Msg.GetListenPlanVersion() != secondSpecification.Msg.GetListenPlanVersion() {
 		t.Fatalf("deterministic specification coordinates first=%v second=%v", firstSpecification.Msg, secondSpecification.Msg)
+	}
+	var listenPlanRaw []byte
+	if err := st.Pool().QueryRow(ctx, `SELECT envelope FROM unit_listen_plans WHERE unit_id=$1 AND version=$2`,
+		unitID, firstSpecification.Msg.GetListenPlanVersion()).Scan(&listenPlanRaw); err != nil {
+		t.Fatal(err)
+	}
+	var listenPlan artifactv1.UnitListenPlan
+	if err := protojson.Unmarshal(listenPlanRaw, &listenPlan); err != nil {
+		t.Fatal(err)
+	}
+	if !listenPlan.GetModelIngressWindow().GetMaxQueueAge().IsValid() ||
+		listenPlan.GetModelIngressWindow().GetMaxItems() != kernel.ModelIngressDefaultItems ||
+		listenPlan.GetModelIngressWindow().GetMaxRetainedBytes() != kernel.ModelIngressDefaultBytes {
+		t.Fatalf("default model ingress window was not frozen into listen plan: %v", listenPlan.GetModelIngressWindow())
 	}
 	var deploymentInstructions int
 	if err := st.Pool().QueryRow(ctx, `SELECT count(*) FROM agent_instructions WHERE kind LIKE 'ONBOARDING%'`).Scan(&deploymentInstructions); err != nil {

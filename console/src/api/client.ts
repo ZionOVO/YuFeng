@@ -48,6 +48,8 @@ import type {
   WorkerEnrollmentRecord,
   TrafficReviewMode,
   TrafficReviewPolicyStatus,
+  ModelIngressWindow,
+  ModelIngressWindowStatus,
 } from './types'
 
 export interface ModelProfileSpecification {
@@ -85,6 +87,7 @@ export type EdgeDeploymentSpecification = EdgeIngressTarget & {
   unitId: string
   assetId: string
   modelProfile: ModelProfileSpecification
+  modelIngressWindow: ModelIngressWindow
 }
 
 export interface EdgeDeploymentCoordinates {
@@ -187,6 +190,8 @@ export interface ConsoleClient {
   detachUnit(assetId: string, unitId: string): Promise<AssetDetail>
   getTrafficReviewPolicy(assetId: string): Promise<TrafficReviewPolicyStatus>
   updateTrafficReviewPolicy(assetId: string, mode: TrafficReviewMode, expectedGenerationId?: string): Promise<TrafficReviewPolicyStatus>
+  getModelIngressWindow(assetId: string, unitId: string): Promise<ModelIngressWindowStatus>
+  updateModelIngressWindow(assetId: string, unitId: string, desired: ModelIngressWindow, expectedListenPlanVersion?: string): Promise<ModelIngressWindowStatus>
 
   /* ----- ConsoleService ----- */
   dashboard(): Promise<DashboardSummary>

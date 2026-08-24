@@ -1053,6 +1053,314 @@ func (x *UpdateTrafficReviewPolicyResponse) GetStatus() *TrafficReviewPolicyStat
 	return nil
 }
 
+type GetModelIngressWindowRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssetId       string                 `protobuf:"bytes,1,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`
+	UnitId        string                 `protobuf:"bytes,2,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetModelIngressWindowRequest) Reset() {
+	*x = GetModelIngressWindowRequest{}
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetModelIngressWindowRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetModelIngressWindowRequest) ProtoMessage() {}
+
+func (x *GetModelIngressWindowRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetModelIngressWindowRequest.ProtoReflect.Descriptor instead.
+func (*GetModelIngressWindowRequest) Descriptor() ([]byte, []int) {
+	return file_yufeng_asset_v1_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetModelIngressWindowRequest) GetAssetId() string {
+	if x != nil {
+		return x.AssetId
+	}
+	return ""
+}
+
+func (x *GetModelIngressWindowRequest) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+type ModelIngressWindowStatus struct {
+	state                    protoimpl.MessageState                 `protogen:"open.v1"`
+	AssetId                  string                                 `protobuf:"bytes,1,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`
+	UnitId                   string                                 `protobuf:"bytes,2,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
+	Desired                  *artifactv1.ModelIngressWindow         `protobuf:"bytes,3,opt,name=desired,proto3" json:"desired,omitempty"`
+	Effective                *artifactv1.ModelIngressWindow         `protobuf:"bytes,4,opt,name=effective,proto3" json:"effective,omitempty"`
+	DesiredListenPlanVersion uint64                                 `protobuf:"varint,5,opt,name=desired_listen_plan_version,json=desiredListenPlanVersion,proto3" json:"desired_listen_plan_version,omitempty"`
+	AppliedListenPlanVersion uint64                                 `protobuf:"varint,6,opt,name=applied_listen_plan_version,json=appliedListenPlanVersion,proto3" json:"applied_listen_plan_version,omitempty"`
+	State                    unitv1.ModelIngressWindowState         `protobuf:"varint,7,opt,name=state,proto3,enum=yufeng.unit.v1.ModelIngressWindowState" json:"state,omitempty"`
+	DegradationReasons       []unitv1.ModelIngressDegradationReason `protobuf:"varint,8,rep,packed,name=degradation_reasons,json=degradationReasons,proto3,enum=yufeng.unit.v1.ModelIngressDegradationReason" json:"degradation_reasons,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *ModelIngressWindowStatus) Reset() {
+	*x = ModelIngressWindowStatus{}
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelIngressWindowStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelIngressWindowStatus) ProtoMessage() {}
+
+func (x *ModelIngressWindowStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelIngressWindowStatus.ProtoReflect.Descriptor instead.
+func (*ModelIngressWindowStatus) Descriptor() ([]byte, []int) {
+	return file_yufeng_asset_v1_service_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ModelIngressWindowStatus) GetAssetId() string {
+	if x != nil {
+		return x.AssetId
+	}
+	return ""
+}
+
+func (x *ModelIngressWindowStatus) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *ModelIngressWindowStatus) GetDesired() *artifactv1.ModelIngressWindow {
+	if x != nil {
+		return x.Desired
+	}
+	return nil
+}
+
+func (x *ModelIngressWindowStatus) GetEffective() *artifactv1.ModelIngressWindow {
+	if x != nil {
+		return x.Effective
+	}
+	return nil
+}
+
+func (x *ModelIngressWindowStatus) GetDesiredListenPlanVersion() uint64 {
+	if x != nil {
+		return x.DesiredListenPlanVersion
+	}
+	return 0
+}
+
+func (x *ModelIngressWindowStatus) GetAppliedListenPlanVersion() uint64 {
+	if x != nil {
+		return x.AppliedListenPlanVersion
+	}
+	return 0
+}
+
+func (x *ModelIngressWindowStatus) GetState() unitv1.ModelIngressWindowState {
+	if x != nil {
+		return x.State
+	}
+	return unitv1.ModelIngressWindowState(0)
+}
+
+func (x *ModelIngressWindowStatus) GetDegradationReasons() []unitv1.ModelIngressDegradationReason {
+	if x != nil {
+		return x.DegradationReasons
+	}
+	return nil
+}
+
+type GetModelIngressWindowResponse struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Status        *ModelIngressWindowStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetModelIngressWindowResponse) Reset() {
+	*x = GetModelIngressWindowResponse{}
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetModelIngressWindowResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetModelIngressWindowResponse) ProtoMessage() {}
+
+func (x *GetModelIngressWindowResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetModelIngressWindowResponse.ProtoReflect.Descriptor instead.
+func (*GetModelIngressWindowResponse) Descriptor() ([]byte, []int) {
+	return file_yufeng_asset_v1_service_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetModelIngressWindowResponse) GetStatus() *ModelIngressWindowStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+type UpdateModelIngressWindowRequest struct {
+	state                     protoimpl.MessageState         `protogen:"open.v1"`
+	AssetId                   string                         `protobuf:"bytes,1,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`
+	UnitId                    string                         `protobuf:"bytes,2,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
+	Desired                   *artifactv1.ModelIngressWindow `protobuf:"bytes,3,opt,name=desired,proto3" json:"desired,omitempty"`
+	ExpectedListenPlanVersion uint64                         `protobuf:"varint,4,opt,name=expected_listen_plan_version,json=expectedListenPlanVersion,proto3" json:"expected_listen_plan_version,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *UpdateModelIngressWindowRequest) Reset() {
+	*x = UpdateModelIngressWindowRequest{}
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateModelIngressWindowRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateModelIngressWindowRequest) ProtoMessage() {}
+
+func (x *UpdateModelIngressWindowRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateModelIngressWindowRequest.ProtoReflect.Descriptor instead.
+func (*UpdateModelIngressWindowRequest) Descriptor() ([]byte, []int) {
+	return file_yufeng_asset_v1_service_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *UpdateModelIngressWindowRequest) GetAssetId() string {
+	if x != nil {
+		return x.AssetId
+	}
+	return ""
+}
+
+func (x *UpdateModelIngressWindowRequest) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *UpdateModelIngressWindowRequest) GetDesired() *artifactv1.ModelIngressWindow {
+	if x != nil {
+		return x.Desired
+	}
+	return nil
+}
+
+func (x *UpdateModelIngressWindowRequest) GetExpectedListenPlanVersion() uint64 {
+	if x != nil {
+		return x.ExpectedListenPlanVersion
+	}
+	return 0
+}
+
+type UpdateModelIngressWindowResponse struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Status        *ModelIngressWindowStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateModelIngressWindowResponse) Reset() {
+	*x = UpdateModelIngressWindowResponse{}
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateModelIngressWindowResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateModelIngressWindowResponse) ProtoMessage() {}
+
+func (x *UpdateModelIngressWindowResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_yufeng_asset_v1_service_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateModelIngressWindowResponse.ProtoReflect.Descriptor instead.
+func (*UpdateModelIngressWindowResponse) Descriptor() ([]byte, []int) {
+	return file_yufeng_asset_v1_service_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *UpdateModelIngressWindowResponse) GetStatus() *ModelIngressWindowStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
 var File_yufeng_asset_v1_service_proto protoreflect.FileDescriptor
 
 const file_yufeng_asset_v1_service_proto_rawDesc = "" +
@@ -1117,7 +1425,28 @@ const file_yufeng_asset_v1_service_proto_rawDesc = "" +
 	"\x04mode\x18\x02 \x01(\x0e2%.yufeng.artifact.v1.TrafficReviewModeR\x04mode\x124\n" +
 	"\x16expected_generation_id\x18\x03 \x01(\tR\x14expectedGenerationId\"g\n" +
 	"!UpdateTrafficReviewPolicyResponse\x12B\n" +
-	"\x06status\x18\x01 \x01(\v2*.yufeng.asset.v1.TrafficReviewPolicyStatusR\x06status2\xf2\x06\n" +
+	"\x06status\x18\x01 \x01(\v2*.yufeng.asset.v1.TrafficReviewPolicyStatusR\x06status\"R\n" +
+	"\x1cGetModelIngressWindowRequest\x12\x19\n" +
+	"\basset_id\x18\x01 \x01(\tR\aassetId\x12\x17\n" +
+	"\aunit_id\x18\x02 \x01(\tR\x06unitId\"\xf3\x03\n" +
+	"\x18ModelIngressWindowStatus\x12\x19\n" +
+	"\basset_id\x18\x01 \x01(\tR\aassetId\x12\x17\n" +
+	"\aunit_id\x18\x02 \x01(\tR\x06unitId\x12@\n" +
+	"\adesired\x18\x03 \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\adesired\x12D\n" +
+	"\teffective\x18\x04 \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\teffective\x12=\n" +
+	"\x1bdesired_listen_plan_version\x18\x05 \x01(\x04R\x18desiredListenPlanVersion\x12=\n" +
+	"\x1bapplied_listen_plan_version\x18\x06 \x01(\x04R\x18appliedListenPlanVersion\x12=\n" +
+	"\x05state\x18\a \x01(\x0e2'.yufeng.unit.v1.ModelIngressWindowStateR\x05state\x12^\n" +
+	"\x13degradation_reasons\x18\b \x03(\x0e2-.yufeng.unit.v1.ModelIngressDegradationReasonR\x12degradationReasons\"b\n" +
+	"\x1dGetModelIngressWindowResponse\x12A\n" +
+	"\x06status\x18\x01 \x01(\v2).yufeng.asset.v1.ModelIngressWindowStatusR\x06status\"\xd8\x01\n" +
+	"\x1fUpdateModelIngressWindowRequest\x12\x19\n" +
+	"\basset_id\x18\x01 \x01(\tR\aassetId\x12\x17\n" +
+	"\aunit_id\x18\x02 \x01(\tR\x06unitId\x12@\n" +
+	"\adesired\x18\x03 \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\adesired\x12?\n" +
+	"\x1cexpected_listen_plan_version\x18\x04 \x01(\x04R\x19expectedListenPlanVersion\"e\n" +
+	" UpdateModelIngressWindowResponse\x12A\n" +
+	"\x06status\x18\x01 \x01(\v2).yufeng.asset.v1.ModelIngressWindowStatusR\x06status2\xeb\b\n" +
 	"\fAssetService\x12X\n" +
 	"\vCreateAsset\x12#.yufeng.asset.v1.CreateAssetRequest\x1a$.yufeng.asset.v1.CreateAssetResponse\x12X\n" +
 	"\vUpdateAsset\x12#.yufeng.asset.v1.UpdateAssetRequest\x1a$.yufeng.asset.v1.UpdateAssetResponse\x12X\n" +
@@ -1130,7 +1459,9 @@ const file_yufeng_asset_v1_service_proto_rawDesc = "" +
 	"\n" +
 	"DetachUnit\x12\".yufeng.asset.v1.DetachUnitRequest\x1a#.yufeng.asset.v1.DetachUnitResponse\x12y\n" +
 	"\x16GetTrafficReviewPolicy\x12..yufeng.asset.v1.GetTrafficReviewPolicyRequest\x1a/.yufeng.asset.v1.GetTrafficReviewPolicyResponse\x12\x82\x01\n" +
-	"\x19UpdateTrafficReviewPolicy\x121.yufeng.asset.v1.UpdateTrafficReviewPolicyRequest\x1a2.yufeng.asset.v1.UpdateTrafficReviewPolicyResponseB\x1aZ\x18yufeng/proto/gen/assetv1b\x06proto3"
+	"\x19UpdateTrafficReviewPolicy\x121.yufeng.asset.v1.UpdateTrafficReviewPolicyRequest\x1a2.yufeng.asset.v1.UpdateTrafficReviewPolicyResponse\x12v\n" +
+	"\x15GetModelIngressWindow\x12-.yufeng.asset.v1.GetModelIngressWindowRequest\x1a..yufeng.asset.v1.GetModelIngressWindowResponse\x12\x7f\n" +
+	"\x18UpdateModelIngressWindow\x120.yufeng.asset.v1.UpdateModelIngressWindowRequest\x1a1.yufeng.asset.v1.UpdateModelIngressWindowResponseB\x1aZ\x18yufeng/proto/gen/assetv1b\x06proto3"
 
 var (
 	file_yufeng_asset_v1_service_proto_rawDescOnce sync.Once
@@ -1144,7 +1475,7 @@ func file_yufeng_asset_v1_service_proto_rawDescGZIP() []byte {
 	return file_yufeng_asset_v1_service_proto_rawDescData
 }
 
-var file_yufeng_asset_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_yufeng_asset_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_yufeng_asset_v1_service_proto_goTypes = []any{
 	(*CreateAssetRequest)(nil),                // 0: yufeng.asset.v1.CreateAssetRequest
 	(*CreateAssetResponse)(nil),               // 1: yufeng.asset.v1.CreateAssetResponse
@@ -1166,53 +1497,72 @@ var file_yufeng_asset_v1_service_proto_goTypes = []any{
 	(*GetTrafficReviewPolicyResponse)(nil),    // 17: yufeng.asset.v1.GetTrafficReviewPolicyResponse
 	(*UpdateTrafficReviewPolicyRequest)(nil),  // 18: yufeng.asset.v1.UpdateTrafficReviewPolicyRequest
 	(*UpdateTrafficReviewPolicyResponse)(nil), // 19: yufeng.asset.v1.UpdateTrafficReviewPolicyResponse
-	(*Asset)(nil),                             // 20: yufeng.asset.v1.Asset
-	(*fieldmaskpb.FieldMask)(nil),             // 21: google.protobuf.FieldMask
-	(*timestamppb.Timestamp)(nil),             // 22: google.protobuf.Timestamp
-	(*unitv1.UnitProjection)(nil),             // 23: yufeng.unit.v1.UnitProjection
-	(*artifactv1.TrafficReviewPolicy)(nil),    // 24: yufeng.artifact.v1.TrafficReviewPolicy
-	(artifactv1.TrafficReviewMode)(0),         // 25: yufeng.artifact.v1.TrafficReviewMode
+	(*GetModelIngressWindowRequest)(nil),      // 20: yufeng.asset.v1.GetModelIngressWindowRequest
+	(*ModelIngressWindowStatus)(nil),          // 21: yufeng.asset.v1.ModelIngressWindowStatus
+	(*GetModelIngressWindowResponse)(nil),     // 22: yufeng.asset.v1.GetModelIngressWindowResponse
+	(*UpdateModelIngressWindowRequest)(nil),   // 23: yufeng.asset.v1.UpdateModelIngressWindowRequest
+	(*UpdateModelIngressWindowResponse)(nil),  // 24: yufeng.asset.v1.UpdateModelIngressWindowResponse
+	(*Asset)(nil),                             // 25: yufeng.asset.v1.Asset
+	(*fieldmaskpb.FieldMask)(nil),             // 26: google.protobuf.FieldMask
+	(*timestamppb.Timestamp)(nil),             // 27: google.protobuf.Timestamp
+	(*unitv1.UnitProjection)(nil),             // 28: yufeng.unit.v1.UnitProjection
+	(*artifactv1.TrafficReviewPolicy)(nil),    // 29: yufeng.artifact.v1.TrafficReviewPolicy
+	(artifactv1.TrafficReviewMode)(0),         // 30: yufeng.artifact.v1.TrafficReviewMode
+	(*artifactv1.ModelIngressWindow)(nil),     // 31: yufeng.artifact.v1.ModelIngressWindow
+	(unitv1.ModelIngressWindowState)(0),       // 32: yufeng.unit.v1.ModelIngressWindowState
+	(unitv1.ModelIngressDegradationReason)(0), // 33: yufeng.unit.v1.ModelIngressDegradationReason
 }
 var file_yufeng_asset_v1_service_proto_depIdxs = []int32{
-	20, // 0: yufeng.asset.v1.CreateAssetRequest.asset:type_name -> yufeng.asset.v1.Asset
-	20, // 1: yufeng.asset.v1.CreateAssetResponse.asset:type_name -> yufeng.asset.v1.Asset
-	20, // 2: yufeng.asset.v1.UpdateAssetRequest.asset:type_name -> yufeng.asset.v1.Asset
-	21, // 3: yufeng.asset.v1.UpdateAssetRequest.update_mask:type_name -> google.protobuf.FieldMask
-	22, // 4: yufeng.asset.v1.UpdateAssetRequest.expected_updated_at:type_name -> google.protobuf.Timestamp
-	20, // 5: yufeng.asset.v1.UpdateAssetResponse.asset:type_name -> yufeng.asset.v1.Asset
-	20, // 6: yufeng.asset.v1.AssetDetail.asset:type_name -> yufeng.asset.v1.Asset
-	23, // 7: yufeng.asset.v1.AssetDetail.units:type_name -> yufeng.unit.v1.UnitProjection
+	25, // 0: yufeng.asset.v1.CreateAssetRequest.asset:type_name -> yufeng.asset.v1.Asset
+	25, // 1: yufeng.asset.v1.CreateAssetResponse.asset:type_name -> yufeng.asset.v1.Asset
+	25, // 2: yufeng.asset.v1.UpdateAssetRequest.asset:type_name -> yufeng.asset.v1.Asset
+	26, // 3: yufeng.asset.v1.UpdateAssetRequest.update_mask:type_name -> google.protobuf.FieldMask
+	27, // 4: yufeng.asset.v1.UpdateAssetRequest.expected_updated_at:type_name -> google.protobuf.Timestamp
+	25, // 5: yufeng.asset.v1.UpdateAssetResponse.asset:type_name -> yufeng.asset.v1.Asset
+	25, // 6: yufeng.asset.v1.AssetDetail.asset:type_name -> yufeng.asset.v1.Asset
+	28, // 7: yufeng.asset.v1.AssetDetail.units:type_name -> yufeng.unit.v1.UnitProjection
 	6,  // 8: yufeng.asset.v1.ListAssetsResponse.assets:type_name -> yufeng.asset.v1.AssetDetail
 	6,  // 9: yufeng.asset.v1.GetAssetResponse.asset:type_name -> yufeng.asset.v1.AssetDetail
 	6,  // 10: yufeng.asset.v1.AttachUnitResponse.asset:type_name -> yufeng.asset.v1.AssetDetail
 	6,  // 11: yufeng.asset.v1.DetachUnitResponse.asset:type_name -> yufeng.asset.v1.AssetDetail
-	24, // 12: yufeng.asset.v1.TrafficReviewPolicyStatus.policy:type_name -> yufeng.artifact.v1.TrafficReviewPolicy
+	29, // 12: yufeng.asset.v1.TrafficReviewPolicyStatus.policy:type_name -> yufeng.artifact.v1.TrafficReviewPolicy
 	16, // 13: yufeng.asset.v1.GetTrafficReviewPolicyResponse.status:type_name -> yufeng.asset.v1.TrafficReviewPolicyStatus
-	25, // 14: yufeng.asset.v1.UpdateTrafficReviewPolicyRequest.mode:type_name -> yufeng.artifact.v1.TrafficReviewMode
+	30, // 14: yufeng.asset.v1.UpdateTrafficReviewPolicyRequest.mode:type_name -> yufeng.artifact.v1.TrafficReviewMode
 	16, // 15: yufeng.asset.v1.UpdateTrafficReviewPolicyResponse.status:type_name -> yufeng.asset.v1.TrafficReviewPolicyStatus
-	0,  // 16: yufeng.asset.v1.AssetService.CreateAsset:input_type -> yufeng.asset.v1.CreateAssetRequest
-	2,  // 17: yufeng.asset.v1.AssetService.UpdateAsset:input_type -> yufeng.asset.v1.UpdateAssetRequest
-	4,  // 18: yufeng.asset.v1.AssetService.DeleteAsset:input_type -> yufeng.asset.v1.DeleteAssetRequest
-	7,  // 19: yufeng.asset.v1.AssetService.ListAssets:input_type -> yufeng.asset.v1.ListAssetsRequest
-	9,  // 20: yufeng.asset.v1.AssetService.GetAsset:input_type -> yufeng.asset.v1.GetAssetRequest
-	11, // 21: yufeng.asset.v1.AssetService.AttachUnit:input_type -> yufeng.asset.v1.AttachUnitRequest
-	13, // 22: yufeng.asset.v1.AssetService.DetachUnit:input_type -> yufeng.asset.v1.DetachUnitRequest
-	15, // 23: yufeng.asset.v1.AssetService.GetTrafficReviewPolicy:input_type -> yufeng.asset.v1.GetTrafficReviewPolicyRequest
-	18, // 24: yufeng.asset.v1.AssetService.UpdateTrafficReviewPolicy:input_type -> yufeng.asset.v1.UpdateTrafficReviewPolicyRequest
-	1,  // 25: yufeng.asset.v1.AssetService.CreateAsset:output_type -> yufeng.asset.v1.CreateAssetResponse
-	3,  // 26: yufeng.asset.v1.AssetService.UpdateAsset:output_type -> yufeng.asset.v1.UpdateAssetResponse
-	5,  // 27: yufeng.asset.v1.AssetService.DeleteAsset:output_type -> yufeng.asset.v1.DeleteAssetResponse
-	8,  // 28: yufeng.asset.v1.AssetService.ListAssets:output_type -> yufeng.asset.v1.ListAssetsResponse
-	10, // 29: yufeng.asset.v1.AssetService.GetAsset:output_type -> yufeng.asset.v1.GetAssetResponse
-	12, // 30: yufeng.asset.v1.AssetService.AttachUnit:output_type -> yufeng.asset.v1.AttachUnitResponse
-	14, // 31: yufeng.asset.v1.AssetService.DetachUnit:output_type -> yufeng.asset.v1.DetachUnitResponse
-	17, // 32: yufeng.asset.v1.AssetService.GetTrafficReviewPolicy:output_type -> yufeng.asset.v1.GetTrafficReviewPolicyResponse
-	19, // 33: yufeng.asset.v1.AssetService.UpdateTrafficReviewPolicy:output_type -> yufeng.asset.v1.UpdateTrafficReviewPolicyResponse
-	25, // [25:34] is the sub-list for method output_type
-	16, // [16:25] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	31, // 16: yufeng.asset.v1.ModelIngressWindowStatus.desired:type_name -> yufeng.artifact.v1.ModelIngressWindow
+	31, // 17: yufeng.asset.v1.ModelIngressWindowStatus.effective:type_name -> yufeng.artifact.v1.ModelIngressWindow
+	32, // 18: yufeng.asset.v1.ModelIngressWindowStatus.state:type_name -> yufeng.unit.v1.ModelIngressWindowState
+	33, // 19: yufeng.asset.v1.ModelIngressWindowStatus.degradation_reasons:type_name -> yufeng.unit.v1.ModelIngressDegradationReason
+	21, // 20: yufeng.asset.v1.GetModelIngressWindowResponse.status:type_name -> yufeng.asset.v1.ModelIngressWindowStatus
+	31, // 21: yufeng.asset.v1.UpdateModelIngressWindowRequest.desired:type_name -> yufeng.artifact.v1.ModelIngressWindow
+	21, // 22: yufeng.asset.v1.UpdateModelIngressWindowResponse.status:type_name -> yufeng.asset.v1.ModelIngressWindowStatus
+	0,  // 23: yufeng.asset.v1.AssetService.CreateAsset:input_type -> yufeng.asset.v1.CreateAssetRequest
+	2,  // 24: yufeng.asset.v1.AssetService.UpdateAsset:input_type -> yufeng.asset.v1.UpdateAssetRequest
+	4,  // 25: yufeng.asset.v1.AssetService.DeleteAsset:input_type -> yufeng.asset.v1.DeleteAssetRequest
+	7,  // 26: yufeng.asset.v1.AssetService.ListAssets:input_type -> yufeng.asset.v1.ListAssetsRequest
+	9,  // 27: yufeng.asset.v1.AssetService.GetAsset:input_type -> yufeng.asset.v1.GetAssetRequest
+	11, // 28: yufeng.asset.v1.AssetService.AttachUnit:input_type -> yufeng.asset.v1.AttachUnitRequest
+	13, // 29: yufeng.asset.v1.AssetService.DetachUnit:input_type -> yufeng.asset.v1.DetachUnitRequest
+	15, // 30: yufeng.asset.v1.AssetService.GetTrafficReviewPolicy:input_type -> yufeng.asset.v1.GetTrafficReviewPolicyRequest
+	18, // 31: yufeng.asset.v1.AssetService.UpdateTrafficReviewPolicy:input_type -> yufeng.asset.v1.UpdateTrafficReviewPolicyRequest
+	20, // 32: yufeng.asset.v1.AssetService.GetModelIngressWindow:input_type -> yufeng.asset.v1.GetModelIngressWindowRequest
+	23, // 33: yufeng.asset.v1.AssetService.UpdateModelIngressWindow:input_type -> yufeng.asset.v1.UpdateModelIngressWindowRequest
+	1,  // 34: yufeng.asset.v1.AssetService.CreateAsset:output_type -> yufeng.asset.v1.CreateAssetResponse
+	3,  // 35: yufeng.asset.v1.AssetService.UpdateAsset:output_type -> yufeng.asset.v1.UpdateAssetResponse
+	5,  // 36: yufeng.asset.v1.AssetService.DeleteAsset:output_type -> yufeng.asset.v1.DeleteAssetResponse
+	8,  // 37: yufeng.asset.v1.AssetService.ListAssets:output_type -> yufeng.asset.v1.ListAssetsResponse
+	10, // 38: yufeng.asset.v1.AssetService.GetAsset:output_type -> yufeng.asset.v1.GetAssetResponse
+	12, // 39: yufeng.asset.v1.AssetService.AttachUnit:output_type -> yufeng.asset.v1.AttachUnitResponse
+	14, // 40: yufeng.asset.v1.AssetService.DetachUnit:output_type -> yufeng.asset.v1.DetachUnitResponse
+	17, // 41: yufeng.asset.v1.AssetService.GetTrafficReviewPolicy:output_type -> yufeng.asset.v1.GetTrafficReviewPolicyResponse
+	19, // 42: yufeng.asset.v1.AssetService.UpdateTrafficReviewPolicy:output_type -> yufeng.asset.v1.UpdateTrafficReviewPolicyResponse
+	22, // 43: yufeng.asset.v1.AssetService.GetModelIngressWindow:output_type -> yufeng.asset.v1.GetModelIngressWindowResponse
+	24, // 44: yufeng.asset.v1.AssetService.UpdateModelIngressWindow:output_type -> yufeng.asset.v1.UpdateModelIngressWindowResponse
+	34, // [34:45] is the sub-list for method output_type
+	23, // [23:34] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_yufeng_asset_v1_service_proto_init() }
@@ -1227,7 +1577,7 @@ func file_yufeng_asset_v1_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_yufeng_asset_v1_service_proto_rawDesc), len(file_yufeng_asset_v1_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

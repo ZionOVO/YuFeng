@@ -195,6 +195,8 @@ function producerUnit(unitId: string): UnitProjection {
       maxInFlightRequests: 4096,
       maxSpoolBytes: String(64 * 1024 * 1024),
       maxEvidenceEntries: 1024,
+      modelIngressHardLimit: { maxItems: 16384, maxRetainedBytes: String(256 * 1024 * 1024), maxQueueAge: '300s' },
+      maxModelIngressBatchItems: 32,
     },
     producerHealth: {
       bufferedCriticalEvents: '0',
@@ -204,7 +206,17 @@ function producerUnit(unitId: string): UnitProjection {
       droppedLocalBypassItems: '0',
       projectionFailures: '0',
       healthyProjectionVersions: ['event/v1'],
+      effectiveModelIngressWindow: { maxItems: 4096, maxRetainedBytes: String(128 * 1024 * 1024), maxQueueAge: '2s' },
+      modelIngressWindowState: 'MODEL_INGRESS_WINDOW_STATE_APPLIED',
+      modelIngressDegradationReasons: [],
+      modelIngressQueuedItems: '0',
+      modelIngressQueuedBytes: '0',
+      modelIngressInFlightItems: '0',
+      modelIngressInFlightBytes: '0',
+      modelIngressOldestAgeMillis: '0',
+      modelIngressDrops: { evictedOldest: '0', expired: '0', itemTooLarge: '0', inFlightCapacity: '0', transportFailed: '0', modelsideRejected: '0', admissionBudget: '0' },
     },
+    currentListenPlanVersion: '1',
   }
 }
 

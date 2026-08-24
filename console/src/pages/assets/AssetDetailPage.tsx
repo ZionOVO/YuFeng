@@ -16,6 +16,7 @@ import { Badge, ConfirmDialog, StateView } from '../../components/ui'
 import { CaseCard } from '../../components/cases/CaseCards'
 import { ACCESS_MODE_LABEL, CRITICALITY_BADGE, EDITABLE_CRITICALITIES, EDITABLE_TIERS, TIER_LABEL } from './assetMeta'
 import { TrafficReviewPolicyCard } from './TrafficReviewPolicyCard'
+import { ModelIngressWindowCard } from './ModelIngressWindowCard'
 
 /** 布尔能力 → 徽章：支持 green / 不支持 mute。 */
 function BoolBadge({ on }: { on: boolean }) {
@@ -243,6 +244,14 @@ export function AssetDetailPage() {
       )}
 
       <TrafficReviewPolicyCard
+        assetId={assetId}
+        units={data.units ?? []}
+        canWrite={canWrite}
+        client={client}
+        onRefreshAsset={reload}
+      />
+
+      <ModelIngressWindowCard
         assetId={assetId}
         units={data.units ?? []}
         canWrite={canWrite}

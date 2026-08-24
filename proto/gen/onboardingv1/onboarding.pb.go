@@ -15,6 +15,7 @@ import (
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+	artifactv1 "yufeng/proto/gen/artifactv1"
 	commonv1 "yufeng/proto/gen/commonv1"
 	modelv1 "yufeng/proto/gen/modelv1"
 )
@@ -1002,8 +1003,10 @@ type PutDeploymentSpecificationRequest struct {
 	Target            isPutDeploymentSpecificationRequest_Target `protobuf_oneof:"target"`
 	TrustedProxyCidrs []string                                   `protobuf:"bytes,7,rep,name=trusted_proxy_cidrs,json=trustedProxyCidrs,proto3" json:"trusted_proxy_cidrs,omitempty"`
 	ModelProfile      *ModelProfileSpecification                 `protobuf:"bytes,8,opt,name=model_profile,json=modelProfile,proto3" json:"model_profile,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// model_ingress_window 省略时由 Brain 写入平台默认值。
+	ModelIngressWindow *artifactv1.ModelIngressWindow `protobuf:"bytes,9,opt,name=model_ingress_window,json=modelIngressWindow,proto3" json:"model_ingress_window,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *PutDeploymentSpecificationRequest) Reset() {
@@ -1099,6 +1102,13 @@ func (x *PutDeploymentSpecificationRequest) GetTrustedProxyCidrs() []string {
 func (x *PutDeploymentSpecificationRequest) GetModelProfile() *ModelProfileSpecification {
 	if x != nil {
 		return x.ModelProfile
+	}
+	return nil
+}
+
+func (x *PutDeploymentSpecificationRequest) GetModelIngressWindow() *artifactv1.ModelIngressWindow {
+	if x != nil {
+		return x.ModelIngressWindow
 	}
 	return nil
 }
@@ -1282,7 +1292,7 @@ var File_yufeng_onboarding_v1_onboarding_proto protoreflect.FileDescriptor
 
 const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\n" +
-	"%yufeng/onboarding/v1/onboarding.proto\x12\x14yufeng.onboarding.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x19yufeng/common/v1/v1.proto\x1a\x1byufeng/model/v1/model.proto\"?\n" +
+	"%yufeng/onboarding/v1/onboarding.proto\x12\x14yufeng.onboarding.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1byufeng/artifact/v1/v1.proto\x1a\x19yufeng/common/v1/v1.proto\x1a\x1byufeng/model/v1/model.proto\"?\n" +
 	"\x0eOnboardingGate\x12-\n" +
 	"\x12missing_predicates\x18\x01 \x03(\x05R\x11missingPredicates\"\x16\n" +
 	"\x14GetOnboardingRequest\"\xf8\x05\n" +
@@ -1351,7 +1361,7 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\x0fallowed_headers\x18\v \x03(\tR\x0eallowedHeaders\x12$\n" +
 	"\x0emax_body_bytes\x18\f \x01(\x05R\fmaxBodyBytes\x12*\n" +
 	"\x11review_new_routes\x18\r \x01(\bR\x0freviewNewRoutes\x12@\n" +
-	"\x1creview_insufficient_coverage\x18\x0e \x01(\bR\x1areviewInsufficientCoverage\"\xda\x03\n" +
+	"\x1creview_insufficient_coverage\x18\x0e \x01(\bR\x1areviewInsufficientCoverage\"\xb4\x04\n" +
 	"!PutDeploymentSpecificationRequest\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x19\n" +
 	"\basset_id\x18\x02 \x01(\tR\aassetId\x12:\n" +
@@ -1361,7 +1371,8 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\rreverse_proxy\x18\x05 \x01(\v2(.yufeng.onboarding.v1.ReverseProxyTargetH\x00R\freverseProxy\x12C\n" +
 	"\text_authz\x18\x06 \x01(\v2$.yufeng.onboarding.v1.ExtAuthzTargetH\x00R\bextAuthz\x12.\n" +
 	"\x13trusted_proxy_cidrs\x18\a \x03(\tR\x11trustedProxyCidrs\x12T\n" +
-	"\rmodel_profile\x18\b \x01(\v2/.yufeng.onboarding.v1.ModelProfileSpecificationR\fmodelProfileB\b\n" +
+	"\rmodel_profile\x18\b \x01(\v2/.yufeng.onboarding.v1.ModelProfileSpecificationR\fmodelProfile\x12X\n" +
+	"\x14model_ingress_window\x18\t \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\x12modelIngressWindowB\b\n" +
 	"\x06target\"\x8a\x02\n" +
 	"\"PutDeploymentSpecificationResponse\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x19\n" +
@@ -1428,6 +1439,7 @@ var file_yufeng_onboarding_v1_onboarding_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),              // 18: google.protobuf.Timestamp
 	(modelv1.ModelDialect)(0),                  // 19: yufeng.model.v1.ModelDialect
 	(commonv1.IngressPosture)(0),               // 20: yufeng.common.v1.IngressPosture
+	(*artifactv1.ModelIngressWindow)(nil),      // 21: yufeng.artifact.v1.ModelIngressWindow
 }
 var file_yufeng_onboarding_v1_onboarding_proto_depIdxs = []int32{
 	0,  // 0: yufeng.onboarding.v1.GetOnboardingResponse.state:type_name -> yufeng.onboarding.v1.OnboardingState
@@ -1442,23 +1454,24 @@ var file_yufeng_onboarding_v1_onboarding_proto_depIdxs = []int32{
 	10, // 9: yufeng.onboarding.v1.PutDeploymentSpecificationRequest.reverse_proxy:type_name -> yufeng.onboarding.v1.ReverseProxyTarget
 	11, // 10: yufeng.onboarding.v1.PutDeploymentSpecificationRequest.ext_authz:type_name -> yufeng.onboarding.v1.ExtAuthzTarget
 	13, // 11: yufeng.onboarding.v1.PutDeploymentSpecificationRequest.model_profile:type_name -> yufeng.onboarding.v1.ModelProfileSpecification
-	3,  // 12: yufeng.onboarding.v1.OnboardingService.GetOnboarding:input_type -> yufeng.onboarding.v1.GetOnboardingRequest
-	5,  // 13: yufeng.onboarding.v1.OnboardingService.PutModelConfig:input_type -> yufeng.onboarding.v1.PutModelConfigRequest
-	7,  // 14: yufeng.onboarding.v1.OnboardingService.TestModelConnectivity:input_type -> yufeng.onboarding.v1.TestModelConnectivityRequest
-	9,  // 15: yufeng.onboarding.v1.OnboardingService.DeployDataplane:input_type -> yufeng.onboarding.v1.DeployDataplaneRequest
-	14, // 16: yufeng.onboarding.v1.OnboardingService.PutDeploymentSpecification:input_type -> yufeng.onboarding.v1.PutDeploymentSpecificationRequest
-	16, // 17: yufeng.onboarding.v1.OnboardingService.CompleteOnboarding:input_type -> yufeng.onboarding.v1.CompleteOnboardingRequest
-	4,  // 18: yufeng.onboarding.v1.OnboardingService.GetOnboarding:output_type -> yufeng.onboarding.v1.GetOnboardingResponse
-	6,  // 19: yufeng.onboarding.v1.OnboardingService.PutModelConfig:output_type -> yufeng.onboarding.v1.PutModelConfigResponse
-	8,  // 20: yufeng.onboarding.v1.OnboardingService.TestModelConnectivity:output_type -> yufeng.onboarding.v1.TestModelConnectivityResponse
-	12, // 21: yufeng.onboarding.v1.OnboardingService.DeployDataplane:output_type -> yufeng.onboarding.v1.DeployDataplaneResponse
-	15, // 22: yufeng.onboarding.v1.OnboardingService.PutDeploymentSpecification:output_type -> yufeng.onboarding.v1.PutDeploymentSpecificationResponse
-	17, // 23: yufeng.onboarding.v1.OnboardingService.CompleteOnboarding:output_type -> yufeng.onboarding.v1.CompleteOnboardingResponse
-	18, // [18:24] is the sub-list for method output_type
-	12, // [12:18] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	21, // 12: yufeng.onboarding.v1.PutDeploymentSpecificationRequest.model_ingress_window:type_name -> yufeng.artifact.v1.ModelIngressWindow
+	3,  // 13: yufeng.onboarding.v1.OnboardingService.GetOnboarding:input_type -> yufeng.onboarding.v1.GetOnboardingRequest
+	5,  // 14: yufeng.onboarding.v1.OnboardingService.PutModelConfig:input_type -> yufeng.onboarding.v1.PutModelConfigRequest
+	7,  // 15: yufeng.onboarding.v1.OnboardingService.TestModelConnectivity:input_type -> yufeng.onboarding.v1.TestModelConnectivityRequest
+	9,  // 16: yufeng.onboarding.v1.OnboardingService.DeployDataplane:input_type -> yufeng.onboarding.v1.DeployDataplaneRequest
+	14, // 17: yufeng.onboarding.v1.OnboardingService.PutDeploymentSpecification:input_type -> yufeng.onboarding.v1.PutDeploymentSpecificationRequest
+	16, // 18: yufeng.onboarding.v1.OnboardingService.CompleteOnboarding:input_type -> yufeng.onboarding.v1.CompleteOnboardingRequest
+	4,  // 19: yufeng.onboarding.v1.OnboardingService.GetOnboarding:output_type -> yufeng.onboarding.v1.GetOnboardingResponse
+	6,  // 20: yufeng.onboarding.v1.OnboardingService.PutModelConfig:output_type -> yufeng.onboarding.v1.PutModelConfigResponse
+	8,  // 21: yufeng.onboarding.v1.OnboardingService.TestModelConnectivity:output_type -> yufeng.onboarding.v1.TestModelConnectivityResponse
+	12, // 22: yufeng.onboarding.v1.OnboardingService.DeployDataplane:output_type -> yufeng.onboarding.v1.DeployDataplaneResponse
+	15, // 23: yufeng.onboarding.v1.OnboardingService.PutDeploymentSpecification:output_type -> yufeng.onboarding.v1.PutDeploymentSpecificationResponse
+	17, // 24: yufeng.onboarding.v1.OnboardingService.CompleteOnboarding:output_type -> yufeng.onboarding.v1.CompleteOnboardingResponse
+	19, // [19:25] is the sub-list for method output_type
+	13, // [13:19] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_yufeng_onboarding_v1_onboarding_proto_init() }

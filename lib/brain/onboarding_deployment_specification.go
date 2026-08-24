@@ -53,9 +53,13 @@ func normalizeDeploymentSpec(msg *onboardingv1.PutDeploymentSpecificationRequest
 	if err != nil {
 		return deploymentSpec{}, err
 	}
+	window, err := kernel.ModelIngressWindowOrDefault(msg.GetModelIngressWindow())
+	if err != nil {
+		return deploymentSpec{}, err
+	}
 	normalized := &onboardingv1.PutDeploymentSpecificationRequest{
 		UnitId: unitID, AssetId: assetID, Posture: msg.GetPosture(), TrafficKey: trafficKey,
-		TrustedProxyCidrs: trustedProxyCIDRs, ModelProfile: modelProfileSpecification(profile),
+		TrustedProxyCidrs: trustedProxyCIDRs, ModelProfile: modelProfileSpecification(profile), ModelIngressWindow: window,
 	}
 	var listenAddress, upstreamURL string
 	switch msg.GetPosture() {
@@ -82,6 +86,7 @@ func normalizeDeploymentSpec(msg *onboardingv1.PutDeploymentSpecificationRequest
 	plan := &artifactv1.UnitListenPlan{
 		UnitId: unitID, Posture: msg.GetPosture(), TrafficKey: trafficKey, Version: 1,
 		ListenAddress: listenAddress, UpstreamUrl: upstreamURL, ClientSource: clientSourcePolicy(trustedProxyCIDRs),
+		ModelIngressWindow: window,
 	}
 	if err := edgecore.ValidateUnitListenPlan(plan); err != nil {
 		return deploymentSpec{}, err
@@ -170,7 +175,8 @@ func publishDeploymentSpecification(ctx context.Context, tx pgx.Tx, spec deploym
 	plan := &artifactv1.UnitListenPlan{
 		UnitId: unitID, Posture: spec.Request.GetPosture(), TrafficKey: spec.Request.GetTrafficKey(), Version: version,
 		ListenAddress: spec.ListenAddress, UpstreamUrl: spec.UpstreamURL,
-		ClientSource: clientSourcePolicy(spec.Request.GetTrustedProxyCidrs()),
+		ClientSource:       clientSourcePolicy(spec.Request.GetTrustedProxyCidrs()),
+		ModelIngressWindow: spec.Request.GetModelIngressWindow(),
 	}
 	if err := edgecore.ValidateUnitListenPlan(plan); err != nil {
 		return 0, "", 0, err

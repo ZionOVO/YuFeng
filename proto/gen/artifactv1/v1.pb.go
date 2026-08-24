@@ -1396,6 +1396,70 @@ func (x *ClientSourcePolicy) GetTrustedProxyCidrs() []string {
 	return nil
 }
 
+// ModelIngressWindow 限定 Edge 为邻近 ModelSide 保留的最新流量窗口。
+type ModelIngressWindow struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 窗口同时保留的排队与在途条目上限。
+	MaxItems uint32 `protobuf:"varint,1,opt,name=max_items,json=maxItems,proto3" json:"max_items,omitempty"`
+	// 窗口同时保留的排队与在途实际字节上限。
+	MaxRetainedBytes uint64 `protobuf:"varint,2,opt,name=max_retained_bytes,json=maxRetainedBytes,proto3" json:"max_retained_bytes,omitempty"`
+	// 单条流量允许停留在排队区的最长时间。
+	MaxQueueAge   *durationpb.Duration `protobuf:"bytes,3,opt,name=max_queue_age,json=maxQueueAge,proto3" json:"max_queue_age,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModelIngressWindow) Reset() {
+	*x = ModelIngressWindow{}
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelIngressWindow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelIngressWindow) ProtoMessage() {}
+
+func (x *ModelIngressWindow) ProtoReflect() protoreflect.Message {
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelIngressWindow.ProtoReflect.Descriptor instead.
+func (*ModelIngressWindow) Descriptor() ([]byte, []int) {
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ModelIngressWindow) GetMaxItems() uint32 {
+	if x != nil {
+		return x.MaxItems
+	}
+	return 0
+}
+
+func (x *ModelIngressWindow) GetMaxRetainedBytes() uint64 {
+	if x != nil {
+		return x.MaxRetainedBytes
+	}
+	return 0
+}
+
+func (x *ModelIngressWindow) GetMaxQueueAge() *durationpb.Duration {
+	if x != nil {
+		return x.MaxQueueAge
+	}
+	return nil
+}
+
 // UnitListenPlan 是单元作用域的签名入口合同，不进资产世代。
 type UnitListenPlan struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1416,14 +1480,16 @@ type UnitListenPlan struct {
 	// 签名覆盖排除本字段后的确定性 proto 字节。
 	Signature *Signature `protobuf:"bytes,8,opt,name=signature,proto3" json:"signature,omitempty"`
 	// 客户端来源取信策略；缺省时只信直接对端。
-	ClientSource  *ClientSourcePolicy `protobuf:"bytes,9,opt,name=client_source,json=clientSource,proto3" json:"client_source,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ClientSource *ClientSourcePolicy `protobuf:"bytes,9,opt,name=client_source,json=clientSource,proto3" json:"client_source,omitempty"`
+	// Edge 邻近模型输入缓存窗口的中央期望值。
+	ModelIngressWindow *ModelIngressWindow `protobuf:"bytes,10,opt,name=model_ingress_window,json=modelIngressWindow,proto3" json:"model_ingress_window,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *UnitListenPlan) Reset() {
 	*x = UnitListenPlan{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[14]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1435,7 +1501,7 @@ func (x *UnitListenPlan) String() string {
 func (*UnitListenPlan) ProtoMessage() {}
 
 func (x *UnitListenPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[14]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1448,7 +1514,7 @@ func (x *UnitListenPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitListenPlan.ProtoReflect.Descriptor instead.
 func (*UnitListenPlan) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{14}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UnitListenPlan) GetUnitId() string {
@@ -1514,6 +1580,13 @@ func (x *UnitListenPlan) GetClientSource() *ClientSourcePolicy {
 	return nil
 }
 
+func (x *UnitListenPlan) GetModelIngressWindow() *ModelIngressWindow {
+	if x != nil {
+		return x.ModelIngressWindow
+	}
+	return nil
+}
+
 // EvidencePolicy 是世代内证据可见档。
 type EvidencePolicy struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1525,7 +1598,7 @@ type EvidencePolicy struct {
 
 func (x *EvidencePolicy) Reset() {
 	*x = EvidencePolicy{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[15]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1537,7 +1610,7 @@ func (x *EvidencePolicy) String() string {
 func (*EvidencePolicy) ProtoMessage() {}
 
 func (x *EvidencePolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[15]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +1623,7 @@ func (x *EvidencePolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidencePolicy.ProtoReflect.Descriptor instead.
 func (*EvidencePolicy) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{15}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *EvidencePolicy) GetTier() commonv1.EvidencePolicyTier {
@@ -1575,7 +1648,7 @@ type EvidenceDigest struct {
 
 func (x *EvidenceDigest) Reset() {
 	*x = EvidenceDigest{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[16]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1587,7 +1660,7 @@ func (x *EvidenceDigest) String() string {
 func (*EvidenceDigest) ProtoMessage() {}
 
 func (x *EvidenceDigest) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[16]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1600,7 +1673,7 @@ func (x *EvidenceDigest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidenceDigest.ProtoReflect.Descriptor instead.
 func (*EvidenceDigest) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{16}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *EvidenceDigest) GetAlgorithm() commonv1.EvidenceDigestAlgorithm {
@@ -1635,7 +1708,7 @@ type ForwardPolicy struct {
 
 func (x *ForwardPolicy) Reset() {
 	*x = ForwardPolicy{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[17]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1647,7 +1720,7 @@ func (x *ForwardPolicy) String() string {
 func (*ForwardPolicy) ProtoMessage() {}
 
 func (x *ForwardPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[17]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1660,7 +1733,7 @@ func (x *ForwardPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForwardPolicy.ProtoReflect.Descriptor instead.
 func (*ForwardPolicy) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{17}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ForwardPolicy) GetKind() commonv1.ForwardPolicyKind {
@@ -1693,7 +1766,7 @@ type ModelProfile struct {
 
 func (x *ModelProfile) Reset() {
 	*x = ModelProfile{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[18]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1705,7 +1778,7 @@ func (x *ModelProfile) String() string {
 func (*ModelProfile) ProtoMessage() {}
 
 func (x *ModelProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[18]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1718,7 +1791,7 @@ func (x *ModelProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModelProfile.ProtoReflect.Descriptor instead.
 func (*ModelProfile) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{18}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ModelProfile) GetProfileId() string {
@@ -1842,7 +1915,7 @@ type TrafficReviewPolicy struct {
 
 func (x *TrafficReviewPolicy) Reset() {
 	*x = TrafficReviewPolicy{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[19]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1854,7 +1927,7 @@ func (x *TrafficReviewPolicy) String() string {
 func (*TrafficReviewPolicy) ProtoMessage() {}
 
 func (x *TrafficReviewPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[19]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1867,7 +1940,7 @@ func (x *TrafficReviewPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrafficReviewPolicy.ProtoReflect.Descriptor instead.
 func (*TrafficReviewPolicy) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{19}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TrafficReviewPolicy) GetWindowSeconds() int32 {
@@ -1958,7 +2031,7 @@ type HttpInspectionProfile struct {
 
 func (x *HttpInspectionProfile) Reset() {
 	*x = HttpInspectionProfile{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[20]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1970,7 +2043,7 @@ func (x *HttpInspectionProfile) String() string {
 func (*HttpInspectionProfile) ProtoMessage() {}
 
 func (x *HttpInspectionProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[20]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1983,7 +2056,7 @@ func (x *HttpInspectionProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpInspectionProfile.ProtoReflect.Descriptor instead.
 func (*HttpInspectionProfile) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{20}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *HttpInspectionProfile) GetNormalizePath() bool {
@@ -2108,7 +2181,7 @@ type ShapeSource struct {
 
 func (x *ShapeSource) Reset() {
 	*x = ShapeSource{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[21]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2120,7 +2193,7 @@ func (x *ShapeSource) String() string {
 func (*ShapeSource) ProtoMessage() {}
 
 func (x *ShapeSource) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[21]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2133,7 +2206,7 @@ func (x *ShapeSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShapeSource.ProtoReflect.Descriptor instead.
 func (*ShapeSource) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{21}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ShapeSource) GetMethods() []string {
@@ -2181,7 +2254,7 @@ type ShapeConstraint struct {
 
 func (x *ShapeConstraint) Reset() {
 	*x = ShapeConstraint{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[22]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2193,7 +2266,7 @@ func (x *ShapeConstraint) String() string {
 func (*ShapeConstraint) ProtoMessage() {}
 
 func (x *ShapeConstraint) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[22]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2206,7 +2279,7 @@ func (x *ShapeConstraint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShapeConstraint.ProtoReflect.Descriptor instead.
 func (*ShapeConstraint) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{22}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ShapeConstraint) GetSelector() string {
@@ -2258,7 +2331,7 @@ type DetectorManifest struct {
 
 func (x *DetectorManifest) Reset() {
 	*x = DetectorManifest{}
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[23]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2270,7 +2343,7 @@ func (x *DetectorManifest) String() string {
 func (*DetectorManifest) ProtoMessage() {}
 
 func (x *DetectorManifest) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[23]
+	mi := &file_yufeng_artifact_v1_v1_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2283,7 +2356,7 @@ func (x *DetectorManifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DetectorManifest.ProtoReflect.Descriptor instead.
 func (*DetectorManifest) Descriptor() ([]byte, []int) {
-	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{23}
+	return file_yufeng_artifact_v1_v1_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DetectorManifest) GetDetectorId() string {
@@ -2429,7 +2502,11 @@ const file_yufeng_artifact_v1_v1_proto_rawDesc = "" +
 	"\vrule_prefix\x18\x03 \x01(\tR\n" +
 	"rulePrefix\"D\n" +
 	"\x12ClientSourcePolicy\x12.\n" +
-	"\x13trusted_proxy_cidrs\x18\x01 \x03(\tR\x11trustedProxyCidrs\"\x9a\x03\n" +
+	"\x13trusted_proxy_cidrs\x18\x01 \x03(\tR\x11trustedProxyCidrs\"\x9e\x01\n" +
+	"\x12ModelIngressWindow\x12\x1b\n" +
+	"\tmax_items\x18\x01 \x01(\rR\bmaxItems\x12,\n" +
+	"\x12max_retained_bytes\x18\x02 \x01(\x04R\x10maxRetainedBytes\x12=\n" +
+	"\rmax_queue_age\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\vmaxQueueAge\"\xf4\x03\n" +
 	"\x0eUnitListenPlan\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12:\n" +
 	"\aposture\x18\x02 \x01(\x0e2 .yufeng.common.v1.IngressPostureR\aposture\x12\x1f\n" +
@@ -2440,7 +2517,9 @@ const file_yufeng_artifact_v1_v1_proto_rawDesc = "" +
 	"\x0elisten_address\x18\x06 \x01(\tR\rlistenAddress\x12!\n" +
 	"\fupstream_url\x18\a \x01(\tR\vupstreamUrl\x12;\n" +
 	"\tsignature\x18\b \x01(\v2\x1d.yufeng.artifact.v1.SignatureR\tsignature\x12K\n" +
-	"\rclient_source\x18\t \x01(\v2&.yufeng.artifact.v1.ClientSourcePolicyR\fclientSource\"J\n" +
+	"\rclient_source\x18\t \x01(\v2&.yufeng.artifact.v1.ClientSourcePolicyR\fclientSource\x12X\n" +
+	"\x14model_ingress_window\x18\n" +
+	" \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\x12modelIngressWindow\"J\n" +
 	"\x0eEvidencePolicy\x128\n" +
 	"\x04tier\x18\x01 \x01(\x0e2$.yufeng.common.v1.EvidencePolicyTierR\x04tier\"\x97\x01\n" +
 	"\x0eEvidenceDigest\x12G\n" +
@@ -2563,7 +2642,7 @@ func file_yufeng_artifact_v1_v1_proto_rawDescGZIP() []byte {
 }
 
 var file_yufeng_artifact_v1_v1_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_yufeng_artifact_v1_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_yufeng_artifact_v1_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_yufeng_artifact_v1_v1_proto_goTypes = []any{
 	(Kind)(0),                             // 0: yufeng.artifact.v1.Kind
 	(ModelDedupeRule)(0),                  // 1: yufeng.artifact.v1.ModelDedupeRule
@@ -2582,71 +2661,74 @@ var file_yufeng_artifact_v1_v1_proto_goTypes = []any{
 	(*TaxonomyMapper)(nil),                // 14: yufeng.artifact.v1.TaxonomyMapper
 	(*TaxonomyRule)(nil),                  // 15: yufeng.artifact.v1.TaxonomyRule
 	(*ClientSourcePolicy)(nil),            // 16: yufeng.artifact.v1.ClientSourcePolicy
-	(*UnitListenPlan)(nil),                // 17: yufeng.artifact.v1.UnitListenPlan
-	(*EvidencePolicy)(nil),                // 18: yufeng.artifact.v1.EvidencePolicy
-	(*EvidenceDigest)(nil),                // 19: yufeng.artifact.v1.EvidenceDigest
-	(*ForwardPolicy)(nil),                 // 20: yufeng.artifact.v1.ForwardPolicy
-	(*ModelProfile)(nil),                  // 21: yufeng.artifact.v1.ModelProfile
-	(*TrafficReviewPolicy)(nil),           // 22: yufeng.artifact.v1.TrafficReviewPolicy
-	(*HttpInspectionProfile)(nil),         // 23: yufeng.artifact.v1.HttpInspectionProfile
-	(*ShapeSource)(nil),                   // 24: yufeng.artifact.v1.ShapeSource
-	(*ShapeConstraint)(nil),               // 25: yufeng.artifact.v1.ShapeConstraint
-	(*DetectorManifest)(nil),              // 26: yufeng.artifact.v1.DetectorManifest
-	(*durationpb.Duration)(nil),           // 27: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),         // 28: google.protobuf.Timestamp
-	(commonv1.ExpiryBehavior)(0),          // 29: yufeng.common.v1.ExpiryBehavior
-	(commonv1.ScopeRisk)(0),               // 30: yufeng.common.v1.ScopeRisk
-	(commonv1.EvidenceClass)(0),           // 31: yufeng.common.v1.EvidenceClass
-	(*commonv1.DetectionKey)(nil),         // 32: yufeng.common.v1.DetectionKey
-	(commonv1.CoverageStatus)(0),          // 33: yufeng.common.v1.CoverageStatus
-	(commonv1.AttackClass)(0),             // 34: yufeng.common.v1.AttackClass
-	(commonv1.IngressPosture)(0),          // 35: yufeng.common.v1.IngressPosture
-	(commonv1.EvidencePolicyTier)(0),      // 36: yufeng.common.v1.EvidencePolicyTier
-	(commonv1.EvidenceDigestAlgorithm)(0), // 37: yufeng.common.v1.EvidenceDigestAlgorithm
-	(commonv1.ForwardPolicyKind)(0),       // 38: yufeng.common.v1.ForwardPolicyKind
+	(*ModelIngressWindow)(nil),            // 17: yufeng.artifact.v1.ModelIngressWindow
+	(*UnitListenPlan)(nil),                // 18: yufeng.artifact.v1.UnitListenPlan
+	(*EvidencePolicy)(nil),                // 19: yufeng.artifact.v1.EvidencePolicy
+	(*EvidenceDigest)(nil),                // 20: yufeng.artifact.v1.EvidenceDigest
+	(*ForwardPolicy)(nil),                 // 21: yufeng.artifact.v1.ForwardPolicy
+	(*ModelProfile)(nil),                  // 22: yufeng.artifact.v1.ModelProfile
+	(*TrafficReviewPolicy)(nil),           // 23: yufeng.artifact.v1.TrafficReviewPolicy
+	(*HttpInspectionProfile)(nil),         // 24: yufeng.artifact.v1.HttpInspectionProfile
+	(*ShapeSource)(nil),                   // 25: yufeng.artifact.v1.ShapeSource
+	(*ShapeConstraint)(nil),               // 26: yufeng.artifact.v1.ShapeConstraint
+	(*DetectorManifest)(nil),              // 27: yufeng.artifact.v1.DetectorManifest
+	(*durationpb.Duration)(nil),           // 28: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),         // 29: google.protobuf.Timestamp
+	(commonv1.ExpiryBehavior)(0),          // 30: yufeng.common.v1.ExpiryBehavior
+	(commonv1.ScopeRisk)(0),               // 31: yufeng.common.v1.ScopeRisk
+	(commonv1.EvidenceClass)(0),           // 32: yufeng.common.v1.EvidenceClass
+	(*commonv1.DetectionKey)(nil),         // 33: yufeng.common.v1.DetectionKey
+	(commonv1.CoverageStatus)(0),          // 34: yufeng.common.v1.CoverageStatus
+	(commonv1.AttackClass)(0),             // 35: yufeng.common.v1.AttackClass
+	(commonv1.IngressPosture)(0),          // 36: yufeng.common.v1.IngressPosture
+	(commonv1.EvidencePolicyTier)(0),      // 37: yufeng.common.v1.EvidencePolicyTier
+	(commonv1.EvidenceDigestAlgorithm)(0), // 38: yufeng.common.v1.EvidenceDigestAlgorithm
+	(commonv1.ForwardPolicyKind)(0),       // 39: yufeng.common.v1.ForwardPolicyKind
 }
 var file_yufeng_artifact_v1_v1_proto_depIdxs = []int32{
 	0,  // 0: yufeng.artifact.v1.Artifact.kind:type_name -> yufeng.artifact.v1.Kind
 	4,  // 1: yufeng.artifact.v1.Artifact.scope:type_name -> yufeng.artifact.v1.Scope
-	27, // 2: yufeng.artifact.v1.Artifact.ttl:type_name -> google.protobuf.Duration
+	28, // 2: yufeng.artifact.v1.Artifact.ttl:type_name -> google.protobuf.Duration
 	5,  // 3: yufeng.artifact.v1.Artifact.replay_report:type_name -> yufeng.artifact.v1.ReplayReport
 	6,  // 4: yufeng.artifact.v1.Artifact.signature:type_name -> yufeng.artifact.v1.Signature
-	28, // 5: yufeng.artifact.v1.Artifact.created_at:type_name -> google.protobuf.Timestamp
-	28, // 6: yufeng.artifact.v1.Artifact.review_at:type_name -> google.protobuf.Timestamp
-	28, // 7: yufeng.artifact.v1.Artifact.hard_expires_at:type_name -> google.protobuf.Timestamp
-	29, // 8: yufeng.artifact.v1.Artifact.expiry_behavior:type_name -> yufeng.common.v1.ExpiryBehavior
-	30, // 9: yufeng.artifact.v1.Artifact.scope_risk:type_name -> yufeng.common.v1.ScopeRisk
-	31, // 10: yufeng.artifact.v1.Artifact.evidence_class:type_name -> yufeng.common.v1.EvidenceClass
-	28, // 11: yufeng.artifact.v1.Signature.signed_at:type_name -> google.protobuf.Timestamp
+	29, // 5: yufeng.artifact.v1.Artifact.created_at:type_name -> google.protobuf.Timestamp
+	29, // 6: yufeng.artifact.v1.Artifact.review_at:type_name -> google.protobuf.Timestamp
+	29, // 7: yufeng.artifact.v1.Artifact.hard_expires_at:type_name -> google.protobuf.Timestamp
+	30, // 8: yufeng.artifact.v1.Artifact.expiry_behavior:type_name -> yufeng.common.v1.ExpiryBehavior
+	31, // 9: yufeng.artifact.v1.Artifact.scope_risk:type_name -> yufeng.common.v1.ScopeRisk
+	32, // 10: yufeng.artifact.v1.Artifact.evidence_class:type_name -> yufeng.common.v1.EvidenceClass
+	29, // 11: yufeng.artifact.v1.Signature.signed_at:type_name -> google.protobuf.Timestamp
 	8,  // 12: yufeng.artifact.v1.PolicyCandidate.scope:type_name -> yufeng.artifact.v1.PolicyScope
 	9,  // 13: yufeng.artifact.v1.PolicyCandidate.predicate:type_name -> yufeng.artifact.v1.PolicyPredicate
 	10, // 14: yufeng.artifact.v1.PolicyCandidate.dependencies:type_name -> yufeng.artifact.v1.PolicyDependencies
 	11, // 15: yufeng.artifact.v1.PolicyCandidate.governance:type_name -> yufeng.artifact.v1.PolicyGovernance
 	12, // 16: yufeng.artifact.v1.PolicyCandidate.lifecycle:type_name -> yufeng.artifact.v1.PolicyLifecycle
 	13, // 17: yufeng.artifact.v1.PolicyCandidate.rollout:type_name -> yufeng.artifact.v1.PolicyRollout
-	32, // 18: yufeng.artifact.v1.PolicyPredicate.detection_keys:type_name -> yufeng.common.v1.DetectionKey
-	33, // 19: yufeng.artifact.v1.PolicyPredicate.coverage_requirement:type_name -> yufeng.common.v1.CoverageStatus
-	30, // 20: yufeng.artifact.v1.PolicyGovernance.scope_risk:type_name -> yufeng.common.v1.ScopeRisk
-	31, // 21: yufeng.artifact.v1.PolicyGovernance.evidence_class:type_name -> yufeng.common.v1.EvidenceClass
-	28, // 22: yufeng.artifact.v1.PolicyLifecycle.review_at:type_name -> google.protobuf.Timestamp
-	28, // 23: yufeng.artifact.v1.PolicyLifecycle.hard_expires_at:type_name -> google.protobuf.Timestamp
-	29, // 24: yufeng.artifact.v1.PolicyLifecycle.expiry_behavior:type_name -> yufeng.common.v1.ExpiryBehavior
+	33, // 18: yufeng.artifact.v1.PolicyPredicate.detection_keys:type_name -> yufeng.common.v1.DetectionKey
+	34, // 19: yufeng.artifact.v1.PolicyPredicate.coverage_requirement:type_name -> yufeng.common.v1.CoverageStatus
+	31, // 20: yufeng.artifact.v1.PolicyGovernance.scope_risk:type_name -> yufeng.common.v1.ScopeRisk
+	32, // 21: yufeng.artifact.v1.PolicyGovernance.evidence_class:type_name -> yufeng.common.v1.EvidenceClass
+	29, // 22: yufeng.artifact.v1.PolicyLifecycle.review_at:type_name -> google.protobuf.Timestamp
+	29, // 23: yufeng.artifact.v1.PolicyLifecycle.hard_expires_at:type_name -> google.protobuf.Timestamp
+	30, // 24: yufeng.artifact.v1.PolicyLifecycle.expiry_behavior:type_name -> yufeng.common.v1.ExpiryBehavior
 	15, // 25: yufeng.artifact.v1.TaxonomyMapper.rules:type_name -> yufeng.artifact.v1.TaxonomyRule
-	34, // 26: yufeng.artifact.v1.TaxonomyRule.attack_class:type_name -> yufeng.common.v1.AttackClass
-	35, // 27: yufeng.artifact.v1.UnitListenPlan.posture:type_name -> yufeng.common.v1.IngressPosture
-	6,  // 28: yufeng.artifact.v1.UnitListenPlan.signature:type_name -> yufeng.artifact.v1.Signature
-	16, // 29: yufeng.artifact.v1.UnitListenPlan.client_source:type_name -> yufeng.artifact.v1.ClientSourcePolicy
-	36, // 30: yufeng.artifact.v1.EvidencePolicy.tier:type_name -> yufeng.common.v1.EvidencePolicyTier
-	37, // 31: yufeng.artifact.v1.EvidenceDigest.algorithm:type_name -> yufeng.common.v1.EvidenceDigestAlgorithm
-	38, // 32: yufeng.artifact.v1.ForwardPolicy.kind:type_name -> yufeng.common.v1.ForwardPolicyKind
-	1,  // 33: yufeng.artifact.v1.ModelProfile.dedupe_rule:type_name -> yufeng.artifact.v1.ModelDedupeRule
-	2,  // 34: yufeng.artifact.v1.TrafficReviewPolicy.mode:type_name -> yufeng.artifact.v1.TrafficReviewMode
-	25, // 35: yufeng.artifact.v1.ShapeSource.constraints:type_name -> yufeng.artifact.v1.ShapeConstraint
-	36, // [36:36] is the sub-list for method output_type
-	36, // [36:36] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	35, // 26: yufeng.artifact.v1.TaxonomyRule.attack_class:type_name -> yufeng.common.v1.AttackClass
+	28, // 27: yufeng.artifact.v1.ModelIngressWindow.max_queue_age:type_name -> google.protobuf.Duration
+	36, // 28: yufeng.artifact.v1.UnitListenPlan.posture:type_name -> yufeng.common.v1.IngressPosture
+	6,  // 29: yufeng.artifact.v1.UnitListenPlan.signature:type_name -> yufeng.artifact.v1.Signature
+	16, // 30: yufeng.artifact.v1.UnitListenPlan.client_source:type_name -> yufeng.artifact.v1.ClientSourcePolicy
+	17, // 31: yufeng.artifact.v1.UnitListenPlan.model_ingress_window:type_name -> yufeng.artifact.v1.ModelIngressWindow
+	37, // 32: yufeng.artifact.v1.EvidencePolicy.tier:type_name -> yufeng.common.v1.EvidencePolicyTier
+	38, // 33: yufeng.artifact.v1.EvidenceDigest.algorithm:type_name -> yufeng.common.v1.EvidenceDigestAlgorithm
+	39, // 34: yufeng.artifact.v1.ForwardPolicy.kind:type_name -> yufeng.common.v1.ForwardPolicyKind
+	1,  // 35: yufeng.artifact.v1.ModelProfile.dedupe_rule:type_name -> yufeng.artifact.v1.ModelDedupeRule
+	2,  // 36: yufeng.artifact.v1.TrafficReviewPolicy.mode:type_name -> yufeng.artifact.v1.TrafficReviewMode
+	26, // 37: yufeng.artifact.v1.ShapeSource.constraints:type_name -> yufeng.artifact.v1.ShapeConstraint
+	38, // [38:38] is the sub-list for method output_type
+	38, // [38:38] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_yufeng_artifact_v1_v1_proto_init() }
@@ -2660,7 +2742,7 @@ func file_yufeng_artifact_v1_v1_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_yufeng_artifact_v1_v1_proto_rawDesc), len(file_yufeng_artifact_v1_v1_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   24,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

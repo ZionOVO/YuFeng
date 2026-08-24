@@ -16,7 +16,6 @@ import (
 	"yufeng/lib/kernel"
 	artifactv1 "yufeng/proto/gen/artifactv1"
 	commonv1 "yufeng/proto/gen/commonv1"
-	modelsidev1 "yufeng/proto/gen/modelsidev1"
 )
 
 // silentEye 只出发现，故意不提供 Action——新眼睛不能单靠接口 403。
@@ -236,20 +235,14 @@ func TestEvidenceRingEvictsByCapacity(t *testing.T) {
 	}
 }
 
-func TestModelIngressDropsWhenFull(t *testing.T) {
-	q := NewModelIngressQueue()
-	q.ch = make(chan *ModelIngressItem, 1)
-	item := func(id string) *ModelIngressItem {
-		return &ModelIngressItem{Profile: kernel.DefaultModelProfile(), Traffic: &modelsidev1.NormalizedTraffic{RequestId: id, Body: []byte("x")}}
-	}
-	if !q.Offer(item("1")) {
+func TestModelIngressDropOldestCanBeForced(t *testing.T) {
+	q := newModelIngressTestQueue(t, modelIngressTestWindow(1, 1<<20, time.Minute))
+	configureModelIngressTestQueue(t, q, modelIngressTestWindow(1, 1<<20, time.Minute))
+	if !q.Offer(modelIngressTestItem("1", "profile-a", []byte("x"))) {
 		t.Fatal("first offer must succeed")
 	}
-	if q.Depth() != 1 || q.QueuedBodyBytes() != 1 {
-		t.Fatalf("queued depth=%d bytes=%d", q.Depth(), q.QueuedBodyBytes())
-	}
-	if q.Offer(item("2")) {
-		t.Fatal("full queue must drop model ingress")
+	if !q.Offer(modelIngressTestItem("2", "profile-a", []byte("x"))) {
+		t.Fatal("full window must retain the newest model ingress")
 	}
 	if q.Dropped() != 1 {
 		t.Fatalf("dropped=%d", q.Dropped())

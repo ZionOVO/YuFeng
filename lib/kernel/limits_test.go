@@ -61,8 +61,23 @@ func TestResourceLimitsMatchFrozenContract(t *testing.T) {
 	if ModelBypassP99Budget != time.Millisecond {
 		t.Fatalf("ModelBypassP99Budget=%s", ModelBypassP99Budget)
 	}
-	if ModelSideIngressQueueMax != 256 || ModelSideResultQueueMax != 1024 || ModelSideUploadBatchMax != 100 {
-		t.Fatalf("modelside queues ingress=%d results=%d batch=%d", ModelSideIngressQueueMax, ModelSideResultQueueMax, ModelSideUploadBatchMax)
+	if ModelBypassCPUPercentBudget != 5 {
+		t.Fatalf("ModelBypassCPUPercentBudget=%v", ModelBypassCPUPercentBudget)
+	}
+	if ModelIngressDefaultItems != 4096 || ModelIngressDefaultBytes != 128<<20 || ModelIngressDefaultAge != 2*time.Second {
+		t.Fatalf("model ingress default items=%d bytes=%d age=%s", ModelIngressDefaultItems, ModelIngressDefaultBytes, ModelIngressDefaultAge)
+	}
+	if ModelIngressLocalMaxItems != 16384 || ModelIngressLocalMaxBytes != 256<<20 || ModelIngressLocalMaxAge != 5*time.Minute {
+		t.Fatalf("model ingress local max items=%d bytes=%d age=%s", ModelIngressLocalMaxItems, ModelIngressLocalMaxBytes, ModelIngressLocalMaxAge)
+	}
+	if ModelIngressAbsoluteMaxItems != 65536 || ModelIngressAbsoluteMinBytes != 1<<20 || ModelIngressAbsoluteMaxBytes != 256<<20 || ModelIngressAbsoluteMinAge != 10*time.Millisecond || ModelIngressAbsoluteMaxAge != 5*time.Minute {
+		t.Fatalf("model ingress absolute items=%d bytes=%d..%d age=%s..%s", ModelIngressAbsoluteMaxItems, ModelIngressAbsoluteMinBytes, ModelIngressAbsoluteMaxBytes, ModelIngressAbsoluteMinAge, ModelIngressAbsoluteMaxAge)
+	}
+	if ModelIngressBatchMaxItems != 32 || ModelIngressBatchMaxBytes != 4<<20 || ModelIngressBatchWait != 10*time.Millisecond || ModelSideIngressWorkers != 2 {
+		t.Fatalf("model ingress batch items=%d bytes=%d wait=%s workers=%d", ModelIngressBatchMaxItems, ModelIngressBatchMaxBytes, ModelIngressBatchWait, ModelSideIngressWorkers)
+	}
+	if ModelSideIngressReceiveMaxBytes != 10<<20 || ModelSideResultQueueMax != 1024 || ModelSideUploadBatchMax != 100 {
+		t.Fatalf("modelside receive=%d results=%d upload batch=%d", ModelSideIngressReceiveMaxBytes, ModelSideResultQueueMax, ModelSideUploadBatchMax)
 	}
 	if ModelReviewWindow != 5*time.Minute || ModelReviewPerUnit != 4 || ModelReviewPerRoute != 1 {
 		t.Fatalf("model review window=%s unit=%d route=%d", ModelReviewWindow, ModelReviewPerUnit, ModelReviewPerRoute)

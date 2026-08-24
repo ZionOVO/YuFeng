@@ -112,7 +112,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // readInspectionBody 读进引擎体上限并回填，同时报告是否超体。
 func readInspectionBody(r *http.Request) (body []byte, oversize bool, total int64) {
-	if r.Body == nil {
+	if r.Body == nil || r.Body == http.NoBody {
 		return nil, false, 0
 	}
 	limit := kernel.EngineBodyLimitBytes
@@ -120,19 +120,19 @@ func readInspectionBody(r *http.Request) (body []byte, oversize bool, total int6
 		oversize = true
 		total = r.ContentLength
 	}
-	buf := make([]byte, limit+1)
-	n, _ := io.ReadFull(r.Body, buf)
-	r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(buf[:n]), r.Body))
+	buf, _ := io.ReadAll(io.LimitReader(r.Body, int64(limit+1)))
+	n := len(buf)
+	r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(buf), r.Body))
 	if n > limit {
 		oversize = true
 		if total == 0 {
 			total = int64(n)
 		}
-		n = limit
+		buf = buf[:limit]
 	} else if total == 0 {
 		total = int64(n)
 	}
-	return buf[:n], oversize, total
+	return buf, oversize, total
 }
 
 func flattenHeaders(h http.Header) map[string]string {

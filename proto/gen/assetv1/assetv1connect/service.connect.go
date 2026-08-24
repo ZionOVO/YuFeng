@@ -57,6 +57,12 @@ const (
 	// AssetServiceUpdateTrafficReviewPolicyProcedure is the fully-qualified name of the AssetService's
 	// UpdateTrafficReviewPolicy RPC.
 	AssetServiceUpdateTrafficReviewPolicyProcedure = "/yufeng.asset.v1.AssetService/UpdateTrafficReviewPolicy"
+	// AssetServiceGetModelIngressWindowProcedure is the fully-qualified name of the AssetService's
+	// GetModelIngressWindow RPC.
+	AssetServiceGetModelIngressWindowProcedure = "/yufeng.asset.v1.AssetService/GetModelIngressWindow"
+	// AssetServiceUpdateModelIngressWindowProcedure is the fully-qualified name of the AssetService's
+	// UpdateModelIngressWindow RPC.
+	AssetServiceUpdateModelIngressWindowProcedure = "/yufeng.asset.v1.AssetService/UpdateModelIngressWindow"
 )
 
 // AssetServiceClient is a client for the yufeng.asset.v1.AssetService service.
@@ -70,6 +76,8 @@ type AssetServiceClient interface {
 	DetachUnit(context.Context, *connect.Request[assetv1.DetachUnitRequest]) (*connect.Response[assetv1.DetachUnitResponse], error)
 	GetTrafficReviewPolicy(context.Context, *connect.Request[assetv1.GetTrafficReviewPolicyRequest]) (*connect.Response[assetv1.GetTrafficReviewPolicyResponse], error)
 	UpdateTrafficReviewPolicy(context.Context, *connect.Request[assetv1.UpdateTrafficReviewPolicyRequest]) (*connect.Response[assetv1.UpdateTrafficReviewPolicyResponse], error)
+	GetModelIngressWindow(context.Context, *connect.Request[assetv1.GetModelIngressWindowRequest]) (*connect.Response[assetv1.GetModelIngressWindowResponse], error)
+	UpdateModelIngressWindow(context.Context, *connect.Request[assetv1.UpdateModelIngressWindowRequest]) (*connect.Response[assetv1.UpdateModelIngressWindowResponse], error)
 }
 
 // NewAssetServiceClient constructs a client for the yufeng.asset.v1.AssetService service. By
@@ -137,6 +145,18 @@ func NewAssetServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(assetServiceMethods.ByName("UpdateTrafficReviewPolicy")),
 			connect.WithClientOptions(opts...),
 		),
+		getModelIngressWindow: connect.NewClient[assetv1.GetModelIngressWindowRequest, assetv1.GetModelIngressWindowResponse](
+			httpClient,
+			baseURL+AssetServiceGetModelIngressWindowProcedure,
+			connect.WithSchema(assetServiceMethods.ByName("GetModelIngressWindow")),
+			connect.WithClientOptions(opts...),
+		),
+		updateModelIngressWindow: connect.NewClient[assetv1.UpdateModelIngressWindowRequest, assetv1.UpdateModelIngressWindowResponse](
+			httpClient,
+			baseURL+AssetServiceUpdateModelIngressWindowProcedure,
+			connect.WithSchema(assetServiceMethods.ByName("UpdateModelIngressWindow")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -151,6 +171,8 @@ type assetServiceClient struct {
 	detachUnit                *connect.Client[assetv1.DetachUnitRequest, assetv1.DetachUnitResponse]
 	getTrafficReviewPolicy    *connect.Client[assetv1.GetTrafficReviewPolicyRequest, assetv1.GetTrafficReviewPolicyResponse]
 	updateTrafficReviewPolicy *connect.Client[assetv1.UpdateTrafficReviewPolicyRequest, assetv1.UpdateTrafficReviewPolicyResponse]
+	getModelIngressWindow     *connect.Client[assetv1.GetModelIngressWindowRequest, assetv1.GetModelIngressWindowResponse]
+	updateModelIngressWindow  *connect.Client[assetv1.UpdateModelIngressWindowRequest, assetv1.UpdateModelIngressWindowResponse]
 }
 
 // CreateAsset calls yufeng.asset.v1.AssetService.CreateAsset.
@@ -198,6 +220,16 @@ func (c *assetServiceClient) UpdateTrafficReviewPolicy(ctx context.Context, req 
 	return c.updateTrafficReviewPolicy.CallUnary(ctx, req)
 }
 
+// GetModelIngressWindow calls yufeng.asset.v1.AssetService.GetModelIngressWindow.
+func (c *assetServiceClient) GetModelIngressWindow(ctx context.Context, req *connect.Request[assetv1.GetModelIngressWindowRequest]) (*connect.Response[assetv1.GetModelIngressWindowResponse], error) {
+	return c.getModelIngressWindow.CallUnary(ctx, req)
+}
+
+// UpdateModelIngressWindow calls yufeng.asset.v1.AssetService.UpdateModelIngressWindow.
+func (c *assetServiceClient) UpdateModelIngressWindow(ctx context.Context, req *connect.Request[assetv1.UpdateModelIngressWindowRequest]) (*connect.Response[assetv1.UpdateModelIngressWindowResponse], error) {
+	return c.updateModelIngressWindow.CallUnary(ctx, req)
+}
+
 // AssetServiceHandler is an implementation of the yufeng.asset.v1.AssetService service.
 type AssetServiceHandler interface {
 	CreateAsset(context.Context, *connect.Request[assetv1.CreateAssetRequest]) (*connect.Response[assetv1.CreateAssetResponse], error)
@@ -209,6 +241,8 @@ type AssetServiceHandler interface {
 	DetachUnit(context.Context, *connect.Request[assetv1.DetachUnitRequest]) (*connect.Response[assetv1.DetachUnitResponse], error)
 	GetTrafficReviewPolicy(context.Context, *connect.Request[assetv1.GetTrafficReviewPolicyRequest]) (*connect.Response[assetv1.GetTrafficReviewPolicyResponse], error)
 	UpdateTrafficReviewPolicy(context.Context, *connect.Request[assetv1.UpdateTrafficReviewPolicyRequest]) (*connect.Response[assetv1.UpdateTrafficReviewPolicyResponse], error)
+	GetModelIngressWindow(context.Context, *connect.Request[assetv1.GetModelIngressWindowRequest]) (*connect.Response[assetv1.GetModelIngressWindowResponse], error)
+	UpdateModelIngressWindow(context.Context, *connect.Request[assetv1.UpdateModelIngressWindowRequest]) (*connect.Response[assetv1.UpdateModelIngressWindowResponse], error)
 }
 
 // NewAssetServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -272,6 +306,18 @@ func NewAssetServiceHandler(svc AssetServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(assetServiceMethods.ByName("UpdateTrafficReviewPolicy")),
 		connect.WithHandlerOptions(opts...),
 	)
+	assetServiceGetModelIngressWindowHandler := connect.NewUnaryHandler(
+		AssetServiceGetModelIngressWindowProcedure,
+		svc.GetModelIngressWindow,
+		connect.WithSchema(assetServiceMethods.ByName("GetModelIngressWindow")),
+		connect.WithHandlerOptions(opts...),
+	)
+	assetServiceUpdateModelIngressWindowHandler := connect.NewUnaryHandler(
+		AssetServiceUpdateModelIngressWindowProcedure,
+		svc.UpdateModelIngressWindow,
+		connect.WithSchema(assetServiceMethods.ByName("UpdateModelIngressWindow")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/yufeng.asset.v1.AssetService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AssetServiceCreateAssetProcedure:
@@ -292,6 +338,10 @@ func NewAssetServiceHandler(svc AssetServiceHandler, opts ...connect.HandlerOpti
 			assetServiceGetTrafficReviewPolicyHandler.ServeHTTP(w, r)
 		case AssetServiceUpdateTrafficReviewPolicyProcedure:
 			assetServiceUpdateTrafficReviewPolicyHandler.ServeHTTP(w, r)
+		case AssetServiceGetModelIngressWindowProcedure:
+			assetServiceGetModelIngressWindowHandler.ServeHTTP(w, r)
+		case AssetServiceUpdateModelIngressWindowProcedure:
+			assetServiceUpdateModelIngressWindowHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -335,4 +385,12 @@ func (UnimplementedAssetServiceHandler) GetTrafficReviewPolicy(context.Context, 
 
 func (UnimplementedAssetServiceHandler) UpdateTrafficReviewPolicy(context.Context, *connect.Request[assetv1.UpdateTrafficReviewPolicyRequest]) (*connect.Response[assetv1.UpdateTrafficReviewPolicyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("yufeng.asset.v1.AssetService.UpdateTrafficReviewPolicy is not implemented"))
+}
+
+func (UnimplementedAssetServiceHandler) GetModelIngressWindow(context.Context, *connect.Request[assetv1.GetModelIngressWindowRequest]) (*connect.Response[assetv1.GetModelIngressWindowResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("yufeng.asset.v1.AssetService.GetModelIngressWindow is not implemented"))
+}
+
+func (UnimplementedAssetServiceHandler) UpdateModelIngressWindow(context.Context, *connect.Request[assetv1.UpdateModelIngressWindowRequest]) (*connect.Response[assetv1.UpdateModelIngressWindowResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("yufeng.asset.v1.AssetService.UpdateModelIngressWindow is not implemented"))
 }

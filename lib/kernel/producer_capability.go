@@ -97,6 +97,16 @@ func NormalizeProducerCapabilities(in *unitv1.ProducerCapabilities) (*unitv1.Pro
 	if out.MaxEventBatch == 0 || out.MaxInFlightRequests == 0 || out.MaxSpoolBytes == 0 || out.MaxEvidenceEntries == 0 {
 		return nil, errors.New("producer capability capacities must be positive")
 	}
+	if out.GetLocalAsyncBypass() {
+		window, err := NormalizeModelIngressWindow(out.GetModelIngressHardLimit())
+		if err != nil {
+			return nil, errors.New("producer model ingress hard limit is invalid")
+		}
+		out.ModelIngressHardLimit = window
+		if out.GetMaxModelIngressBatchItems() == 0 || out.GetMaxModelIngressBatchItems() > ModelIngressBatchMaxItems {
+			return nil, errors.New("producer model ingress batch capacity is invalid")
+		}
+	}
 	return out, nil
 }
 
@@ -122,5 +132,46 @@ func NormalizeProducerHealth(in *unitv1.ProducerHealth) (*unitv1.ProducerHealth,
 		out.HealthyProjectionVersions = append(out.HealthyProjectionVersions, value)
 	}
 	slices.Sort(out.HealthyProjectionVersions)
+
+	state := out.GetModelIngressWindowState()
+	if state < unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED || state > unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_DISABLED {
+		return nil, errors.New("producer health contains invalid model ingress state")
+	}
+	reasons := make(map[unitv1.ModelIngressDegradationReason]struct{}, len(out.ModelIngressDegradationReasons))
+	for _, reason := range out.ModelIngressDegradationReasons {
+		if reason < unitv1.ModelIngressDegradationReason_MODEL_INGRESS_DEGRADATION_REASON_MAX_ITEMS ||
+			reason > unitv1.ModelIngressDegradationReason_MODEL_INGRESS_DEGRADATION_REASON_MAX_QUEUE_AGE {
+			return nil, errors.New("producer health contains invalid model ingress degradation reason")
+		}
+		reasons[reason] = struct{}{}
+	}
+	out.ModelIngressDegradationReasons = out.ModelIngressDegradationReasons[:0]
+	for reason := range reasons {
+		out.ModelIngressDegradationReasons = append(out.ModelIngressDegradationReasons, reason)
+	}
+	slices.Sort(out.ModelIngressDegradationReasons)
+	if state == unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_APPLIED ||
+		state == unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_DEGRADED ||
+		state == unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_CONVERGING {
+		window, err := NormalizeModelIngressWindow(out.GetEffectiveModelIngressWindow())
+		if err != nil {
+			return nil, errors.New("producer health model ingress window is invalid")
+		}
+		out.EffectiveModelIngressWindow = window
+	}
+	if state == unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_APPLIED && len(out.ModelIngressDegradationReasons) != 0 {
+		return nil, errors.New("applied model ingress window must not report degradation")
+	}
+	if state == unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_DEGRADED && len(out.ModelIngressDegradationReasons) == 0 {
+		return nil, errors.New("degraded model ingress window must report a reason")
+	}
+	if drops := out.GetModelIngressDrops(); drops != nil {
+		total := drops.GetEvictedOldest() + drops.GetExpired() + drops.GetItemTooLarge() + drops.GetInFlightCapacity() + drops.GetTransportFailed() + drops.GetModelsideRejected() + drops.GetAdmissionBudget()
+		if total != out.GetDroppedLocalBypassItems() {
+			return nil, errors.New("producer model ingress drop counters do not match aggregate")
+		}
+	} else if out.GetDroppedLocalBypassItems() != 0 {
+		return nil, errors.New("producer model ingress drop counters are required")
+	}
 	return out, nil
 }

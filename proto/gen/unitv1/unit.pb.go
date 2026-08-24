@@ -15,6 +15,7 @@ import (
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+	artifactv1 "yufeng/proto/gen/artifactv1"
 	commonv1 "yufeng/proto/gen/commonv1"
 )
 
@@ -133,6 +134,213 @@ func (SensorType) EnumDescriptor() ([]byte, []int) {
 	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{1}
 }
 
+// ModelIngressWindowState 是 Edge 模型输入缓存窗口的应用状态。
+type ModelIngressWindowState int32
+
+const (
+	ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED ModelIngressWindowState = 0
+	// 中央期望值已完整应用。
+	ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_APPLIED ModelIngressWindowState = 1
+	// 本机硬上限收窄了中央期望值。
+	ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_DEGRADED ModelIngressWindowState = 2
+	// 新上限已应用，旧排队或在途项仍在自然收敛。
+	ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_CONVERGING ModelIngressWindowState = 3
+	// 邻近模型旁路未启用。
+	ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_DISABLED ModelIngressWindowState = 4
+)
+
+// Enum value maps for ModelIngressWindowState.
+var (
+	ModelIngressWindowState_name = map[int32]string{
+		0: "MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED",
+		1: "MODEL_INGRESS_WINDOW_STATE_APPLIED",
+		2: "MODEL_INGRESS_WINDOW_STATE_DEGRADED",
+		3: "MODEL_INGRESS_WINDOW_STATE_CONVERGING",
+		4: "MODEL_INGRESS_WINDOW_STATE_DISABLED",
+	}
+	ModelIngressWindowState_value = map[string]int32{
+		"MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED": 0,
+		"MODEL_INGRESS_WINDOW_STATE_APPLIED":     1,
+		"MODEL_INGRESS_WINDOW_STATE_DEGRADED":    2,
+		"MODEL_INGRESS_WINDOW_STATE_CONVERGING":  3,
+		"MODEL_INGRESS_WINDOW_STATE_DISABLED":    4,
+	}
+)
+
+func (x ModelIngressWindowState) Enum() *ModelIngressWindowState {
+	p := new(ModelIngressWindowState)
+	*p = x
+	return p
+}
+
+func (x ModelIngressWindowState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ModelIngressWindowState) Descriptor() protoreflect.EnumDescriptor {
+	return file_yufeng_unit_v1_unit_proto_enumTypes[2].Descriptor()
+}
+
+func (ModelIngressWindowState) Type() protoreflect.EnumType {
+	return &file_yufeng_unit_v1_unit_proto_enumTypes[2]
+}
+
+func (x ModelIngressWindowState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ModelIngressWindowState.Descriptor instead.
+func (ModelIngressWindowState) EnumDescriptor() ([]byte, []int) {
+	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{2}
+}
+
+// ModelIngressDegradationReason 是中央期望值被本机收窄的闭集原因。
+type ModelIngressDegradationReason int32
+
+const (
+	ModelIngressDegradationReason_MODEL_INGRESS_DEGRADATION_REASON_UNSPECIFIED        ModelIngressDegradationReason = 0
+	ModelIngressDegradationReason_MODEL_INGRESS_DEGRADATION_REASON_MAX_ITEMS          ModelIngressDegradationReason = 1
+	ModelIngressDegradationReason_MODEL_INGRESS_DEGRADATION_REASON_MAX_RETAINED_BYTES ModelIngressDegradationReason = 2
+	ModelIngressDegradationReason_MODEL_INGRESS_DEGRADATION_REASON_MAX_QUEUE_AGE      ModelIngressDegradationReason = 3
+)
+
+// Enum value maps for ModelIngressDegradationReason.
+var (
+	ModelIngressDegradationReason_name = map[int32]string{
+		0: "MODEL_INGRESS_DEGRADATION_REASON_UNSPECIFIED",
+		1: "MODEL_INGRESS_DEGRADATION_REASON_MAX_ITEMS",
+		2: "MODEL_INGRESS_DEGRADATION_REASON_MAX_RETAINED_BYTES",
+		3: "MODEL_INGRESS_DEGRADATION_REASON_MAX_QUEUE_AGE",
+	}
+	ModelIngressDegradationReason_value = map[string]int32{
+		"MODEL_INGRESS_DEGRADATION_REASON_UNSPECIFIED":        0,
+		"MODEL_INGRESS_DEGRADATION_REASON_MAX_ITEMS":          1,
+		"MODEL_INGRESS_DEGRADATION_REASON_MAX_RETAINED_BYTES": 2,
+		"MODEL_INGRESS_DEGRADATION_REASON_MAX_QUEUE_AGE":      3,
+	}
+)
+
+func (x ModelIngressDegradationReason) Enum() *ModelIngressDegradationReason {
+	p := new(ModelIngressDegradationReason)
+	*p = x
+	return p
+}
+
+func (x ModelIngressDegradationReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ModelIngressDegradationReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_yufeng_unit_v1_unit_proto_enumTypes[3].Descriptor()
+}
+
+func (ModelIngressDegradationReason) Type() protoreflect.EnumType {
+	return &file_yufeng_unit_v1_unit_proto_enumTypes[3]
+}
+
+func (x ModelIngressDegradationReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ModelIngressDegradationReason.Descriptor instead.
+func (ModelIngressDegradationReason) EnumDescriptor() ([]byte, []int) {
+	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{3}
+}
+
+// ModelIngressDropCounters 按失败边界拆分易失旁路丢弃。
+type ModelIngressDropCounters struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	EvictedOldest     uint64                 `protobuf:"varint,1,opt,name=evicted_oldest,json=evictedOldest,proto3" json:"evicted_oldest,omitempty"`
+	Expired           uint64                 `protobuf:"varint,2,opt,name=expired,proto3" json:"expired,omitempty"`
+	ItemTooLarge      uint64                 `protobuf:"varint,3,opt,name=item_too_large,json=itemTooLarge,proto3" json:"item_too_large,omitempty"`
+	InFlightCapacity  uint64                 `protobuf:"varint,4,opt,name=in_flight_capacity,json=inFlightCapacity,proto3" json:"in_flight_capacity,omitempty"`
+	TransportFailed   uint64                 `protobuf:"varint,5,opt,name=transport_failed,json=transportFailed,proto3" json:"transport_failed,omitempty"`
+	ModelsideRejected uint64                 `protobuf:"varint,6,opt,name=modelside_rejected,json=modelsideRejected,proto3" json:"modelside_rejected,omitempty"`
+	// 为保护请求路径，达到单次有界淘汰预算后仍无法准入的新项。
+	AdmissionBudget uint64 `protobuf:"varint,7,opt,name=admission_budget,json=admissionBudget,proto3" json:"admission_budget,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ModelIngressDropCounters) Reset() {
+	*x = ModelIngressDropCounters{}
+	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelIngressDropCounters) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelIngressDropCounters) ProtoMessage() {}
+
+func (x *ModelIngressDropCounters) ProtoReflect() protoreflect.Message {
+	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelIngressDropCounters.ProtoReflect.Descriptor instead.
+func (*ModelIngressDropCounters) Descriptor() ([]byte, []int) {
+	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ModelIngressDropCounters) GetEvictedOldest() uint64 {
+	if x != nil {
+		return x.EvictedOldest
+	}
+	return 0
+}
+
+func (x *ModelIngressDropCounters) GetExpired() uint64 {
+	if x != nil {
+		return x.Expired
+	}
+	return 0
+}
+
+func (x *ModelIngressDropCounters) GetItemTooLarge() uint64 {
+	if x != nil {
+		return x.ItemTooLarge
+	}
+	return 0
+}
+
+func (x *ModelIngressDropCounters) GetInFlightCapacity() uint64 {
+	if x != nil {
+		return x.InFlightCapacity
+	}
+	return 0
+}
+
+func (x *ModelIngressDropCounters) GetTransportFailed() uint64 {
+	if x != nil {
+		return x.TransportFailed
+	}
+	return 0
+}
+
+func (x *ModelIngressDropCounters) GetModelsideRejected() uint64 {
+	if x != nil {
+		return x.ModelsideRejected
+	}
+	return 0
+}
+
+func (x *ModelIngressDropCounters) GetAdmissionBudget() uint64 {
+	if x != nil {
+		return x.AdmissionBudget
+	}
+	return 0
+}
+
 // ProducerCapabilities 声明单元客观具备的生产能力，不授予任何权限。
 type ProducerCapabilities struct {
 	state               protoimpl.MessageState    `protogen:"open.v1"`
@@ -148,13 +356,17 @@ type ProducerCapabilities struct {
 	MaxEvidenceEntries  uint32                    `protobuf:"varint,10,opt,name=max_evidence_entries,json=maxEvidenceEntries,proto3" json:"max_evidence_entries,omitempty"`
 	// 当前二进制实现的模块协议能力；只用于兼容性判断，不产生授权。
 	ModuleCapabilities []string `protobuf:"bytes,11,rep,name=module_capabilities,json=moduleCapabilities,proto3" json:"module_capabilities,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// 本机允许中央监听计划使用的模型输入缓存窗口硬上限。
+	ModelIngressHardLimit *artifactv1.ModelIngressWindow `protobuf:"bytes,12,opt,name=model_ingress_hard_limit,json=modelIngressHardLimit,proto3" json:"model_ingress_hard_limit,omitempty"`
+	// 单次提交给 ModelSide 的最大流量条数。
+	MaxModelIngressBatchItems uint32 `protobuf:"varint,13,opt,name=max_model_ingress_batch_items,json=maxModelIngressBatchItems,proto3" json:"max_model_ingress_batch_items,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *ProducerCapabilities) Reset() {
 	*x = ProducerCapabilities{}
-	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[0]
+	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -166,7 +378,7 @@ func (x *ProducerCapabilities) String() string {
 func (*ProducerCapabilities) ProtoMessage() {}
 
 func (x *ProducerCapabilities) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[0]
+	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,7 +391,7 @@ func (x *ProducerCapabilities) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProducerCapabilities.ProtoReflect.Descriptor instead.
 func (*ProducerCapabilities) Descriptor() ([]byte, []int) {
-	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{0}
+	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ProducerCapabilities) GetOutputs() []ProducerOutput {
@@ -259,23 +471,46 @@ func (x *ProducerCapabilities) GetModuleCapabilities() []string {
 	return nil
 }
 
+func (x *ProducerCapabilities) GetModelIngressHardLimit() *artifactv1.ModelIngressWindow {
+	if x != nil {
+		return x.ModelIngressHardLimit
+	}
+	return nil
+}
+
+func (x *ProducerCapabilities) GetMaxModelIngressBatchItems() uint32 {
+	if x != nil {
+		return x.MaxModelIngressBatchItems
+	}
+	return 0
+}
+
 // ProducerHealth 是能力对应的单调或瞬时健康投影，不携带请求原文。
 type ProducerHealth struct {
-	state                     protoimpl.MessageState `protogen:"open.v1"`
-	BufferedCriticalEvents    uint64                 `protobuf:"varint,1,opt,name=buffered_critical_events,json=bufferedCriticalEvents,proto3" json:"buffered_critical_events,omitempty"`
-	BufferedOrdinarySamples   uint64                 `protobuf:"varint,2,opt,name=buffered_ordinary_samples,json=bufferedOrdinarySamples,proto3" json:"buffered_ordinary_samples,omitempty"`
-	DroppedCriticalEvents     uint64                 `protobuf:"varint,3,opt,name=dropped_critical_events,json=droppedCriticalEvents,proto3" json:"dropped_critical_events,omitempty"`
-	DroppedOrdinarySamples    uint64                 `protobuf:"varint,4,opt,name=dropped_ordinary_samples,json=droppedOrdinarySamples,proto3" json:"dropped_ordinary_samples,omitempty"`
-	DroppedLocalBypassItems   uint64                 `protobuf:"varint,5,opt,name=dropped_local_bypass_items,json=droppedLocalBypassItems,proto3" json:"dropped_local_bypass_items,omitempty"`
-	ProjectionFailures        uint64                 `protobuf:"varint,6,opt,name=projection_failures,json=projectionFailures,proto3" json:"projection_failures,omitempty"`
-	HealthyProjectionVersions []string               `protobuf:"bytes,7,rep,name=healthy_projection_versions,json=healthyProjectionVersions,proto3" json:"healthy_projection_versions,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	state                          protoimpl.MessageState          `protogen:"open.v1"`
+	BufferedCriticalEvents         uint64                          `protobuf:"varint,1,opt,name=buffered_critical_events,json=bufferedCriticalEvents,proto3" json:"buffered_critical_events,omitempty"`
+	BufferedOrdinarySamples        uint64                          `protobuf:"varint,2,opt,name=buffered_ordinary_samples,json=bufferedOrdinarySamples,proto3" json:"buffered_ordinary_samples,omitempty"`
+	DroppedCriticalEvents          uint64                          `protobuf:"varint,3,opt,name=dropped_critical_events,json=droppedCriticalEvents,proto3" json:"dropped_critical_events,omitempty"`
+	DroppedOrdinarySamples         uint64                          `protobuf:"varint,4,opt,name=dropped_ordinary_samples,json=droppedOrdinarySamples,proto3" json:"dropped_ordinary_samples,omitempty"`
+	DroppedLocalBypassItems        uint64                          `protobuf:"varint,5,opt,name=dropped_local_bypass_items,json=droppedLocalBypassItems,proto3" json:"dropped_local_bypass_items,omitempty"`
+	ProjectionFailures             uint64                          `protobuf:"varint,6,opt,name=projection_failures,json=projectionFailures,proto3" json:"projection_failures,omitempty"`
+	HealthyProjectionVersions      []string                        `protobuf:"bytes,7,rep,name=healthy_projection_versions,json=healthyProjectionVersions,proto3" json:"healthy_projection_versions,omitempty"`
+	EffectiveModelIngressWindow    *artifactv1.ModelIngressWindow  `protobuf:"bytes,8,opt,name=effective_model_ingress_window,json=effectiveModelIngressWindow,proto3" json:"effective_model_ingress_window,omitempty"`
+	ModelIngressWindowState        ModelIngressWindowState         `protobuf:"varint,9,opt,name=model_ingress_window_state,json=modelIngressWindowState,proto3,enum=yufeng.unit.v1.ModelIngressWindowState" json:"model_ingress_window_state,omitempty"`
+	ModelIngressDegradationReasons []ModelIngressDegradationReason `protobuf:"varint,10,rep,packed,name=model_ingress_degradation_reasons,json=modelIngressDegradationReasons,proto3,enum=yufeng.unit.v1.ModelIngressDegradationReason" json:"model_ingress_degradation_reasons,omitempty"`
+	ModelIngressQueuedItems        uint64                          `protobuf:"varint,11,opt,name=model_ingress_queued_items,json=modelIngressQueuedItems,proto3" json:"model_ingress_queued_items,omitempty"`
+	ModelIngressQueuedBytes        uint64                          `protobuf:"varint,12,opt,name=model_ingress_queued_bytes,json=modelIngressQueuedBytes,proto3" json:"model_ingress_queued_bytes,omitempty"`
+	ModelIngressInFlightItems      uint64                          `protobuf:"varint,13,opt,name=model_ingress_in_flight_items,json=modelIngressInFlightItems,proto3" json:"model_ingress_in_flight_items,omitempty"`
+	ModelIngressInFlightBytes      uint64                          `protobuf:"varint,14,opt,name=model_ingress_in_flight_bytes,json=modelIngressInFlightBytes,proto3" json:"model_ingress_in_flight_bytes,omitempty"`
+	ModelIngressOldestAgeMillis    uint64                          `protobuf:"varint,15,opt,name=model_ingress_oldest_age_millis,json=modelIngressOldestAgeMillis,proto3" json:"model_ingress_oldest_age_millis,omitempty"`
+	ModelIngressDrops              *ModelIngressDropCounters       `protobuf:"bytes,16,opt,name=model_ingress_drops,json=modelIngressDrops,proto3" json:"model_ingress_drops,omitempty"`
+	unknownFields                  protoimpl.UnknownFields
+	sizeCache                      protoimpl.SizeCache
 }
 
 func (x *ProducerHealth) Reset() {
 	*x = ProducerHealth{}
-	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[1]
+	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -287,7 +522,7 @@ func (x *ProducerHealth) String() string {
 func (*ProducerHealth) ProtoMessage() {}
 
 func (x *ProducerHealth) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[1]
+	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -300,7 +535,7 @@ func (x *ProducerHealth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProducerHealth.ProtoReflect.Descriptor instead.
 func (*ProducerHealth) Descriptor() ([]byte, []int) {
-	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{1}
+	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ProducerHealth) GetBufferedCriticalEvents() uint64 {
@@ -352,6 +587,69 @@ func (x *ProducerHealth) GetHealthyProjectionVersions() []string {
 	return nil
 }
 
+func (x *ProducerHealth) GetEffectiveModelIngressWindow() *artifactv1.ModelIngressWindow {
+	if x != nil {
+		return x.EffectiveModelIngressWindow
+	}
+	return nil
+}
+
+func (x *ProducerHealth) GetModelIngressWindowState() ModelIngressWindowState {
+	if x != nil {
+		return x.ModelIngressWindowState
+	}
+	return ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED
+}
+
+func (x *ProducerHealth) GetModelIngressDegradationReasons() []ModelIngressDegradationReason {
+	if x != nil {
+		return x.ModelIngressDegradationReasons
+	}
+	return nil
+}
+
+func (x *ProducerHealth) GetModelIngressQueuedItems() uint64 {
+	if x != nil {
+		return x.ModelIngressQueuedItems
+	}
+	return 0
+}
+
+func (x *ProducerHealth) GetModelIngressQueuedBytes() uint64 {
+	if x != nil {
+		return x.ModelIngressQueuedBytes
+	}
+	return 0
+}
+
+func (x *ProducerHealth) GetModelIngressInFlightItems() uint64 {
+	if x != nil {
+		return x.ModelIngressInFlightItems
+	}
+	return 0
+}
+
+func (x *ProducerHealth) GetModelIngressInFlightBytes() uint64 {
+	if x != nil {
+		return x.ModelIngressInFlightBytes
+	}
+	return 0
+}
+
+func (x *ProducerHealth) GetModelIngressOldestAgeMillis() uint64 {
+	if x != nil {
+		return x.ModelIngressOldestAgeMillis
+	}
+	return 0
+}
+
+func (x *ProducerHealth) GetModelIngressDrops() *ModelIngressDropCounters {
+	if x != nil {
+		return x.ModelIngressDrops
+	}
+	return nil
+}
+
 // UnitProjection 是资产查询面返回的单元只读状态。
 type UnitProjection struct {
 	state           protoimpl.MessageState  `protogen:"open.v1"`
@@ -368,13 +666,15 @@ type UnitProjection struct {
 	CurrentGenerationId string `protobuf:"bytes,10,opt,name=current_generation_id,json=currentGenerationId,proto3" json:"current_generation_id,omitempty"`
 	// 与 current_generation_id 对应的资产世代序号。
 	CurrentGenerationSeq int64 `protobuf:"varint,11,opt,name=current_generation_seq,json=currentGenerationSeq,proto3" json:"current_generation_seq,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// 最近合法心跳确认已应用的监听计划版本。
+	CurrentListenPlanVersion uint64 `protobuf:"varint,12,opt,name=current_listen_plan_version,json=currentListenPlanVersion,proto3" json:"current_listen_plan_version,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *UnitProjection) Reset() {
 	*x = UnitProjection{}
-	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[2]
+	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -386,7 +686,7 @@ func (x *UnitProjection) String() string {
 func (*UnitProjection) ProtoMessage() {}
 
 func (x *UnitProjection) ProtoReflect() protoreflect.Message {
-	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[2]
+	mi := &file_yufeng_unit_v1_unit_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -399,7 +699,7 @@ func (x *UnitProjection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitProjection.ProtoReflect.Descriptor instead.
 func (*UnitProjection) Descriptor() ([]byte, []int) {
-	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{2}
+	return file_yufeng_unit_v1_unit_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UnitProjection) GetUnitId() string {
@@ -479,11 +779,26 @@ func (x *UnitProjection) GetCurrentGenerationSeq() int64 {
 	return 0
 }
 
+func (x *UnitProjection) GetCurrentListenPlanVersion() uint64 {
+	if x != nil {
+		return x.CurrentListenPlanVersion
+	}
+	return 0
+}
+
 var File_yufeng_unit_v1_unit_proto protoreflect.FileDescriptor
 
 const file_yufeng_unit_v1_unit_proto_rawDesc = "" +
 	"\n" +
-	"\x19yufeng/unit/v1/unit.proto\x12\x0eyufeng.unit.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x19yufeng/common/v1/v1.proto\"\xbb\x04\n" +
+	"\x19yufeng/unit/v1/unit.proto\x12\x0eyufeng.unit.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1byufeng/artifact/v1/v1.proto\x1a\x19yufeng/common/v1/v1.proto\"\xb4\x02\n" +
+	"\x18ModelIngressDropCounters\x12%\n" +
+	"\x0eevicted_oldest\x18\x01 \x01(\x04R\revictedOldest\x12\x18\n" +
+	"\aexpired\x18\x02 \x01(\x04R\aexpired\x12$\n" +
+	"\x0eitem_too_large\x18\x03 \x01(\x04R\fitemTooLarge\x12,\n" +
+	"\x12in_flight_capacity\x18\x04 \x01(\x04R\x10inFlightCapacity\x12)\n" +
+	"\x10transport_failed\x18\x05 \x01(\x04R\x0ftransportFailed\x12-\n" +
+	"\x12modelside_rejected\x18\x06 \x01(\x04R\x11modelsideRejected\x12)\n" +
+	"\x10admission_budget\x18\a \x01(\x04R\x0fadmissionBudget\"\xde\x05\n" +
 	"\x14ProducerCapabilities\x128\n" +
 	"\aoutputs\x18\x01 \x03(\x0e2\x1e.yufeng.unit.v1.ProducerOutputR\aoutputs\x12/\n" +
 	"\x13projection_versions\x18\x02 \x03(\tR\x12projectionVersions\x12<\n" +
@@ -496,7 +811,9 @@ const file_yufeng_unit_v1_unit_proto_rawDesc = "" +
 	"\x0fmax_spool_bytes\x18\t \x01(\x04R\rmaxSpoolBytes\x120\n" +
 	"\x14max_evidence_entries\x18\n" +
 	" \x01(\rR\x12maxEvidenceEntries\x12/\n" +
-	"\x13module_capabilities\x18\v \x03(\tR\x12moduleCapabilities\"\xa6\x03\n" +
+	"\x13module_capabilities\x18\v \x03(\tR\x12moduleCapabilities\x12_\n" +
+	"\x18model_ingress_hard_limit\x18\f \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\x15modelIngressHardLimit\x12@\n" +
+	"\x1dmax_model_ingress_batch_items\x18\r \x01(\rR\x19maxModelIngressBatchItems\"\x91\t\n" +
 	"\x0eProducerHealth\x128\n" +
 	"\x18buffered_critical_events\x18\x01 \x01(\x04R\x16bufferedCriticalEvents\x12:\n" +
 	"\x19buffered_ordinary_samples\x18\x02 \x01(\x04R\x17bufferedOrdinarySamples\x126\n" +
@@ -504,7 +821,17 @@ const file_yufeng_unit_v1_unit_proto_rawDesc = "" +
 	"\x18dropped_ordinary_samples\x18\x04 \x01(\x04R\x16droppedOrdinarySamples\x12;\n" +
 	"\x1adropped_local_bypass_items\x18\x05 \x01(\x04R\x17droppedLocalBypassItems\x12/\n" +
 	"\x13projection_failures\x18\x06 \x01(\x04R\x12projectionFailures\x12>\n" +
-	"\x1bhealthy_projection_versions\x18\a \x03(\tR\x19healthyProjectionVersions\"\xaf\x04\n" +
+	"\x1bhealthy_projection_versions\x18\a \x03(\tR\x19healthyProjectionVersions\x12k\n" +
+	"\x1eeffective_model_ingress_window\x18\b \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\x1beffectiveModelIngressWindow\x12d\n" +
+	"\x1amodel_ingress_window_state\x18\t \x01(\x0e2'.yufeng.unit.v1.ModelIngressWindowStateR\x17modelIngressWindowState\x12x\n" +
+	"!model_ingress_degradation_reasons\x18\n" +
+	" \x03(\x0e2-.yufeng.unit.v1.ModelIngressDegradationReasonR\x1emodelIngressDegradationReasons\x12;\n" +
+	"\x1amodel_ingress_queued_items\x18\v \x01(\x04R\x17modelIngressQueuedItems\x12;\n" +
+	"\x1amodel_ingress_queued_bytes\x18\f \x01(\x04R\x17modelIngressQueuedBytes\x12@\n" +
+	"\x1dmodel_ingress_in_flight_items\x18\r \x01(\x04R\x19modelIngressInFlightItems\x12@\n" +
+	"\x1dmodel_ingress_in_flight_bytes\x18\x0e \x01(\x04R\x19modelIngressInFlightBytes\x12D\n" +
+	"\x1fmodel_ingress_oldest_age_millis\x18\x0f \x01(\x04R\x1bmodelIngressOldestAgeMillis\x12X\n" +
+	"\x13model_ingress_drops\x18\x10 \x01(\v2(.yufeng.unit.v1.ModelIngressDropCountersR\x11modelIngressDrops\"\xee\x04\n" +
 	"\x0eUnitProjection\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x18\n" +
@@ -518,7 +845,8 @@ const file_yufeng_unit_v1_unit_proto_rawDesc = "" +
 	"\x11last_heartbeat_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x0flastHeartbeatAt\x122\n" +
 	"\x15current_generation_id\x18\n" +
 	" \x01(\tR\x13currentGenerationId\x124\n" +
-	"\x16current_generation_seq\x18\v \x01(\x03R\x14currentGenerationSeq*\x9f\x01\n" +
+	"\x16current_generation_seq\x18\v \x01(\x03R\x14currentGenerationSeq\x12=\n" +
+	"\x1bcurrent_listen_plan_version\x18\f \x01(\x04R\x18currentListenPlanVersion*\x9f\x01\n" +
 	"\x0eProducerOutput\x12\x1f\n" +
 	"\x1bPRODUCER_OUTPUT_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1ePRODUCER_OUTPUT_CRITICAL_EVENT\x10\x01\x12#\n" +
@@ -528,7 +856,18 @@ const file_yufeng_unit_v1_unit_proto_rawDesc = "" +
 	"SensorType\x12\x1b\n" +
 	"\x17SENSOR_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10SENSOR_TYPE_HTTP\x10\x01\x12\x16\n" +
-	"\x12SENSOR_TYPE_CORAZA\x10\x02B\x19Z\x17yufeng/proto/gen/unitv1b\x06proto3"
+	"\x12SENSOR_TYPE_CORAZA\x10\x02*\xea\x01\n" +
+	"\x17ModelIngressWindowState\x12*\n" +
+	"&MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED\x10\x00\x12&\n" +
+	"\"MODEL_INGRESS_WINDOW_STATE_APPLIED\x10\x01\x12'\n" +
+	"#MODEL_INGRESS_WINDOW_STATE_DEGRADED\x10\x02\x12)\n" +
+	"%MODEL_INGRESS_WINDOW_STATE_CONVERGING\x10\x03\x12'\n" +
+	"#MODEL_INGRESS_WINDOW_STATE_DISABLED\x10\x04*\xee\x01\n" +
+	"\x1dModelIngressDegradationReason\x120\n" +
+	",MODEL_INGRESS_DEGRADATION_REASON_UNSPECIFIED\x10\x00\x12.\n" +
+	"*MODEL_INGRESS_DEGRADATION_REASON_MAX_ITEMS\x10\x01\x127\n" +
+	"3MODEL_INGRESS_DEGRADATION_REASON_MAX_RETAINED_BYTES\x10\x02\x122\n" +
+	".MODEL_INGRESS_DEGRADATION_REASON_MAX_QUEUE_AGE\x10\x03B\x19Z\x17yufeng/proto/gen/unitv1b\x06proto3"
 
 var (
 	file_yufeng_unit_v1_unit_proto_rawDescOnce sync.Once
@@ -542,32 +881,41 @@ func file_yufeng_unit_v1_unit_proto_rawDescGZIP() []byte {
 	return file_yufeng_unit_v1_unit_proto_rawDescData
 }
 
-var file_yufeng_unit_v1_unit_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_yufeng_unit_v1_unit_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_yufeng_unit_v1_unit_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_yufeng_unit_v1_unit_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_yufeng_unit_v1_unit_proto_goTypes = []any{
-	(ProducerOutput)(0),           // 0: yufeng.unit.v1.ProducerOutput
-	(SensorType)(0),               // 1: yufeng.unit.v1.SensorType
-	(*ProducerCapabilities)(nil),  // 2: yufeng.unit.v1.ProducerCapabilities
-	(*ProducerHealth)(nil),        // 3: yufeng.unit.v1.ProducerHealth
-	(*UnitProjection)(nil),        // 4: yufeng.unit.v1.UnitProjection
-	(commonv1.IngressPosture)(0),  // 5: yufeng.common.v1.IngressPosture
-	(commonv1.UnitHealth)(0),      // 6: yufeng.common.v1.UnitHealth
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(ProducerOutput)(0),                   // 0: yufeng.unit.v1.ProducerOutput
+	(SensorType)(0),                       // 1: yufeng.unit.v1.SensorType
+	(ModelIngressWindowState)(0),          // 2: yufeng.unit.v1.ModelIngressWindowState
+	(ModelIngressDegradationReason)(0),    // 3: yufeng.unit.v1.ModelIngressDegradationReason
+	(*ModelIngressDropCounters)(nil),      // 4: yufeng.unit.v1.ModelIngressDropCounters
+	(*ProducerCapabilities)(nil),          // 5: yufeng.unit.v1.ProducerCapabilities
+	(*ProducerHealth)(nil),                // 6: yufeng.unit.v1.ProducerHealth
+	(*UnitProjection)(nil),                // 7: yufeng.unit.v1.UnitProjection
+	(commonv1.IngressPosture)(0),          // 8: yufeng.common.v1.IngressPosture
+	(*artifactv1.ModelIngressWindow)(nil), // 9: yufeng.artifact.v1.ModelIngressWindow
+	(commonv1.UnitHealth)(0),              // 10: yufeng.common.v1.UnitHealth
+	(*timestamppb.Timestamp)(nil),         // 11: google.protobuf.Timestamp
 }
 var file_yufeng_unit_v1_unit_proto_depIdxs = []int32{
-	0, // 0: yufeng.unit.v1.ProducerCapabilities.outputs:type_name -> yufeng.unit.v1.ProducerOutput
-	5, // 1: yufeng.unit.v1.ProducerCapabilities.postures:type_name -> yufeng.common.v1.IngressPosture
-	1, // 2: yufeng.unit.v1.ProducerCapabilities.sensors:type_name -> yufeng.unit.v1.SensorType
-	6, // 3: yufeng.unit.v1.UnitProjection.health:type_name -> yufeng.common.v1.UnitHealth
-	2, // 4: yufeng.unit.v1.UnitProjection.capabilities:type_name -> yufeng.unit.v1.ProducerCapabilities
-	3, // 5: yufeng.unit.v1.UnitProjection.producer_health:type_name -> yufeng.unit.v1.ProducerHealth
-	5, // 6: yufeng.unit.v1.UnitProjection.posture:type_name -> yufeng.common.v1.IngressPosture
-	7, // 7: yufeng.unit.v1.UnitProjection.last_heartbeat_at:type_name -> google.protobuf.Timestamp
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	0,  // 0: yufeng.unit.v1.ProducerCapabilities.outputs:type_name -> yufeng.unit.v1.ProducerOutput
+	8,  // 1: yufeng.unit.v1.ProducerCapabilities.postures:type_name -> yufeng.common.v1.IngressPosture
+	1,  // 2: yufeng.unit.v1.ProducerCapabilities.sensors:type_name -> yufeng.unit.v1.SensorType
+	9,  // 3: yufeng.unit.v1.ProducerCapabilities.model_ingress_hard_limit:type_name -> yufeng.artifact.v1.ModelIngressWindow
+	9,  // 4: yufeng.unit.v1.ProducerHealth.effective_model_ingress_window:type_name -> yufeng.artifact.v1.ModelIngressWindow
+	2,  // 5: yufeng.unit.v1.ProducerHealth.model_ingress_window_state:type_name -> yufeng.unit.v1.ModelIngressWindowState
+	3,  // 6: yufeng.unit.v1.ProducerHealth.model_ingress_degradation_reasons:type_name -> yufeng.unit.v1.ModelIngressDegradationReason
+	4,  // 7: yufeng.unit.v1.ProducerHealth.model_ingress_drops:type_name -> yufeng.unit.v1.ModelIngressDropCounters
+	10, // 8: yufeng.unit.v1.UnitProjection.health:type_name -> yufeng.common.v1.UnitHealth
+	5,  // 9: yufeng.unit.v1.UnitProjection.capabilities:type_name -> yufeng.unit.v1.ProducerCapabilities
+	6,  // 10: yufeng.unit.v1.UnitProjection.producer_health:type_name -> yufeng.unit.v1.ProducerHealth
+	8,  // 11: yufeng.unit.v1.UnitProjection.posture:type_name -> yufeng.common.v1.IngressPosture
+	11, // 12: yufeng.unit.v1.UnitProjection.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_yufeng_unit_v1_unit_proto_init() }
@@ -580,8 +928,8 @@ func file_yufeng_unit_v1_unit_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_yufeng_unit_v1_unit_proto_rawDesc), len(file_yufeng_unit_v1_unit_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   3,
+			NumEnums:      4,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

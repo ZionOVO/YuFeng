@@ -55,6 +55,8 @@ import type {
   WorkerEnrollmentRecord,
   TrafficReviewMode,
   TrafficReviewPolicyStatus,
+  ModelIngressWindow,
+  ModelIngressWindowStatus,
 } from './types'
 import type { ConsoleClient, EdgeDeploymentCoordinates, EdgeDeploymentSpecification } from './client'
 import {
@@ -72,6 +74,7 @@ import {
   normalizeReleaseStats,
   normalizeSession,
   normalizeTrafficReviewPolicyStatus,
+  normalizeModelIngressWindowStatus,
   normalizeWorkerEnrollmentDecision,
   normalizeWorkerEnrollmentRecord,
   normalizeWorkerRecord,
@@ -372,6 +375,25 @@ export class ConnectClient implements ConsoleClient {
 	  { idempotent: true },
 	)
 	return normalizeTrafficReviewPolicyStatus(res.status)
+  }
+
+  async getModelIngressWindow(assetId: string, unitId: string): Promise<ModelIngressWindowStatus> {
+	const res = await this.call<{ status: ModelIngressWindowStatus }>(
+	  'yufeng.asset.v1.AssetService',
+	  'GetModelIngressWindow',
+	  { assetId, unitId },
+	)
+	return normalizeModelIngressWindowStatus(res.status)
+  }
+
+  async updateModelIngressWindow(assetId: string, unitId: string, desired: ModelIngressWindow, expectedListenPlanVersion = ''): Promise<ModelIngressWindowStatus> {
+	const res = await this.call<{ status: ModelIngressWindowStatus }>(
+	  'yufeng.asset.v1.AssetService',
+	  'UpdateModelIngressWindow',
+	  { assetId, unitId, desired, expectedListenPlanVersion },
+	  { idempotent: true },
+	)
+	return normalizeModelIngressWindowStatus(res.status)
   }
 
   /* ----- ConsoleService ----- */

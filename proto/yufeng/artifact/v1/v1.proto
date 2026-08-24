@@ -253,6 +253,16 @@ message ClientSourcePolicy {
   repeated string trusted_proxy_cidrs = 1;
 }
 
+// ModelIngressWindow 限定 Edge 为邻近 ModelSide 保留的最新流量窗口。
+message ModelIngressWindow {
+  // 窗口同时保留的排队与在途条目上限。
+  uint32 max_items = 1;
+  // 窗口同时保留的排队与在途实际字节上限。
+  uint64 max_retained_bytes = 2;
+  // 单条流量允许停留在排队区的最长时间。
+  google.protobuf.Duration max_queue_age = 3;
+}
+
 // UnitListenPlan 是单元作用域的签名入口合同，不进资产世代。
 message UnitListenPlan {
   // 单元标识。
@@ -273,6 +283,8 @@ message UnitListenPlan {
   Signature signature = 8;
   // 客户端来源取信策略；缺省时只信直接对端。
   ClientSourcePolicy client_source = 9;
+  // Edge 邻近模型输入缓存窗口的中央期望值。
+  ModelIngressWindow model_ingress_window = 10;
 }
 
 // EvidencePolicy 是世代内证据可见档。

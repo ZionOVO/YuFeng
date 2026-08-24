@@ -4,6 +4,7 @@ syntax = "proto3";
 package yufeng.unit.v1;
 
 import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
 import "yufeng/common/v1/v1.proto";
 
 option go_package = "yufeng/proto/gen/unitv1";
@@ -28,6 +29,39 @@ enum SensorType {
   SENSOR_TYPE_CORAZA = 2;
 }
 
+// ModelIngressWindowState 是 Edge 模型输入缓存窗口的应用状态。
+enum ModelIngressWindowState {
+  MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED = 0;
+  // 中央期望值已完整应用。
+  MODEL_INGRESS_WINDOW_STATE_APPLIED = 1;
+  // 本机硬上限收窄了中央期望值。
+  MODEL_INGRESS_WINDOW_STATE_DEGRADED = 2;
+  // 新上限已应用，旧排队或在途项仍在自然收敛。
+  MODEL_INGRESS_WINDOW_STATE_CONVERGING = 3;
+  // 邻近模型旁路未启用。
+  MODEL_INGRESS_WINDOW_STATE_DISABLED = 4;
+}
+
+// ModelIngressDegradationReason 是中央期望值被本机收窄的闭集原因。
+enum ModelIngressDegradationReason {
+  MODEL_INGRESS_DEGRADATION_REASON_UNSPECIFIED = 0;
+  MODEL_INGRESS_DEGRADATION_REASON_MAX_ITEMS = 1;
+  MODEL_INGRESS_DEGRADATION_REASON_MAX_RETAINED_BYTES = 2;
+  MODEL_INGRESS_DEGRADATION_REASON_MAX_QUEUE_AGE = 3;
+}
+
+// ModelIngressDropCounters 按失败边界拆分易失旁路丢弃。
+message ModelIngressDropCounters {
+  uint64 evicted_oldest = 1;
+  uint64 expired = 2;
+  uint64 item_too_large = 3;
+  uint64 in_flight_capacity = 4;
+  uint64 transport_failed = 5;
+  uint64 modelside_rejected = 6;
+  // 为保护请求路径，达到单次有界淘汰预算后仍无法准入的新项。
+  uint64 admission_budget = 7;
+}
+
 // ProducerCapabilities 声明单元客观具备的生产能力，不授予任何权限。
 message ProducerCapabilities {
   repeated ProducerOutput outputs = 1;
@@ -42,6 +76,10 @@ message ProducerCapabilities {
   uint32 max_evidence_entries = 10;
   // 当前二进制实现的模块协议能力；只用于兼容性判断，不产生授权。
   repeated string module_capabilities = 11;
+  // 本机允许中央监听计划使用的模型输入缓存窗口硬上限。
+  yufeng.artifact.v1.ModelIngressWindow model_ingress_hard_limit = 12;
+  // 单次提交给 ModelSide 的最大流量条数。
+  uint32 max_model_ingress_batch_items = 13;
 }
 
 // ProducerHealth 是能力对应的单调或瞬时健康投影，不携带请求原文。
@@ -53,6 +91,15 @@ message ProducerHealth {
   uint64 dropped_local_bypass_items = 5;
   uint64 projection_failures = 6;
   repeated string healthy_projection_versions = 7;
+  yufeng.artifact.v1.ModelIngressWindow effective_model_ingress_window = 8;
+  ModelIngressWindowState model_ingress_window_state = 9;
+  repeated ModelIngressDegradationReason model_ingress_degradation_reasons = 10;
+  uint64 model_ingress_queued_items = 11;
+  uint64 model_ingress_queued_bytes = 12;
+  uint64 model_ingress_in_flight_items = 13;
+  uint64 model_ingress_in_flight_bytes = 14;
+  uint64 model_ingress_oldest_age_millis = 15;
+  ModelIngressDropCounters model_ingress_drops = 16;
 }
 
 // UnitProjection 是资产查询面返回的单元只读状态。
@@ -70,4 +117,6 @@ message UnitProjection {
   string current_generation_id = 10;
   // 与 current_generation_id 对应的资产世代序号。
   int64 current_generation_seq = 11;
+  // 最近合法心跳确认已应用的监听计划版本。
+  uint64 current_listen_plan_version = 12;
 }

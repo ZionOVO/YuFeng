@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -19,6 +20,7 @@ import (
 	artifactv1 "yufeng/proto/gen/artifactv1"
 	commonv1 "yufeng/proto/gen/commonv1"
 	modelsidev1 "yufeng/proto/gen/modelsidev1"
+	unitv1 "yufeng/proto/gen/unitv1"
 )
 
 type blockingModelTrafficSender struct {
@@ -26,13 +28,13 @@ type blockingModelTrafficSender struct {
 	release chan struct{}
 }
 
-func (s *blockingModelTrafficSender) SubmitTraffic(ctx context.Context, _ *edgecore.ModelIngressItem) error {
+func (s *blockingModelTrafficSender) SubmitTraffic(ctx context.Context, batch *edgecore.ModelIngressBatch) (uint32, error) {
 	s.started <- struct{}{}
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return 0, ctx.Err()
 	case <-s.release:
-		return nil
+		return uint32(len(batch.Traffic)), nil
 	}
 }
 
@@ -46,7 +48,7 @@ func TestModelIngressStartsExactlyTheBudgetedSenderCount(t *testing.T) {
 	for index := 0; index < kernel.ModelSideIngressWorkers+1; index++ {
 		if !runtime.modelQueue.Offer(&edgecore.ModelIngressItem{
 			Profile: kernel.DefaultModelProfile(),
-			Traffic: &modelsidev1.NormalizedTraffic{RequestId: "request"},
+			Traffic: &modelsidev1.NormalizedTraffic{RequestId: "request", ModelProfileDigest: fmt.Sprintf("profile-%d", index)},
 		}) {
 			t.Fatal("model ingress fixture must fit the queue")
 		}
@@ -77,7 +79,7 @@ func TestEdgeBindsOnlyAfterVerifiedListenPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	set := edgecore.NewReleaseSet()
-	if _, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{}); err == nil {
+	if _, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{}, nil, nil); err == nil {
 		t.Fatal("edge must not bind without a verified listen plan")
 	}
 
@@ -95,7 +97,7 @@ func TestEdgeBindsOnlyAfterVerifiedListenPlan(t *testing.T) {
 	if err := set.ApplyListenPlan(plan, pub, "local-1"); err != nil {
 		t.Fatal(err)
 	}
-	runtime, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{})
+	runtime, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +116,7 @@ func TestEdgeReadyProbeDoesNotEnterBusinessHandler(t *testing.T) {
 	if err := set.ApplyListenPlan(plan, pub, "local-1"); err != nil {
 		t.Fatal(err)
 	}
-	runtime, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{})
+	runtime, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +158,7 @@ func TestListenPlanUpdateIsMonotonicAndRebindsByRestart(t *testing.T) {
 	if err := set.ApplyListenPlan(first, pub, "local-1"); err != nil {
 		t.Fatal(err)
 	}
-	runtime, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{})
+	runtime, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,11 +185,48 @@ func TestListenPlanUpdateIsMonotonicAndRebindsByRestart(t *testing.T) {
 	}
 }
 
+func TestListenPlanUpdateReconfiguresTheEdgeModelIngressWindow(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := edgecore.NewReleaseSet()
+	first := signedRuntimeListenPlan(t, priv, "local-1", 1, ":18080")
+	if err := set.ApplyListenPlan(first, pub, "local-1"); err != nil {
+		t.Fatal(err)
+	}
+	hard := &artifactv1.ModelIngressWindow{MaxItems: 2048, MaxRetainedBytes: 64 << 20, MaxQueueAge: durationpb.New(time.Second)}
+	runtime, err := newEdgeRuntime(set, "local-1", "asset-1", nil, edgecore.SourcePseudonymizer{}, &blockingModelTrafficSender{}, hard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := runtime.modelQueue.Snapshot(); snapshot.State != unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_DEGRADED {
+		t.Fatalf("initial snapshot=%+v", snapshot)
+	}
+
+	second := signedRuntimeListenPlan(t, priv, "local-1", 2, ":18080")
+	second.ModelIngressWindow = &artifactv1.ModelIngressWindow{MaxItems: 1024, MaxRetainedBytes: 32 << 20, MaxQueueAge: durationpb.New(500 * time.Millisecond)}
+	second.Signature = nil
+	if err := kernel.SignUnitListenPlan(second, priv); err != nil {
+		t.Fatal(err)
+	}
+	if err := runtime.applyPlan(second, pub, t.TempDir()+"/listen.json"); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := runtime.modelQueue.Snapshot()
+	if snapshot.State != unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_APPLIED ||
+		!kernel.EqualModelIngressWindow(snapshot.Desired, second.GetModelIngressWindow()) ||
+		!kernel.EqualModelIngressWindow(snapshot.Effective, second.GetModelIngressWindow()) {
+		t.Fatalf("updated snapshot=%+v", snapshot)
+	}
+}
+
 func signedRuntimeListenPlan(t *testing.T, priv ed25519.PrivateKey, unitID string, version uint64, address string) *artifactv1.UnitListenPlan {
 	t.Helper()
 	plan := &artifactv1.UnitListenPlan{
 		UnitId: unitID, Version: version, Posture: commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY,
 		TrafficKey: "site-a", ListenAddress: address, UpstreamUrl: "http://app:8080",
+		ModelIngressWindow: kernel.DefaultModelIngressWindow(),
 	}
 	if err := kernel.SignUnitListenPlan(plan, priv); err != nil {
 		t.Fatal(err)

@@ -36,16 +36,17 @@ type loadResult struct {
 }
 
 type budgetResult struct {
-	P99ExtraLatencyMicros   int64  `json:"p99_extra_latency_micros"`
-	ModelBypassP99Micros    int64  `json:"model_bypass_p99_micros"`
-	EdgeThroughputRPS       int    `json:"edge_throughput_rps"`
-	EdgeMemoryBytes         int64  `json:"edge_memory_bytes"`
-	EdgeCacheDiskBytes      int64  `json:"edge_cache_disk_bytes"`
-	EdgeTelemetrySpoolBytes int64  `json:"edge_telemetry_spool_bytes"`
-	EdgeInFlight            int    `json:"edge_in_flight"`
-	CRSVersion              string `json:"crs_version"`
-	CRSParanoia             int    `json:"crs_paranoia"`
-	GoVersion               string `json:"go_version"`
+	P99ExtraLatencyMicros   int64   `json:"p99_extra_latency_micros"`
+	ModelBypassP99Micros    int64   `json:"model_bypass_p99_micros"`
+	ModelBypassCPUPercent   float64 `json:"model_bypass_cpu_percent"`
+	EdgeThroughputRPS       int     `json:"edge_throughput_rps"`
+	EdgeMemoryBytes         int64   `json:"edge_memory_bytes"`
+	EdgeCacheDiskBytes      int64   `json:"edge_cache_disk_bytes"`
+	EdgeTelemetrySpoolBytes int64   `json:"edge_telemetry_spool_bytes"`
+	EdgeInFlight            int     `json:"edge_in_flight"`
+	CRSVersion              string  `json:"crs_version"`
+	CRSParanoia             int     `json:"crs_paranoia"`
+	GoVersion               string  `json:"go_version"`
 }
 
 type runner struct {
@@ -102,6 +103,7 @@ func frozenBudgets() budgetResult {
 	return budgetResult{
 		P99ExtraLatencyMicros:   kernel.P99ExtraLatency.Microseconds(),
 		ModelBypassP99Micros:    kernel.ModelBypassP99Budget.Microseconds(),
+		ModelBypassCPUPercent:   kernel.ModelBypassCPUPercentBudget,
 		EdgeThroughputRPS:       kernel.EdgeThroughputRPS,
 		EdgeMemoryBytes:         kernel.EdgeMemoryBytes,
 		EdgeCacheDiskBytes:      kernel.EdgeCacheDiskBytes,

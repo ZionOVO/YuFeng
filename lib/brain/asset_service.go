@@ -389,7 +389,8 @@ func (s *AssetServer) assetDetail(ctx context.Context, a *assetv1.Asset) (*asset
 	}
 	detail := &assetv1.AssetDetail{Asset: a, Health: h}
 	rows, err := s.pool.Query(ctx, `SELECT u.unit_id, u.kind, u.version, u.health, u.producer_capabilities,
-		u.producer_health, u.posture, u.traffic_key, u.last_heartbeat_at,u.current_generation_id,u.current_generation_seq
+		u.producer_health, u.posture, u.traffic_key, u.last_heartbeat_at,u.current_generation_id,u.current_generation_seq,
+		u.current_listen_plan_version
 		FROM units u JOIN unit_assets ua ON ua.unit_id=u.unit_id WHERE ua.asset_id=$1 ORDER BY u.unit_id`, a.Id)
 	if err != nil {
 		return nil, err
@@ -397,10 +398,10 @@ func (s *AssetServer) assetDetail(ctx context.Context, a *assetv1.Asset) (*asset
 	defer rows.Close()
 	for rows.Next() {
 		var id, kind, version, health, capabilitiesRaw, producerHealthRaw, posture, trafficKey, currentGenerationID string
-		var currentGenerationSeq int64
+		var currentGenerationSeq, currentListenPlanVersion int64
 		var lastHeartbeat *time.Time
 		if err := rows.Scan(&id, &kind, &version, &health, &capabilitiesRaw, &producerHealthRaw, &posture, &trafficKey,
-			&lastHeartbeat, &currentGenerationID, &currentGenerationSeq); err != nil {
+			&lastHeartbeat, &currentGenerationID, &currentGenerationSeq, &currentListenPlanVersion); err != nil {
 			return nil, err
 		}
 		detail.UnitIds = append(detail.UnitIds, id)
@@ -408,6 +409,9 @@ func (s *AssetServer) assetDetail(ctx context.Context, a *assetv1.Asset) (*asset
 			UnitId: id, Kind: kind, Version: version, Health: unitHealthEnum(health),
 			Posture: ingressPostureEnum(posture), TrafficKey: trafficKey,
 			CurrentGenerationId: currentGenerationID, CurrentGenerationSeq: currentGenerationSeq,
+		}
+		if currentListenPlanVersion > 0 {
+			unit.CurrentListenPlanVersion = uint64(currentListenPlanVersion)
 		}
 		var capabilities unitv1.ProducerCapabilities
 		if err := protojson.Unmarshal([]byte(capabilitiesRaw), &capabilities); err != nil {
