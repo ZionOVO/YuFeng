@@ -389,13 +389,17 @@ brain 从资产标签与部署档案编译、随资产世代签名下发的普�
 ### 规范化模型流量（Normalized Model Traffic）
 Edge 从已解密 HTTP 请求副本构造的版本化模型输入，包含请求归属、世代、方法、路由、签名档案允许的头和查询参数、有界正文、内容类型、原始正文长度、截断状态与检查覆盖度。正文所有权只从请求视图向本地模型队列转移一次；该合同不得发送给 Brain、贾维斯或调查 run。
 
+<a id="model-ingress-window"></a>
+### 模型输入缓存窗口（Model Ingress Window）
+Edge 在同步检查与裁决完成后为邻近 ModelSide 保留的易失、至多一次最新流量窗口。窗口同时受条数、实际保留字节和排队年龄约束，任一上限先到即淘汰最旧的可排队项；中央签名监听计划给出期望值，本机启动配置给出硬上限，Edge 取逐项较小值。单次请求的淘汰工作有固定预算，预算用尽仍无法准入时丢新副本；窗口不落盘、不重试、不向当前请求传播背压。ModelSide 的浅层批次交接队列不是本窗口。
+
 <a id="triage-object"></a>
 ### 研判对象（TriageObject）
 brain 从钉死聚类版本冻结给贾维斯的只读投影，包含研判原因、代表票据、聚合计数、检测与世代轨迹以及已追加推理记录。生产贾维斯通过 `triage.get` 读取它，不使用通用 `event.get/list`；它不含原文、证据环定位能力或单元日志与指标。
 
 <a id="local-async-bypass"></a>
 ### 本地异步旁路
-请求路径把[规范化模型流量](#normalized-model-traffic)交给 Edge 本地有界非阻塞队列，再由后台发送器传给邻近 `yufeng-modelside`。满则丢旁路并计数，已发出的状态码不变。禁止为 Brain 或 Agent 再拷原文；不得在请求路径推理、访问 Brain、同步写文件或等待消费者。Python 始终位于独立 ModelSide 进程，不编进 `yufeng-edge`。
+请求路径把[规范化模型流量](#normalized-model-traffic)交给 Edge [模型输入缓存窗口](#model-ingress-window)，再由后台发送器批量传给邻近 `yufeng-modelside`。满则淘汰最旧旁路并计数，已发出的状态码不变。禁止为 Brain 或 Agent 再拷原文；不得在请求路径推理、访问 Brain、同步写文件或等待消费者。Python 始终位于独立 ModelSide 进程，不编进 `yufeng-edge`。
 
 <a id="async-detection-worker"></a>
 ### 异步检测执行实例

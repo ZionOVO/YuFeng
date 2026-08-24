@@ -127,6 +127,45 @@ class AlertBackend:
 
 
 class RuntimeIsolationTests(unittest.TestCase):
+    def test_ingress_capacity_counts_submitted_batches_not_individual_traffic(self):
+        runtime = ModelSideRuntime(
+            "modelside-1",
+            AlertBackend(),
+            OfflineBrain(),
+            ingress_capacity=2,
+            result_capacity=4,
+            shutdown_timeout=0,
+        )
+        first = runtime.submit(
+            {
+                "modelProfile": profile_payload(),
+                "modelProfileDigest": "sha256:profile",
+                "traffic": [traffic("request-1"), traffic("request-2")],
+            }
+        )
+        second = runtime.submit(
+            {
+                "modelProfile": profile_payload(),
+                "modelProfileDigest": "sha256:profile",
+                "traffic": [traffic("request-3"), traffic("request-4")],
+            }
+        )
+        full = runtime.submit(
+            {
+                "modelProfile": profile_payload(),
+                "modelProfileDigest": "sha256:profile",
+                "traffic": [traffic("request-5"), traffic("request-6")],
+            }
+        )
+        self.assertEqual(first["accepted"], 2)
+        self.assertEqual(second["accepted"], 2)
+        self.assertEqual(runtime.ingress.qsize(), 2)
+        self.assertEqual(full["accepted"], 0)
+        self.assertEqual(len(full["dropped"]), 2)
+        self.assertTrue(all(item["code"] == "ingress_queue_full" for item in full["dropped"]))
+        self.assertEqual(len(runtime.ingress.get_nowait()), 2)
+        self.assertEqual(len(runtime.ingress.get_nowait()), 2)
+
     def test_brain_disconnect_does_not_stop_local_inference(self):
         brain = OfflineBrain()
         runtime = ModelSideRuntime(

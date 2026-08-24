@@ -87,6 +87,11 @@ describe('引导页', () => {
         posture: 'INGRESS_POSTURE_REVERSE_PROXY',
         trafficKey: 'site-a',
         reverseProxy: { listenAddress: ':18080', upstreamUrl: 'http://app:8080' },
+        modelIngressWindow: {
+          maxItems: 4096,
+          maxRetainedBytes: String(128 * 1024 * 1024),
+          maxQueueAge: '2s',
+        },
         modelProfile: expect.objectContaining({
           modelType: 'PVM',
           alertThreshold: 0.9,

@@ -11,7 +11,7 @@
    sudo ./edge/install-linux.sh install ./bin/yufeng-edge
    ```
 
-3. 编辑 `/etc/yufeng/edge.env`。把单元引导令牌、制品验签公钥、来源假名密钥和 Edge 客户端相互传输层安全协议材料分别放到服务文件声明的路径，所有私钥与令牌权限设为 `0640 root:yufeng`。
+3. 编辑 `/etc/yufeng/edge.env`。把单元引导令牌、制品验签公钥、来源假名密钥和 Edge 客户端相互传输层安全协议材料分别放到服务文件声明的路径，所有私钥与令牌权限设为 `0640 root:yufeng`。`YUFENG_MODEL_INGRESS_WINDOW_MAX_ITEMS`、`YUFENG_MODEL_INGRESS_WINDOW_MAX_BYTES` 和 `YUFENG_MODEL_INGRESS_WINDOW_MAX_AGE` 是 Edge 本机硬上限；中央监听计划只能逐项收窄，不能放大这些值。
 4. 执行 `sudo systemctl start yufeng-edge`，再在控制台确认 Edge 已装载部署规格中的监听计划与世代。
 
 升级与卸载由技术人员显式执行：

@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Sequence
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from .contracts import (
     ContractError,
@@ -28,10 +28,10 @@ from .contracts import (
 )
 from .inference import Backend, InferenceError
 
-INGRESS_MAX = 256
 RESULT_MAX = 1024
 UPLOAD_MAX = 100
 INFERENCE_BATCH = 32
+INGRESS_BATCH_SLOTS_PER_WORKER = 2
 SEEN_ROUTE_MAX = 8192
 
 
@@ -271,11 +271,13 @@ class ModelSideRuntime:
         modelside_id: str,
         backend: Backend,
         brain: BrainClient,
-        ingress_capacity: int = INGRESS_MAX,
+        ingress_capacity: Optional[int] = None,
         result_capacity: int = RESULT_MAX,
         workers: int = 1,
         shutdown_timeout: float = 5.0,
     ):
+        if ingress_capacity is None:
+            ingress_capacity = max(2, workers * INGRESS_BATCH_SLOTS_PER_WORKER)
         if (
             not modelside_id.strip()
             or ingress_capacity <= 0
@@ -286,7 +288,7 @@ class ModelSideRuntime:
             raise ValueError("modelside runtime configuration is invalid")
         self.modelside_id = modelside_id.strip()
         self.metrics = Metrics()
-        self.ingress: queue.Queue[InferenceItem] = queue.Queue(maxsize=ingress_capacity)
+        self.ingress: queue.Queue[list[InferenceItem]] = queue.Queue(maxsize=ingress_capacity)
         self.results = ResultQueue(result_capacity, self.metrics)
         self.sampler = ReviewSampler(self.results, self.metrics)
         self._backend = backend
@@ -325,54 +327,61 @@ class ModelSideRuntime:
         traffic = field(payload, "traffic", default=[])
         if not digest or not isinstance(traffic, list) or not traffic:
             raise ContractError("model profile digest and traffic are required")
-        accepted = 0
+        if len(traffic) > INFERENCE_BATCH:
+            self.metrics.add("ingress_dropped", len(traffic))
+            return {
+                "accepted": 0,
+                "dropped": [
+                    {
+                        "requestId": str(field(raw, "requestId", "request_id", "")) if isinstance(raw, dict) else "",
+                        "code": "ingress_batch_too_large",
+                    }
+                    for raw in traffic
+                ],
+            }
+        items: list[InferenceItem] = []
         dropped: list[dict[str, str]] = []
         for raw in traffic:
             request_id = str(field(raw, "requestId", "request_id", "")) if isinstance(raw, dict) else ""
             try:
-                item = parse_traffic(profile, digest, raw)
-                self.ingress.put_nowait(item)
-                accepted += 1
-            except queue.Full:
-                dropped.append({"requestId": request_id, "code": "ingress_queue_full"})
-                self.metrics.add("ingress_dropped")
+                items.append(parse_traffic(profile, digest, raw))
             except ContractError:
                 dropped.append({"requestId": request_id, "code": "invalid_traffic"})
                 self.metrics.add("ingress_invalid")
+        accepted = 0
+        if items:
+            try:
+                self.ingress.put_nowait(items)
+                accepted = len(items)
+            except queue.Full:
+                dropped.extend(
+                    {"requestId": str(field(item.traffic, "requestId", "request_id", "")), "code": "ingress_queue_full"}
+                    for item in items
+                )
+                self.metrics.add("ingress_dropped", len(items))
         self.metrics.add("ingress_accepted", accepted)
         return {"accepted": accepted, "dropped": dropped}
 
     def _infer_loop(self) -> None:
         while not self._stop.is_set():
             try:
-                first = self.ingress.get(timeout=0.2)
+                batch = self.ingress.get(timeout=0.2)
             except queue.Empty:
                 self.sampler.flush_expired(time.time())
                 continue
-            batch = [first]
-            while len(batch) < INFERENCE_BATCH:
-                try:
-                    batch.append(self.ingress.get_nowait())
-                except queue.Empty:
-                    break
-            grouped: dict[tuple[str, str, str, str], list[InferenceItem]] = {}
-            for item in batch:
-                grouped.setdefault(item.profile.key, []).append(item)
-            for items in grouped.values():
-                try:
-                    scores = self._backend.score_batch(items[0].profile, items)
-                    if len(scores) != len(items):
-                        raise InferenceError("model result count does not match input")
-                    for item, score in zip(items, scores):
-                        if not 0 <= score <= 1:
-                            raise InferenceError("model returned an invalid score")
-                        self.sampler.classify(item, score)
-                        self.metrics.add("inference_completed")
-                except (InferenceError, ValueError, OSError):
-                    self.metrics.add("inference_failed", len(items))
-                finally:
-                    for _ in items:
-                        self.ingress.task_done()
+            try:
+                scores = self._backend.score_batch(batch[0].profile, batch)
+                if len(scores) != len(batch):
+                    raise InferenceError("model result count does not match input")
+                for item, score in zip(batch, scores):
+                    if not 0 <= score <= 1:
+                        raise InferenceError("model returned an invalid score")
+                    self.sampler.classify(item, score)
+                    self.metrics.add("inference_completed")
+            except (InferenceError, ValueError, OSError):
+                self.metrics.add("inference_failed", len(batch))
+            finally:
+                self.ingress.task_done()
             self.sampler.flush_expired(time.time())
 
     def _upload_loop(self) -> None:

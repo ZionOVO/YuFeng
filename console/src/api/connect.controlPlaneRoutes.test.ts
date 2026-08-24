@@ -16,6 +16,18 @@ function responseFor(path: string): Response {
   if (path.endsWith('/GetTrafficReviewPolicy') || path.endsWith('/UpdateTrafficReviewPolicy')) {
     return Response.json({ status: { policy: { mode: 'TRAFFIC_REVIEW_MODE_STATISTICS_ONLY' }, generationId: 'generation-1', generationSeq: '1' } })
   }
+  if (path.endsWith('/GetModelIngressWindow') || path.endsWith('/UpdateModelIngressWindow')) {
+    return Response.json({
+      status: {
+        assetId: 'asset-1',
+        unitId: 'edge-1',
+        desired: { maxItems: 4096, maxRetainedBytes: '134217728', maxQueueAge: '2s' },
+        desiredListenPlanVersion: '2',
+        appliedListenPlanVersion: '1',
+        state: 'MODEL_INGRESS_WINDOW_STATE_CONVERGING',
+      },
+    })
+  }
   return Response.json({})
 }
 
@@ -58,6 +70,13 @@ describe('ConnectClient 控制面真实路由', () => {
     await client.decideWorkerEnrollment({ enrollmentId: 'enrollment-1', approved: true, bindings: ['asset-1'] })
     await client.getTrafficReviewPolicy('asset-1')
     await client.updateTrafficReviewPolicy('asset-1', 'TRAFFIC_REVIEW_MODE_STATISTICS_ONLY', 'generation-0')
+    await client.getModelIngressWindow('asset-1', 'edge-1')
+    await client.updateModelIngressWindow(
+      'asset-1',
+      'edge-1',
+      { maxItems: 4096, maxRetainedBytes: '134217728', maxQueueAge: '2s' },
+      '1',
+    )
 
     expect(paths).toEqual([
       '/yufeng.case.v1.CaseService/ListCases',
@@ -79,6 +98,8 @@ describe('ConnectClient 控制面真实路由', () => {
       '/yufeng.worker.v1.WorkerService/DecideWorkerEnrollment',
       '/yufeng.asset.v1.AssetService/GetTrafficReviewPolicy',
       '/yufeng.asset.v1.AssetService/UpdateTrafficReviewPolicy',
+      '/yufeng.asset.v1.AssetService/GetModelIngressWindow',
+      '/yufeng.asset.v1.AssetService/UpdateModelIngressWindow',
     ])
   })
 })

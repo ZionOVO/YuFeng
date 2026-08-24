@@ -17,6 +17,7 @@ func TestUnitListenPlanSignatureCoversBinding(t *testing.T) {
 	plan := &artifactv1.UnitListenPlan{
 		UnitId: "unit-a", Posture: commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY,
 		TrafficKey: "site-a", Version: 1, ListenAddress: ":18080", UpstreamUrl: "http://app:8080",
+		ModelIngressWindow: DefaultModelIngressWindow(),
 	}
 	if err := SignUnitListenPlan(plan, priv); err != nil {
 		t.Fatal(err)
@@ -24,8 +25,8 @@ func TestUnitListenPlanSignatureCoversBinding(t *testing.T) {
 	if err := VerifyUnitListenPlan(plan, pub); err != nil {
 		t.Fatal(err)
 	}
-	plan.UpstreamUrl = "http://other:8080"
+	plan.ModelIngressWindow.MaxItems++
 	if err := VerifyUnitListenPlan(plan, pub); err == nil {
-		t.Fatal("tampered upstream passed signature verification")
+		t.Fatal("tampered model ingress window passed signature verification")
 	}
 }

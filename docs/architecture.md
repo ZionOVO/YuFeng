@@ -99,7 +99,7 @@
 
 **发现（Inspect）** 与 **闸（Gate）** 分离。同步口是进程内 [Inspector](glossary.md#inspector)：只出完整检测键与每面检查覆盖度，**不**返回拦截动作。接口刻意不进 proto。`Action` 只属于 [Gate](glossary.md#gate)。回放硬保证：同一规范请求视图 + 同一客户端来源元数据 + 同一 `activeGeneration` + 同一入口姿态 + 同一 `unit_id` ⇒ 同一发现集 + 同一每面覆盖度 + 同一闸门动作。活路径是 `Inspector.Inspect` + `Gate`：世代清单选装眼睛，监听计划决定入口姿态与绑定，与发布状态拆开。
 
-**五层眼睛**见[检测器档位](glossary.md#detector-tiers)。同步层：Coraza 核心规则集（永远 DetectionOnly）+ 可选纯 Go 画像核（后接，未装载则清单里没有）。异步深度学习由邻近的 `yufeng-modelside` 执行：Edge 从反向代理、外部授权或已解密流量复制入口取得真实 HTTP 请求，形成版本化[规范化模型流量](glossary.md#normalized-model-traffic)，在同步 Inspect + Gate 完成后把正文缓冲的一次有界所有权交给非阻塞队列。队列满、modelside 空闲或满载、brain 断连、磁盘变慢都不得改变当前请求；满时丢旁路并计数。modelside 不进 Edge 二进制、不持 Gate 权限，结果只能影响后续案件与新世代。调查执行实例由 brain 创建，短命、窄权，不回改本次请求。hold-and-forward 默认永不做。
+**五层眼睛**见[检测器档位](glossary.md#detector-tiers)。同步层：Coraza 核心规则集（永远 DetectionOnly）+ 可选纯 Go 画像核（后接，未装载则清单里没有）。异步深度学习由邻近的 `yufeng-modelside` 执行：Edge 从反向代理、外部授权或已解密流量复制入口取得真实 HTTP 请求，形成版本化[规范化模型流量](glossary.md#normalized-model-traffic)，在同步 Inspect + Gate 完成后把正文缓冲的一次有界所有权交给[模型输入缓存窗口](glossary.md#model-ingress-window)。窗口按条数、实际保留字节和排队年龄三重限界，满时淘汰最旧可排队项；modelside 空闲或满载、brain 断连、磁盘变慢都不得改变当前请求。modelside 不进 Edge 二进制、不持 Gate 权限，结果只能影响后续案件与新世代。调查执行实例由 brain 创建，短命、窄权，不回改本次请求。hold-and-forward 默认永不做。
 
 **边缘观察与中台研判是两层语义。** 边缘只报告同步发现、无发现、覆盖不足或检测器失败；brain 再结合钉死世代与独立证据形成 `TRIAGE_REASON_*` 研判原因。普通完整无发现只进入签名流量审查统计，不创建 Agent 指令；高风险模型结果、人工报告、漏洞复现、回放、上游防护发现或可信情报复现只有满足 [`api.md`](api.md) 第 18.1.2 节的独立证据条件时，才能把同步无发现解释为疑似漏检。
 
@@ -109,7 +109,7 @@
 
 **侧载灰故障**：监听计划签不了「网关真的把流量拷过来了」。连续两个心跳无请求而同键拦截单元在跑 → 资产健康 `tap_silent`；已声明跟随关系的观察流与拦截流方法×路由模板 Top-N 集合 Jaccard < 0.5 且双方请求数都 ≥ 100 → `tap_skew`；镜像单元 `body_full_rate` 长期为 0 却报 HTTP `FULL` → 该面强制 `UNSUPPORTED`。控制台必须写「执行面可能看不见」。
 
-**过载早丢**：同步 Inspect+Gate → 契约③关键事件的内存交接 → modelside 旁路 / 采样。请求路径禁止推理、访问 brain、同步写文件或等待旁路消费者。同步超 `EdgeInFlight` 对新连接 503；遥测或 modelside 队列满时只丢对应异步副本并计数。证据环有条数与字节上限，持久化只在后台发生。
+**过载早丢**：同步 Inspect+Gate → 契约③关键事件的内存交接 → modelside 旁路 / 采样。请求路径禁止推理、访问 brain、同步写文件或等待旁路消费者。同步超 `EdgeInFlight` 对新连接 503；遥测队列满时丢对应异步副本，模型输入窗口满时淘汰最旧的可排队副本；单次模型窗口准入最多淘汰 32 项，仍不足则丢新副本并累计准入预算计数，避免大窗口缩容或大小正文混合产生线性暂停。证据环有条数与字节上限，持久化只在后台发生。
 
 **生产能力不是授权。** 注册与心跳携带结构化能力广告，只描述该单元客观上能产生的关键事件、普通样本、票据特征、投影版本、入口姿态、传感类型、编译进二进制的模块协议能力和容量上限；生产健康另报缓冲与丢弃计数。brain 持久化后在世代下发前做兼容性检查，并用模块协议能力决定编译期模块目录是否激活，不兼容整代拒绝。资产标签与中台策略参与编译下一份签名世代，决定实际采样、证据和转发行为。能力广告不能改变资产绑定、Tools、Bindings、发布范围或消费者可见性。支持 `TrafficReviewPolicy` 的 Edge 使用签名模式运行完整统计与有界代表；`NoDetectionSampleRate` 仅供旧 Edge 兼容，禁止读取实时可变标签直接改变边缘行为。
 
@@ -130,7 +130,7 @@
 ### 4.3 独立分布 · 边缘亲和与中台亲和算力（可选）
 
 - **`yufeng-modelside`（边缘亲和算力 Y）**：独立 Python 服务进程，参考 sentry-docker ModelSide 的 TensorFlow 模型形状、字符编码、分组权重加载和批量推理，但不复用其日志接入、Redis、消费者或结果上报代码。它接收 Edge 已验证世代导出的[签名模型档案](glossary.md#signed-model-profile)和版本化规范流量，按档案中的模型版本、告警阈值、复核下限、窗口、单元/路由上限与去重规则推理和采样；任何值都不得由进程硬编码为运行策略。它不进平台 Go 二进制、不持 Gate 权限、不训练、不接 NATS 或 PostgreSQL。
-- **两个独立队列**：Edge 的输入队列只负责 `edge → modelside`，modelside 的结果队列只负责 `modelside → brain`。输入队列满时丢流量旁路；结果队列满时丢结果旁路；二者分别计数且互不施加背压。`MODEL_ALERT` 达到签名告警阈值后全量尝试进入结果队列；`REVIEW_SAMPLE` 只在达到复核下限、新路由或覆盖不足等签名条件时进入窗口化有界代表集，同方法与路由默认只保留最高风险代表。brain 断连不能停止本地推理。
+- **两个独立队列**：Edge 的模型输入缓存窗口只负责 `edge → modelside`，modelside 的结果队列只负责 `modelside → brain`。Edge 窗口按条数、保留字节和排队年龄保留最新流量；ModelSide 只用浅层批次队列把一次提交交给推理线程，不另建业务窗口。输入满载时淘汰最旧可排队流量，结果队列满时丢结果旁路；二者分别计数且互不施加背压。`MODEL_ALERT` 达到签名告警阈值后全量尝试进入结果队列；`REVIEW_SAMPLE` 只在达到复核下限、新路由或覆盖不足等签名条件时进入窗口化有界代表集，同方法与路由默认只保留最高风险代表。brain 断连不能停止本地推理。
 - **传输边界**：同机 Edge 与 modelside 优先使用权限受限的 Unix 域套接字；跨主机使用双向传输层安全协议，双方证书身份必须匹配允许的 Edge/modelside 工作负载，并只部署在同一受控防御网络。modelside 上报只含请求标识、归属、世代、方法、路由、覆盖度、分数、模型坐标、档案摘要和采样原因；不得包含原始头、查询参数或正文。
 - **沙箱（中台亲和算力 Z）**：漏洞验证代码（PoC）复现、提取利用行为签名、程序制品沙箱演练（发布前门禁）；Landlock/seccomp 隔离、默认无网——跑不可信代码的地方必须是独立单元。
 
@@ -437,6 +437,7 @@ L1 生产数据面不变量见 §4，网络结果与失败语义见 [`api.md`](a
 | 036 | Edge 生命周期归技术人员；Brain 只签发部署规格派生制品；深度学习下沉为 `edge → modelside → brain` 双队列旁路 | 基础设施权限不属于智能代理。原始流量必须留在入口附近，异步推理不能给当前请求施加背压或 Gate 权限；只有类型化无原文结果进入中台事务与案件 |
 | 037 | 软件发布静态预检绑定预期合并 Git 树，最终提交只补活栈并提升证据 | 已由架构决策记录 038 取代；该流程把首次活栈反馈放在合入后，并把发布工具、源码谱系和部署环境绑定为一个失效域，形成无法稳定收敛的发布循环 |
 | 038 | `main` 单主干、冻结验收合同、一次构建并提升精确软件制品，部署证据独立 | 分支只管理源码；发布任务验证并上传同一批不可变文件。新发现不得由智能代理自动扩大发布范围；门禁缺陷先停止发布并作为独立变更修复 |
+| 039 | Edge 模型输入使用可配置易失最新窗口，ModelSide 只保留浅层批次交接 | 中央期望写进签名单元监听计划，本机配置只收窄条数、保留字节和排队年龄；窗口不落盘、不重试、不阻塞请求。只有在 2000 请求/秒、第 99 百分位增量、中央处理器和 512 MiB 内存硬门槛全部通过时保留内置实现，否则另立外部消息队列设计 |
 
 ---
 
@@ -462,9 +463,13 @@ L1 生产数据面不变量见 §4，网络结果与失败语义见 [`api.md`](a
 | `ClusterWindow` / `ClusterIdle` / `ClusterRepresentatives` | 15min / 2h / 5 | 研判聚类 |
 | `P99ExtraLatency` | 5ms | 数据面第 99 百分位额外延迟预算 |
 | `ModelBypassP99Budget` | 1ms | 启用异步模型旁路相对关闭旁路基线允许增加的第 99 百分位延迟 |
+| `ModelBypassCPUPercentBudget` | 5 个百分点 | 启用异步模型旁路相对关闭旁路基线允许增加的 Edge 进程中央处理器占用 |
 | `EdgeThroughputRPS` | 2000 | 单 edge 进程吞吐目标 |
 | `EdgeMemoryBytes` / `EdgeCacheDiskBytes` / `EdgeInFlight` | 512 MiB / 512 MiB / 4096 | 进程内存、世代盘、在途 |
-| `ModelSideIngressQueueMax` / `ModelSideIngressQueueBytes` / `ModelSideIngressWorkers` | 256 / 8 MiB / 2 | Edge → modelside 非阻塞流量队列与后台发送协程 |
+| `ModelIngressDefaultItems` / `ModelIngressDefaultBytes` / `ModelIngressDefaultAge` | 4096 / 128 MiB / 2s | Brain 签发的 Edge → modelside 模型输入缓存窗口默认期望值 |
+| `ModelIngressLocalMaxItems` / `ModelIngressLocalMaxBytes` / `ModelIngressLocalMaxAge` | 16384 / 256 MiB / 5min | Edge 本机默认硬上限；启动参数可进一步收窄 |
+| `ModelIngressAbsoluteMaxItems` / `ModelIngressAbsoluteMinBytes` / `ModelIngressAbsoluteMaxBytes` / `ModelIngressAbsoluteMinAge` / `ModelIngressAbsoluteMaxAge` | 65536 / 1 MiB / 256 MiB / 10ms / 5min | Brain 与 Edge 接受模型输入缓存窗口配置的绝对范围 |
+| `ModelIngressBatchMaxItems` / `ModelIngressBatchWait` / `ModelSideIngressWorkers` | 32 / 10ms / 2 | Edge 后台同档案批量与并发发送上限 |
 | `ModelSideResultQueueMax` / `ModelSideUploadBatchMax` | 1024 / 100 | modelside → brain 独立结果队列与单批上限 |
 | `ModelReviewWindow` / `ModelReviewPerUnit` / `ModelReviewPerRoute` | 5min / 4 / 1 | 初始签名模型档案的复核窗口与代表上限 |
 | `ModelAlertThresholdDefault` / `ModelReviewFloorDefault` | 0.9 / 0.5 | 初始签名模型档案阈值；运行时只认档案，不认进程默认值 |

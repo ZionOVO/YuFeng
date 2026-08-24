@@ -99,6 +99,8 @@ const (
 	P99ExtraLatency = 5 * time.Millisecond
 	// ModelBypassP99Budget 是模型旁路相对关闭状态允许增加的第 99 百分位延迟。
 	ModelBypassP99Budget = time.Millisecond
+	// ModelBypassCPUPercentBudget 是模型旁路相对关闭状态允许增加的进程中央处理器占用百分点。
+	ModelBypassCPUPercentBudget = 5.0
 	// EdgeThroughputRPS 是单 edge 进程吞吐目标。
 	EdgeThroughputRPS = 2000
 	// EdgeMemoryBytes 是单 edge 进程内存上限。
@@ -109,12 +111,6 @@ const (
 	EdgeTelemetrySpoolBytes = 64 * 1024 * 1024
 	// EdgeInFlight 是单 edge 在途请求上限。
 	EdgeInFlight = 4096
-	// EdgeBypassQueueMax 是本地异步旁路队列条数上限。
-	EdgeBypassQueueMax = 256
-	// EdgeBypassQueueBytes 是本地异步旁路队列字节上限。
-	EdgeBypassQueueBytes = 8 << 20
-	// EdgeBypassWorkers 是本地异步旁路后台协程数。
-	EdgeBypassWorkers = 2
 	// EvidenceRingMaxEntries 是证据环条数上限。
 	EvidenceRingMaxEntries = 1024
 	// EvidenceRingMaxBytes 是证据环字节上限。
@@ -197,12 +193,38 @@ const (
 	JarvisOnlineWindow = 60 * time.Second
 	// EdgeOnlineWindow 是人工部署 Edge 的最近心跳就绪窗口。
 	EdgeOnlineWindow = 90 * time.Second
-	// ModelSideIngressQueueMax 是 Edge 到 ModelSide 的最大排队条目数。
-	ModelSideIngressQueueMax = 256
-	// ModelSideIngressQueueBytes 是 Edge 到 ModelSide 的最大排队正文总字节。
-	ModelSideIngressQueueBytes = 8 << 20
+	// ModelIngressDefaultItems 是 Brain 签发的模型输入缓存窗口默认条目数。
+	ModelIngressDefaultItems = 4096
+	// ModelIngressDefaultBytes 是 Brain 签发的模型输入缓存窗口默认保留字节数。
+	ModelIngressDefaultBytes = 128 << 20
+	// ModelIngressDefaultAge 是 Brain 签发的模型输入缓存窗口默认排队年龄。
+	ModelIngressDefaultAge = 2 * time.Second
+	// ModelIngressLocalMaxItems 是 Edge 本机默认硬上限条目数。
+	ModelIngressLocalMaxItems = 16384
+	// ModelIngressLocalMaxBytes 是 Edge 本机默认硬上限保留字节数。
+	ModelIngressLocalMaxBytes = 256 << 20
+	// ModelIngressLocalMaxAge 是 Edge 本机默认硬上限排队年龄。
+	ModelIngressLocalMaxAge = 5 * time.Minute
+	// ModelIngressAbsoluteMaxItems 是平台接受的模型输入缓存窗口条目上限。
+	ModelIngressAbsoluteMaxItems = 65536
+	// ModelIngressAbsoluteMinBytes 是平台接受的模型输入缓存窗口字节下限。
+	ModelIngressAbsoluteMinBytes = 1 << 20
+	// ModelIngressAbsoluteMaxBytes 是平台接受的模型输入缓存窗口字节上限。
+	ModelIngressAbsoluteMaxBytes = 256 << 20
+	// ModelIngressAbsoluteMinAge 是平台接受的模型输入缓存窗口最短年龄。
+	ModelIngressAbsoluteMinAge = 10 * time.Millisecond
+	// ModelIngressAbsoluteMaxAge 是平台接受的模型输入缓存窗口最长年龄。
+	ModelIngressAbsoluteMaxAge = 5 * time.Minute
+	// ModelIngressBatchMaxItems 是 Edge 单批交给 ModelSide 的最大条目数。
+	ModelIngressBatchMaxItems = 32
+	// ModelIngressBatchMaxBytes 是 Edge 单批规范流量的保留字节上限。
+	ModelIngressBatchMaxBytes = 4 << 20
+	// ModelIngressBatchWait 是 Edge 从首项开始组批的最长等待。
+	ModelIngressBatchWait = 10 * time.Millisecond
 	// ModelSideIngressWorkers 是 Edge 后台模型输入发送协程数。
 	ModelSideIngressWorkers = 2
+	// ModelSideIngressReceiveMaxBytes 是 ModelSide Connect 请求接收上限。
+	ModelSideIngressReceiveMaxBytes = 10 << 20
 	// EdgeObservationQueueMax 是请求路径到本地遥测落盘后台的最大条目数。
 	EdgeObservationQueueMax = 256
 	// ModelSideIngressTimeout 是单次 Edge 到 ModelSide 后台提交上限。

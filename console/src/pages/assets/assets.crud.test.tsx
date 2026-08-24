@@ -33,6 +33,28 @@ describe('资产增删改查角色', () => {
     expect((await client.getTrafficReviewPolicy('asset-01')).policy.mode).toBe('TRAFFIC_REVIEW_MODE_STATISTICS_ONLY')
   })
 
+  it('管理员按监听计划版本签发 Edge 模型输入缓存窗口', async () => {
+    const user = userEvent.setup()
+    const client = new ConsoleClientFixture()
+    const update = vi.spyOn(client, 'updateModelIngressWindow')
+    await loginAs(client)
+    renderApp({ route: '/assets/asset-01', client })
+
+    expect(await screen.findByRole('region', { name: '模型输入缓存窗口' })).toBeInTheDocument()
+    const items = screen.getByLabelText('窗口条目数')
+    await user.clear(items)
+    await user.type(items, '8192')
+    await user.click(screen.getByRole('button', { name: '签发窗口配置' }))
+
+    await waitFor(() => expect(update).toHaveBeenCalledWith(
+      'asset-01',
+      'unit-edge-01',
+      { maxItems: 8192, maxRetainedBytes: String(128 * 1024 * 1024), maxQueueAge: '2s' },
+      '1',
+    ))
+    expect(await screen.findByText('等待收敛')).toBeInTheDocument()
+  })
+
   it('按完整 int64 世代序号判断 Edge 是否已经装载', async () => {
     class GenerationFixture extends ConsoleClientFixture {
       override async getAsset(assetId: string): Promise<AssetDetail> {

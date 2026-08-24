@@ -21,6 +21,8 @@ service AssetService {
   rpc DetachUnit(DetachUnitRequest) returns (DetachUnitResponse);
   rpc GetTrafficReviewPolicy(GetTrafficReviewPolicyRequest) returns (GetTrafficReviewPolicyResponse);
   rpc UpdateTrafficReviewPolicy(UpdateTrafficReviewPolicyRequest) returns (UpdateTrafficReviewPolicyResponse);
+  rpc GetModelIngressWindow(GetModelIngressWindowRequest) returns (GetModelIngressWindowResponse);
+  rpc UpdateModelIngressWindow(UpdateModelIngressWindowRequest) returns (UpdateModelIngressWindowResponse);
 }
 
 message CreateAssetRequest {
@@ -113,4 +115,35 @@ message UpdateTrafficReviewPolicyRequest {
 
 message UpdateTrafficReviewPolicyResponse {
   TrafficReviewPolicyStatus status = 1;
+}
+
+message GetModelIngressWindowRequest {
+  string asset_id = 1;
+  string unit_id = 2;
+}
+
+message ModelIngressWindowStatus {
+  string asset_id = 1;
+  string unit_id = 2;
+  yufeng.artifact.v1.ModelIngressWindow desired = 3;
+  yufeng.artifact.v1.ModelIngressWindow effective = 4;
+  uint64 desired_listen_plan_version = 5;
+  uint64 applied_listen_plan_version = 6;
+  yufeng.unit.v1.ModelIngressWindowState state = 7;
+  repeated yufeng.unit.v1.ModelIngressDegradationReason degradation_reasons = 8;
+}
+
+message GetModelIngressWindowResponse {
+  ModelIngressWindowStatus status = 1;
+}
+
+message UpdateModelIngressWindowRequest {
+  string asset_id = 1;
+  string unit_id = 2;
+  yufeng.artifact.v1.ModelIngressWindow desired = 3;
+  uint64 expected_listen_plan_version = 4;
+}
+
+message UpdateModelIngressWindowResponse {
+  ModelIngressWindowStatus status = 1;
 }

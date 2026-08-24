@@ -66,7 +66,7 @@ func TestReleaseDocumentationSeparatesSoftwareReleaseFromDeploymentEvidence(t *t
 	agents := readRepoFile(t, "AGENTS.md")
 
 	requireContains(t, "README.md", readme,
-		"v0.1.0", "2026-08-24", "releases/latest", "软件 Release 公开不等于客户现场上线完成")
+		"v0.1.1", "2026-08-24", "releases/latest", "软件 Release 公开不等于客户现场上线完成")
 	for name, document := range map[string]string{
 		"AGENTS.md":                               agents,
 		"docs/architecture.md":                    architecture,
@@ -79,7 +79,7 @@ func TestReleaseDocumentationSeparatesSoftwareReleaseFromDeploymentEvidence(t *t
 		}
 	}
 	requireContains(t, "operations/release-and-delivery.md", releaseDelivery,
-		"v0.1.0", "2026-08-24", "正式公开", "v0.1.1", "冻结发布验收合同")
+		"v0.1.1", "2026-08-24", "正式公开", "v0.1.2", "冻结发布验收合同")
 	for _, asset := range []string{
 		"yufeng-v0.1.0-linux-amd64.tar.gz",
 		"yufeng-v0.1.0-modelside-image-linux-amd64.tar.gz",
@@ -89,6 +89,10 @@ func TestReleaseDocumentationSeparatesSoftwareReleaseFromDeploymentEvidence(t *t
 		"yufeng-v0.1.1-modelside-image-linux-amd64.tar.gz",
 		"yufeng-v0.1.1-release-manifest.json",
 		"yufeng-v0.1.1-checksums.txt",
+		"yufeng-v0.1.2-linux-amd64.tar.gz",
+		"yufeng-v0.1.2-modelside-image-linux-amd64.tar.gz",
+		"yufeng-v0.1.2-release-manifest.json",
+		"yufeng-v0.1.2-checksums.txt",
 		"yufeng.software-release/v1",
 	} {
 		if !strings.Contains(releaseDelivery, asset) {

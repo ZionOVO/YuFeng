@@ -35,7 +35,7 @@ const (
 
 // runBrainMode 以中台下发模式运行 edge：注册、拉取监听计划与发布、心跳计数、遥测上行。
 // bootstrapToken 是部署级引导令牌：首次注册凭它放行，注册后凭会话令牌续用。
-func runBrainMode(ctx context.Context, brainURL, adminAddr, unitID, unitVersion, bootstrapToken, dataDir, spoolDir string, pub ed25519.PublicKey, source edgecore.SourcePseudonymizer, hc *http.Client, modelSender modelTrafficSender) error {
+func runBrainMode(ctx context.Context, brainURL, adminAddr, unitID, unitVersion, bootstrapToken, dataDir, spoolDir string, pub ed25519.PublicKey, source edgecore.SourcePseudonymizer, hc *http.Client, modelSender modelTrafficSender, modelHardLimit *artifactv1.ModelIngressWindow) error {
 	if dataDir == "" {
 		dataDir = ".tmp"
 	}
@@ -68,7 +68,7 @@ func runBrainMode(ctx context.Context, brainURL, adminAddr, unitID, unitVersion,
 	if reg == nil && (prevSession == nil || prevSession.Refresh == "") {
 		reg, sessErr = client.Register(ctx, &registryv1.RegisterRequest{
 			UnitId: unitID, Kind: registryv1.UnitKind_UNIT_KIND_EDGE, Version: unitVersion,
-			ContractVersion: "v1", Asset: assetFor(unitID), PubkeyHint: pubHint(pub), Capabilities: edgecore.ProducerCapabilities(),
+			ContractVersion: "v1", Asset: assetFor(unitID), PubkeyHint: pubHint(pub), Capabilities: edgecore.ProducerCapabilitiesWithModelIngressHardLimit(modelHardLimit),
 		})
 	}
 	if err := decideOfflineStart(cachedGeneration, cachedListenPlan, sessErr); err != nil {
@@ -80,7 +80,7 @@ func runBrainMode(ctx context.Context, brainURL, adminAddr, unitID, unitVersion,
 		if prev := loadSession(sessionPath); prev != nil && prev.AssetID != "" {
 			offlineAsset = prev.AssetID
 		}
-		return serveOffline(ctx, adminAddr, set, offlineAsset, client, sessionPath, cachePath, listenCachePath, pub, spoolDir, unitID, unitVersion, source, modelSender)
+		return serveOffline(ctx, adminAddr, set, offlineAsset, client, sessionPath, cachePath, listenCachePath, pub, spoolDir, unitID, unitVersion, source, modelSender, modelHardLimit)
 	}
 	if err := saveSession(sessionPath, reg); err != nil {
 		return fmt.Errorf("persist registered session: %w", err)
@@ -105,7 +105,7 @@ func runBrainMode(ctx context.Context, brainURL, adminAddr, unitID, unitVersion,
 	if err != nil {
 		return fmt.Errorf("open traffic review storage: %w", err)
 	}
-	runtime, err := newEdgeRuntime(set, reg.UnitID, reg.AssetID, spool, source, modelSender)
+	runtime, err := newEdgeRuntime(set, reg.UnitID, reg.AssetID, spool, source, modelSender, modelHardLimit)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func heartbeatLoop(ctx context.Context, client *edgeclient.Client, reg *edgeclie
 		req := &registryv1.HeartbeatRequest{
 			UnitId: reg.UnitID, Generation: generation,
 			Posture: plan.GetPosture(), TrafficKey: plan.GetTrafficKey(), WindowRequests: reqs, RouteTemplates: routes,
-			Capabilities: edgecore.ProducerCapabilities(), ProducerHealth: runtime.producerHealth(), Version: unitVersion,
+			Capabilities: runtime.capabilities(), ProducerHealth: runtime.producerHealth(), Version: unitVersion,
 			CurrentListenPlanVersion: plan.GetVersion(),
 		}
 		if currentGeneration != nil {
@@ -367,7 +367,7 @@ func uploadEventBatches(ctx context.Context, client *edgeclient.Client, reg *edg
 	return spool.ResolveUpload(file, retry, permanent)
 }
 
-func serveOffline(ctx context.Context, adminAddr string, set *edgecore.ReleaseSet, assetID string, client *edgeclient.Client, sessionPath, cachePath, listenCachePath string, pub ed25519.PublicKey, spoolDir, unitID, unitVersion string, source edgecore.SourcePseudonymizer, modelSender modelTrafficSender) error {
+func serveOffline(ctx context.Context, adminAddr string, set *edgecore.ReleaseSet, assetID string, client *edgeclient.Client, sessionPath, cachePath, listenCachePath string, pub ed25519.PublicKey, spoolDir, unitID, unitVersion string, source edgecore.SourcePseudonymizer, modelSender modelTrafficSender, modelHardLimit *artifactv1.ModelIngressWindow) error {
 	var spool *edgeclient.Spool
 	if spoolDir != "" {
 		s, err := edgeclient.NewSpool(filepath.Join(spoolDir, "edge-spool-"+unitID))
@@ -376,7 +376,7 @@ func serveOffline(ctx context.Context, adminAddr string, set *edgecore.ReleaseSe
 		}
 		spool = s
 	}
-	runtime, err := newEdgeRuntime(set, unitID, assetID, spool, source, modelSender)
+	runtime, err := newEdgeRuntime(set, unitID, assetID, spool, source, modelSender, modelHardLimit)
 	if err != nil {
 		return err
 	}
@@ -435,7 +435,7 @@ func reconnectLoop(ctx context.Context, client *edgeclient.Client, sessionPath, 
 		if reg == nil && (prev == nil || prev.Refresh == "") {
 			s, err := client.Register(ctx, &registryv1.RegisterRequest{
 				UnitId: unitID, Kind: registryv1.UnitKind_UNIT_KIND_EDGE, Version: unitVersion,
-				ContractVersion: "v1", Asset: assetFor(unitID), PubkeyHint: pubHint(pub), Capabilities: edgecore.ProducerCapabilities(),
+				ContractVersion: "v1", Asset: assetFor(unitID), PubkeyHint: pubHint(pub), Capabilities: runtime.capabilities(),
 			})
 			if err != nil {
 				log.Printf("离线恢复注册失败: %v", err)

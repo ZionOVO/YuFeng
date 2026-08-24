@@ -93,7 +93,7 @@ signature = Ed25519.Sign(canonical)
 | 6 | `yufeng.user.v1.UserService` | 操作域（持 `user.admin`） | ✅ | CreateUser, ListUsers, GetUser, UpdateUser, DeleteUser, AdminResetPassword |
 | 6a | `yufeng.grant.v1.GrantService` | 操作域（持 `grant.write` 或查自己） | 定契约 | ListGrants, PutGrant, RevokeGrant |
 | 7 | 回放组件（进程内库接口，非网络） | brain 内部 | ✅ | `GateArtifact` 直接调用 `replay.Run`；外置算力阶段再升格为网络服务 |
-| 8 | `yufeng.asset.v1.AssetService` | 操作域 | ✅ | CreateAsset, UpdateAsset, DeleteAsset, ListAssets, GetAsset, AttachUnit, DetachUnit |
+| 8 | `yufeng.asset.v1.AssetService` | 操作域 | ✅ | CreateAsset, UpdateAsset, DeleteAsset, ListAssets, GetAsset, AttachUnit, DetachUnit, GetTrafficReviewPolicy, UpdateTrafficReviewPolicy, GetModelIngressWindow, UpdateModelIngressWindow |
 | 9 | `yufeng.console.v1.ConsoleService` | 控制台 | ✅ | Dashboard, ListEvents, GetEvent |
 | 9a | `yufeng.onboarding.v1.OnboardingService` | 控制台（引导） | 人机交付必交 | GetOnboarding, PutModelConfig, TestModelConnectivity, PutDeploymentSpecification, CompleteOnboarding（§19） |
 | 9b | `yufeng.model.v1.ModelGatewayService` | Agent 生成；管理员读改槽 | 人机交付必交 + 座架目标契约 | CompleteChat（迁移/探测）；Generate（§18.10）；GetModelGateway / UpdateModelGateway / ProbeModelGateway（§19.4）；生产出口，不是 `agents/modelgateway` |
@@ -141,6 +141,8 @@ signature = Ed25519.Sign(canonical)
 | POST | `{BASE}/yufeng.asset.v1.AssetService/GetAsset` | §9 |
 | POST | `{BASE}/yufeng.asset.v1.AssetService/AttachUnit` | §9 |
 | POST | `{BASE}/yufeng.asset.v1.AssetService/DetachUnit` | §9 |
+| POST | `{BASE}/yufeng.asset.v1.AssetService/GetModelIngressWindow` | §9 |
+| POST | `{BASE}/yufeng.asset.v1.AssetService/UpdateModelIngressWindow` | §9 |
 | POST | `{BASE}/yufeng.govern.v1.GovernService/ProposeArtifact` | §7.2 |
 | POST | `{BASE}/yufeng.govern.v1.GovernService/GateArtifact` | §7.3 |
 | POST | `{BASE}/yufeng.govern.v1.GovernService/StartShadow` | §7.4 |
@@ -298,7 +300,7 @@ signature = Ed25519.Sign(canonical)
 | pubkey_hint | string | ❌ | 本地签名公钥指纹：`hex(sha256(pubkey_bytes))` |
 | capabilities | ProducerCapabilities | edge 必填 | 生产能力广告；只用于兼容性判断，不产生授权 |
 
-`ProducerCapabilities` 固定表达：`outputs[]`（关键事件、普通样本、票据特征）、`projection_versions[]`、`postures[]`、`sensors[]`（HTTP、Coraza）、是否具备本地证据环与本地异步旁路，以及事件批量、在途请求、事件落盘和证据环容量上限。列表规范化为去重升序，枚举不接受未指定值，版本字符串不得为空。
+`ProducerCapabilities` 固定表达：`outputs[]`（关键事件、普通样本、票据特征）、`projection_versions[]`、`postures[]`、`sensors[]`（HTTP、Coraza）、是否具备本地证据环与本地异步旁路，以及事件批量、在途请求、事件落盘、证据环容量、`model_ingress_hard_limit` 与 `max_model_ingress_batch_items`。模型输入硬上限是本机启动配置允许的条数、实际保留字节和排队年龄上界，只用于收窄签名监听计划；它不能产生模型可见字段或授权。列表规范化为去重升序，枚举不接受未指定值，版本字符串不得为空。
 
 它只回答“这台单元客观上能生产什么”，由 brain 持久化为兼容性与调度输入：
 
@@ -336,7 +338,7 @@ signature = Ed25519.Sign(canonical)
 | loaded_release_count | uint32 | 已装载 release 数 |
 | version | string | 当前程序版本 |
 | capabilities | ProducerCapabilities | 当前进程能力；用于升级后刷新注册快照，不改变身份或授权 |
-| producer_health | ProducerHealth | 关键事件/普通样本缓冲与丢弃、本地旁路丢弃、投影失败及健康投影版本；不得携带请求原文 |
+| producer_health | ProducerHealth | 关键事件/普通样本缓冲与丢弃、模型输入窗口实际值、状态、排队/在途容量、按原因丢弃、投影失败及健康投影版本；不得携带请求原文 |
 | current_generation_id | string | Edge 已验签并原子装载的当前资产世代标识；未装载时为空 |
 | current_generation_seq | int64 | 与 `current_generation_id` 对应的世代序号；中台只用该心跳回执确认策略已真实生效 |
 | current_listen_plan_version | uint64 | Edge 已验签并应用的单元监听计划版本；未应用时为零。Brain 与部署规格的期望版本比较后确定 Edge 就绪，不主动探测 Edge 管理口 |
@@ -869,10 +871,16 @@ RELEASE_STATE_SHADOW ──PromoteCanary──▶ RELEASE_STATE_CANARY ──Pro
 | GetAsset | asset_id | 单个资产详情（读路径，非管理员可查自己范围内的资产） |
 | AttachUnit | asset_id、unit_id + Idempotency-Key | 仅管理员。把旁路资产交给 edge 单元保护；v1 每单元只允许一个主资产 |
 | DetachUnit | asset_id、unit_id + Idempotency-Key | 仅管理员。解绑；正在受保护的资产解绑后边缘下次快照卸载 |
+| GetModelIngressWindow | asset_id、unit_id | 读取最新签名监听计划中的中央期望、最近心跳实际值、期望/已应用监听计划版本、状态和收窄原因。要求 `console.read` 与资产 Binding |
+| UpdateModelIngressWindow | asset_id、unit_id、desired、expected_listen_plan_version + Idempotency-Key | 仅管理员且要求 `asset.update`。校验单元属于该资产且广告模型输入窗口能力；克隆最新监听计划、只替换窗口、递增版本、重新签名并审计，不创建资产世代 |
 
 **写冲突语义**：不再整行后写胜。操作方字段与单元探针字段分区；同区冲突采用 `updated_at` 乐观锁，版本不匹配返回 `failed_precondition` + `version_mismatch`。
 
 `AssetDetail.units[]` 是只读单元投影：包含单元标识、种类、版本、健康、入口姿态、流量键、最近心跳、生产能力、生产健康以及已装载的资产世代标识和序号。`tap_silent` / `tap_skew` 保持逐单元可见。流量审查策略更新后，控制台必须等待绑定 Edge 的心跳世代序号全部达到目标序号，才能显示“已生效”。控制台不能修改能力或健康，也不能把广告字段转换成操作权限。
+
+`ModelIngressWindow` 同时要求正数 `max_items`、`max_retained_bytes` 与 `max_queue_age`；平台接受 1–65536 条、1–256 MiB、10 毫秒–5 分钟。Brain 初始签发默认 4096 条、128 MiB、2 秒。Edge 将中央期望逐项收窄到本机硬上限；字节上限优先，因此年龄是可达覆盖目标，不保证最坏正文负载一定装满整段时间。中央缩容不批量清空现有项：后台发送和过期清理自然收敛，新流量仍按新上限淘汰最旧可排队项；收敛前状态为 `MODEL_INGRESS_WINDOW_STATE_CONVERGING`。本机收窄后状态为 `MODEL_INGRESS_WINDOW_STATE_DEGRADED` 并返回条数、字节或年龄的闭集原因；旁路关闭为 `MODEL_INGRESS_WINDOW_STATE_DISABLED`。
+
+模型输入窗口易失且至多一次：不落盘、不重试，Edge 或 ModelSide 退出、传输失败、ModelSide 拒绝均允许丢失。`ProducerHealth.dropped_local_bypass_items` 保留为总计；`model_ingress_drops` 分解为淘汰最旧、过期、单项超限、在途容量、单次准入工作预算、传输失败与 ModelSide 拒绝，分项之和必须等于总计。为避免大窗口缩容或大小正文混合在单个业务请求上形成线性暂停，请求路径每次准入最多淘汰 32 个排队项；达到该预算仍无法安全准入时丢新项并累计 `admission_budget`。排队与在途保留字节都计入实际窗口。
 
 `TrafficReviewPolicyStatus.edge_supported` 是面向整份资产绑定的发布兼容性投影，不是“任一 Edge 支持”或授权判断。它仅在资产至少绑定一个 Edge，且每个绑定 Edge 都在最近两分钟内成功心跳并同时声明 `traffic-window/v1` 与 `traffic-review-candidate/v1` 时为真；没有绑定 Edge、任一绑定 Edge 心跳过期、缺少任一能力或能力载荷不可解析时都为假。绑定到同一资产的 host 不参与该投影。该字段为真以后，策略是否已实际生效仍按上一段的全体绑定 Edge 世代序号判断。
 
@@ -1152,9 +1160,9 @@ const res = await console.dashboard({}, {
 
 | 页面 | 数据读取（服务端已按 Bindings 裁剪） | 写操作（按钮 ↔ 工具名） |
 |---|---|---|
-| 引导 `/app/setup` | GetOnboarding / ListAssets | PutModelConfig / TestModelConnectivity / PutDeploymentSpecification / CreateAsset / UpdateAsset / DeleteAsset / CreateUser / PutGrant / CompleteOnboarding（仅管理员） |
+| 引导 `/app/setup` | GetOnboarding / ListAssets | PutModelConfig / TestModelConnectivity / PutDeploymentSpecification / CreateAsset / UpdateAsset / DeleteAsset / CreateUser / PutGrant / CompleteOnboarding（仅管理员）；部署规格可设置初始模型输入缓存窗口 |
 | 登录 | Login / GetMe（含 `access`） | Logout、ChangePassword |
-| 资产 | ListAssets / GetAsset | `asset.create` / `asset.update` / `asset.delete` / `asset.attach` / `asset.detach`（仅管理员；前端按 `USER_ROLE_ADMIN` 隐藏写入口） |
+| 资产 | ListAssets / GetAsset / GetModelIngressWindow | `asset.create` / `asset.update` / `asset.delete` / `asset.attach` / `asset.detach` / UpdateModelIngressWindow（仅管理员；前端按 `USER_ROLE_ADMIN` 隐藏写入口） |
 | 防护策略（路由仍为 `/app/releases`） | ListReleases / GetRelease / Timeline / Stats | `govern.propose` / `gate` / `start_shadow` / `promote_canary` / `promote_enforce` / `rollback` / `retire` |
 | 事件 | ListEvents / GetEvent | `govern.deny_feedback` |
 | 审计 | ListAuditEntries / VerifyChain | 无（只读，仍裁 Bindings） |
@@ -1298,7 +1306,7 @@ const res = await console.dashboard({}, {
 | `GetOnboarding` | 任意登录用户 | 否 | 返回 `state`（枚举全名）、`base_url`、`model`、`dialect`（枚举全名，缺省 `MODEL_DIALECT_OPENAI_CHAT`）、`has_secret`、`secret_hint`、`jarvis_online`、`edge_ready`、`local_unit_id`、`local_asset_id`、`deployment_spec_digest`、`expected_generation_id`、`expected_generation_seq`、`expected_listen_plan_version`、`last_error`、`updated_at`。无密钥明文。`jarvis_online` 只用于 §19.1 第 2 条；`edge_ready` 只由 Brain 对注册和心跳回执计算。提交部署规格前单元、资产和期望版本字段为空或为零 |
 | `PutModelConfig` | 仅 `USER_ROLE_ADMIN` | 是，`Idempotency-Key` | `base_url` 必须是绝对 HTTPS URL。`dialect` 省略或 `MODEL_DIALECT_UNSPECIFIED` 则写入 `MODEL_DIALECT_OPENAI_CHAT`；只许 §19.4 三种方言。密钥**只**写入凭据槽。`YUFENG_MODEL_API_KEY` 不是第二份权威密钥：仅供人机交付活栈 / CI **脚本**读出后填进本 RPC 的 `secret` 字段；brain 补全路径只读槽，不读该环境变量。成功 → `ONBOARDING_STATE_MODEL_CONFIGURED`（覆盖旧密钥必须重新探测） |
 | `TestModelConnectivity` | 仅管理员 | 是，`Idempotency-Key` | **brain 模型网关**用凭据槽密钥按槽方言发一次最小补全。模型 HTTP **不得**握着引导行 `FOR UPDATE`：锁内取槽快照 → 锁外出网 → 重新加锁核对槽未变再提交。HTTP 成功且非空文本 → `ONBOARDING_STATE_MODEL_LIVE`。失败 → `ONBOARDING_STATE_FAILED` + `last_error`（英文小写）+ Connect `unavailable` 或 `failed_precondition`。探测期间槽被改写 → `aborted`，不把过期结果写成 `MODEL_LIVE`。本档不跑评测集。可重试本 RPC，不必重新 `PutModelConfig`（除非改密钥或方言） |
-| `PutDeploymentSpecification` | 仅管理员 | 是，`Idempotency-Key` | 请求必填稳定 `unit_id`、`asset_id`、入口姿态、`traffic_key`、与姿态匹配的目标、可选可信代理网段和 `ModelProfileSpecification`。反向代理目标与网段规范化同 §21.1。模型规格必须包含模型组、类型、版本、告警阈值、复核下限、窗口秒数、每单元和每路由上限、允许进入模型的请求头及最大正文；告警阈值必须大于复核下限。Brain 在单一数据库事务中规范化并持久化规格，确定性创建或复用资产，预声明 `${unit_id}-modelside` 工作负载身份，签发下一单调监听计划，并签发含冻结核心检测制品与 `ModelProfile` 的基线资产世代。相同规范规格不重签制品；相同幂等键不同摘要返回 `failed_precondition`。本远程过程调用不等待 Jarvis、Edge、ModelSide、容器运行时或探针，返回期望单元、资产、规格摘要、监听计划版本和世代标识，状态仍为 `ONBOARDING_STATE_MODEL_LIVE` |
+| `PutDeploymentSpecification` | 仅管理员 | 是，`Idempotency-Key` | 请求必填稳定 `unit_id`、`asset_id`、入口姿态、`traffic_key`、与姿态匹配的目标、可选可信代理网段、`ModelProfileSpecification` 和可选 `ModelIngressWindow`。反向代理目标与网段规范化同 §21.1。模型规格必须包含模型组、类型、版本、告警阈值、复核下限、窗口秒数、每单元和每路由上限、允许进入模型的请求头及最大正文；告警阈值必须大于复核下限。模型输入缓存窗口省略时由 Brain 写入 4096 条、128 MiB、2 秒的默认值，签名监听计划不得保留空窗口。Brain 在单一数据库事务中规范化并持久化规格，确定性创建或复用资产，预声明 `${unit_id}-modelside` 工作负载身份，签发下一单调监听计划，并签发含冻结核心检测制品与 `ModelProfile` 的基线资产世代。相同规范规格不重签制品；相同幂等键不同摘要返回 `failed_precondition`。本远程过程调用不等待 Jarvis、Edge、ModelSide、容器运行时或探针，返回期望单元、资产、规格摘要、监听计划版本和世代标识，状态仍为 `ONBOARDING_STATE_MODEL_LIVE` |
 | `CompleteOnboarding` | 仅管理员 | 是，`Idempotency-Key` | 只检查 §19.1 四条（第 4 条必须**已经**存在）。Edge 就绪只读取数据库中的注册与最近心跳，不发网络探针。通过 → `ONBOARDING_STATE_COMPLETED` 并写入管理员系统授予（见 §19.1 末段）；失败 `failed_precondition`，`details` **恰好一条** `type.googleapis.com/yufeng.onboarding.v1.OnboardingGate`，字段 `missing_predicates` 为 `repeated int32`（取值 1–4，升序去重），状态不变，不写系统授予 |
 
 `base_url` 指向公网模型端点**仅允许从 brain 模型网关出网**。贾维斯、edge、浏览器不得持该密钥。Edge 邻近 ModelSide 只装载签名模型档案和本地权重，不读取聊天凭据槽；其跨主机入口必须位于受控防御网络并使用相互传输层安全协议，禁止默认公网。
@@ -2010,7 +2018,7 @@ L3 执行前对完整修复计划/Procedure 的审批，与程序执行中单个
 
 入口姿态闭集（线上全名 `INGRESS_POSTURE_*`，散文可用中文）：反代拦截、外部授权拦截、侧载只告警、镜像或 SPAN 只观察。
 
-单元监听计划是单元作用域、已签名的制品：声明该 `unit_id` 的壳、流量键、监听地址、回源目标和跟随关系。**不**编进资产世代，资产世代出现 `KIND_LISTEN_PLAN` 必须拒绝整代。
+单元监听计划是单元作用域、已签名的制品：声明该 `unit_id` 的壳、流量键、监听地址、回源目标、跟随关系和 Edge 模型输入缓存窗口。**不**编进资产世代，资产世代出现 `KIND_LISTEN_PLAN` 必须拒绝整代。Brain 签发前必须把缺省窗口规范化为 4096 条、128 MiB、2 秒；Edge 不从空字段推断另一套运行默认值。
 
 单元用自己的注册身份调用 `ArtifactService.ListUnitListenPlans(unit_id, since_version)`。服务端只返回该身份的目标单元，按 `version` 升序；每份计划的确定性 proto 字节（排除 `signature`）由制品签名根签名。边缘只接受目标 `unit_id` 相符、签名有效、`version` 严格递增且全部约束通过的计划；先将计划持久到本地缓存，再切换处理器。监听地址不变时原子替换处理器；监听地址变化时边缘以专用错误退出，由容器重启策略按新地址重新绑定，期间允许秒级中断。断网只有已验证世代与已验证监听计划两份缓存均存在才继续服务；坏签名、错单元或倒退版本均保留旧计划。首次启动没有已验证监听计划时，边缘不得开放业务监听。
 
@@ -2136,9 +2144,11 @@ Envoy 的授权服务超时必须大于 `ExtAuthzTimeout`，参考配置为 100m
 
 `NormalizedTraffic.schema_version` 当前固定为 `normalized-http/v1`，并至少包含：`request_id`、`unit_id`、`asset_id`、`generation_id`、`generation_seq`、`model_profile_id`、`model_profile_digest`、`method`、`route`、允许进入模型的请求头、查询参数、正文、`content_type`、原始 `body_length`、`body_truncated` 和逐检查面的 `coverage`。查询参数保留重复值与规范顺序；路由使用不含敏感值的模板。禁止携带 Cookie、Authorization、客户端原始地址、业务传输层安全协议密钥、Edge/Brain 凭据或未被签名档案允许的请求头。
 
-请求路径在同步 Inspect/Gate 完成后，只尝试把规范视图持有的有界正文切片连同元数据**转移所有权一次**给 Edge 本地队列；成功后请求路径不得再读取或复制该切片。该正文不得为了 Brain、Jarvis、普通 Event、`CheckTicket`、日志或磁盘缓冲再次复制。旁路关闭或队列达到条目/字节上限时立即跳过并增加 `modelside_ingress_dropped_total`；不得等待队列、执行推理、访问 Brain、同步写文件或等待任何消费者。
+请求路径在同步 Inspect/Gate 完成后，只尝试把规范视图持有的有界正文切片连同元数据**转移所有权一次**给 Edge 模型输入缓存窗口；成功后请求路径不得再读取或复制该切片。该正文不得为了 Brain、Jarvis、普通 Event、`CheckTicket`、日志或磁盘缓冲再次复制。窗口按条数、实际保留字节和排队年龄同时限界，排队与在途项都计入前两项；达到上限时请求路径在同一短临界区内淘汰最旧的可排队项，保留新流量。单项本身超过有效字节上限，或全部可排队项淘汰后仍因在途容量无法容纳时，丢弃新项并按原因计数。旁路关闭或任何丢弃都不得等待队列、执行推理、访问 Brain、同步写文件或等待任何消费者。
 
-后台发送器调用 `ModelSideIngressService.SubmitTraffic`，批量交给 ModelSide 自己的有界输入队列。`accepted + dropped == len(items)`；ModelSide 满载返回逐项丢弃而不是拖住连接。Edge 的请求队列与 ModelSide 的结果队列彼此独立，任何一端满载都只丢旁路并计数，不改变当前请求裁决。旁路关闭、ModelSide 空闲或满载、Brain 断连、Brain 磁盘变慢时，同步请求路径均不得出现同步模型或存储依赖。
+Edge 用一个后台批次组装器按相同模型档案聚合最多 32 条或 4 MiB，首项最多等待 10 毫秒；两个发送器并发调用 `ModelSideIngressService.SubmitTraffic`，单次调用超时 2 秒且不重试。批次编码后的请求必须低于 ModelSide 10 MiB 接收上限。`accepted + dropped == len(items)`；传输失败或 ModelSide 拒绝均视为至多一次丢失并分项计数。
+
+ModelSide 输入端只保留不少于两个、默认不超过推理线程数两倍的浅层批次交接槽；一次提交的批次直接交给一个推理线程，不再拆成逐条业务队列。ModelSide 满载立即返回批次丢弃而不是拖住连接。Edge 的模型输入缓存窗口与 ModelSide 的结果队列彼此独立，任何一端满载都只丢旁路并计数，不改变当前请求裁决。旁路关闭、ModelSide 空闲或满载、Brain 断连、Brain 磁盘变慢时，同步请求路径均不得出现同步模型或存储依赖。
 
 #### 21.5.3 ModelSide 推理、采样与结果队列
 
@@ -2178,4 +2188,8 @@ Brain 接受 `REVIEW_SAMPLE` 时执行同一身份、世代、档案、幂等与
 
 Edge 与 ModelSide 同机时默认连接 Unix 域套接字；套接字目录只允许对应服务账户访问。跨主机时两端必须使用相互传输层安全协议认证，服务端名称、证书用途和受信任证书机构均失败关闭，并用防火墙限制在同一受控防御网络。原始流量不得发送给 Brain，即使 Brain 与 Edge 同一物理节点也不例外。
 
-发布门禁以每秒 2000 个 HTTP 请求分别验证五个场景：旁路关闭、ModelSide 空闲、ModelSide 满载、Brain 断连、Brain 磁盘变慢。每个场景至少记录吞吐、请求路径第 99 百分位延迟、两个队列深度、普通旁路丢弃、高优先级告警丢弃和上报重试；第 99 百分位延迟必须不超过关闭旁路基线加架构 §13 的 `ModelBypassP99Budget`，且不得观察到请求处理协程等待旁路队列、模型、Brain 或磁盘。
+发布门禁必须运行真实 Coraza Web 应用防火墙检查链，以旁路关闭为同进程基线，覆盖 ModelSide 空闲、稳定消费、满载和不可达四种旁路负载；每种负载还要交叉小正文、接近检查上限正文，以及 4096 条 / 128 MiB 默认窗口和 16384 条 / 256 MiB 本机默认硬上限窗口。Brain 断连和 Brain 磁盘变慢继续作为结果上报隔离场景，不得影响 Edge 请求路径。
+
+每个组合由 64 个并发发生器在每秒 2000 个 HTTP 请求下预热后连续测量至少 60 秒并重复三次，记录计划请求、发生器丢失、实际吞吐、请求路径第 50 / 95 / 99 百分位延迟、Edge 进程中央处理器时间与常驻内存、窗口排队与在途条数和字节、最老排队年龄、各原因丢弃、ModelSide 批次深度及结果上报重试。发生器丢失必须为零；启用旁路相对关闭旁路基线的第 99 百分位延迟增量不得超过 1 毫秒，Edge 中央处理器占用增量不得超过 5 个百分点，Edge 常驻内存不得超过 512 MiB；同时不得观察到请求处理协程等待窗口、模型、Brain 或磁盘。
+
+任一硬门槛失败即停止扩大进程内窗口的实现路线：不得通过放宽门槛、隐藏丢弃或增加请求路径阻塞规避；后续设计改为 Edge 外置消息队列，并重新评估原文边界、持久化语义与部署开销。

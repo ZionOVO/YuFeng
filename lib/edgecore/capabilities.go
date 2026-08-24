@@ -1,6 +1,7 @@
 package edgecore
 
 import (
+	artifactv1 "yufeng/proto/gen/artifactv1"
 	commonv1 "yufeng/proto/gen/commonv1"
 	unitv1 "yufeng/proto/gen/unitv1"
 
@@ -11,6 +12,11 @@ const eventProjectionVersion = "event/v1"
 
 // ProducerCapabilities 返回当前边缘二进制客观具备的生产能力。
 func ProducerCapabilities() *unitv1.ProducerCapabilities {
+	return ProducerCapabilitiesWithModelIngressHardLimit(kernel.DefaultModelIngressHardLimit())
+}
+
+// ProducerCapabilitiesWithModelIngressHardLimit 返回包含本机真实窗口硬上限的生产能力。
+func ProducerCapabilitiesWithModelIngressHardLimit(hardLimit *artifactv1.ModelIngressWindow) *unitv1.ProducerCapabilities {
 	return &unitv1.ProducerCapabilities{
 		Outputs: []unitv1.ProducerOutput{
 			unitv1.ProducerOutput_PRODUCER_OUTPUT_CRITICAL_EVENT,
@@ -24,13 +30,15 @@ func ProducerCapabilities() *unitv1.ProducerCapabilities {
 			commonv1.IngressPosture_INGRESS_POSTURE_TAP_ALERT,
 			commonv1.IngressPosture_INGRESS_POSTURE_MIRROR_OBSERVE,
 		},
-		Sensors:             []unitv1.SensorType{unitv1.SensorType_SENSOR_TYPE_HTTP, unitv1.SensorType_SENSOR_TYPE_CORAZA},
-		LocalEvidenceRing:   true,
-		LocalAsyncBypass:    true,
-		MaxEventBatch:       kernel.UploadBatchMax,
-		MaxInFlightRequests: kernel.EdgeInFlight,
-		MaxSpoolBytes:       kernel.EdgeTelemetrySpoolBytes,
-		MaxEvidenceEntries:  kernel.EvidenceRingMaxEntries,
-		ModuleCapabilities:  []string{"traffic-review-candidate/v1", "traffic-window/v1"},
+		Sensors:                   []unitv1.SensorType{unitv1.SensorType_SENSOR_TYPE_HTTP, unitv1.SensorType_SENSOR_TYPE_CORAZA},
+		LocalEvidenceRing:         true,
+		LocalAsyncBypass:          true,
+		MaxEventBatch:             kernel.UploadBatchMax,
+		MaxInFlightRequests:       kernel.EdgeInFlight,
+		MaxSpoolBytes:             kernel.EdgeTelemetrySpoolBytes,
+		MaxEvidenceEntries:        kernel.EvidenceRingMaxEntries,
+		ModuleCapabilities:        []string{"traffic-review-candidate/v1", "traffic-window/v1"},
+		ModelIngressHardLimit:     hardLimit,
+		MaxModelIngressBatchItems: kernel.ModelIngressBatchMaxItems,
 	}
 }

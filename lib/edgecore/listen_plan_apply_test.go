@@ -20,6 +20,7 @@ func TestListenPlanActivationRequiresSignatureTargetAndMonotonicVersion(t *testi
 		plan := &artifactv1.UnitListenPlan{
 			UnitId: "unit-a", Posture: commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY,
 			TrafficKey: "site-a", Version: version, ListenAddress: ":18080", UpstreamUrl: upstream,
+			ModelIngressWindow: kernel.DefaultModelIngressWindow(),
 		}
 		if err := kernel.SignUnitListenPlan(plan, priv); err != nil {
 			t.Fatal(err)

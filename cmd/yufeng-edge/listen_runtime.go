@@ -39,7 +39,7 @@ type edgeBinding struct {
 }
 
 type modelTrafficSender interface {
-	SubmitTraffic(context.Context, *edgecore.ModelIngressItem) error
+	SubmitTraffic(context.Context, *edgecore.ModelIngressBatch) (uint32, error)
 }
 
 type edgeObservation struct {
@@ -62,24 +62,39 @@ type edgeRuntime struct {
 	reviewSeq       int64
 	modelQueue      *edgecore.ModelIngressQueue
 	modelSender     modelTrafficSender
+	modelHardLimit  *artifactv1.ModelIngressWindow
 	observations    chan edgeObservation
 	droppedObserve  atomic.Uint64
 	current         atomic.Pointer[edgeBinding]
 }
 
 // newEdgeRuntime 只在已经装载验签监听计划时构造业务运行时。
-func newEdgeRuntime(set *edgecore.ReleaseSet, unitID, assetID string, spool *edgeclient.Spool, source edgecore.SourcePseudonymizer, senders ...modelTrafficSender) (*edgeRuntime, error) {
+func newEdgeRuntime(set *edgecore.ReleaseSet, unitID, assetID string, spool *edgeclient.Spool, source edgecore.SourcePseudonymizer, modelSender modelTrafficSender, modelHardLimit *artifactv1.ModelIngressWindow) (*edgeRuntime, error) {
 	r := &edgeRuntime{
 		set: set, unitID: unitID, assetID: assetID, spool: spool, source: source,
 		observations: make(chan edgeObservation, kernel.EdgeObservationQueueMax),
 	}
-	if len(senders) > 0 && senders[0] != nil {
-		r.modelSender = senders[0]
-		r.modelQueue = edgecore.NewModelIngressQueue()
-	}
 	plan := set.CurrentListenPlan()
 	if plan == nil {
 		return nil, errors.New("verified listen plan is required")
+	}
+	if modelHardLimit == nil {
+		modelHardLimit = kernel.DefaultModelIngressHardLimit()
+	}
+	normalizedHardLimit, err := kernel.NormalizeModelIngressWindow(modelHardLimit)
+	if err != nil {
+		return nil, fmt.Errorf("model ingress hard limit: %w", err)
+	}
+	r.modelHardLimit = normalizedHardLimit
+	if modelSender != nil {
+		r.modelSender = modelSender
+		r.modelQueue, err = edgecore.NewModelIngressQueueWithHardLimit(normalizedHardLimit)
+		if err != nil {
+			return nil, err
+		}
+		if err := r.modelQueue.Configure(plan.GetModelIngressWindow()); err != nil {
+			return nil, fmt.Errorf("configure model ingress window: %w", err)
+		}
 	}
 	binding, err := r.buildBinding(plan)
 	if err != nil {
@@ -161,8 +176,10 @@ func (r *edgeRuntime) startBackground(ctx context.Context) {
 	if r.modelQueue == nil || r.modelSender == nil {
 		return
 	}
+	batches := make(chan *edgecore.ModelIngressBatch)
+	go r.modelIngressBatchLoop(ctx, batches)
 	for range kernel.ModelSideIngressWorkers {
-		go r.modelIngressLoop(ctx)
+		go r.modelIngressSendLoop(ctx, batches)
 	}
 }
 
@@ -187,14 +204,28 @@ func (r *edgeRuntime) observationLoop(ctx context.Context) {
 	}
 }
 
-func (r *edgeRuntime) modelIngressLoop(ctx context.Context) {
+func (r *edgeRuntime) modelIngressBatchLoop(ctx context.Context, batches chan<- *edgecore.ModelIngressBatch) {
+	defer close(batches)
 	for {
-		item, ok := r.modelQueue.Take(ctx)
+		batch, ok := r.modelQueue.TakeBatch(ctx, kernel.ModelIngressBatchMaxItems, kernel.ModelIngressBatchMaxBytes, kernel.ModelIngressBatchWait)
 		if !ok {
 			return
 		}
-		if err := r.modelSender.SubmitTraffic(ctx, item); err != nil {
-			r.modelQueue.MarkDropped()
+		select {
+		case batches <- batch:
+		case <-ctx.Done():
+			r.modelQueue.CompleteBatch(batch, 0, true)
+			return
+		}
+	}
+}
+
+func (r *edgeRuntime) modelIngressSendLoop(ctx context.Context, batches <-chan *edgecore.ModelIngressBatch) {
+	for batch := range batches {
+		accepted, err := r.modelSender.SubmitTraffic(ctx, batch)
+		r.modelQueue.CompleteBatch(batch, accepted, err != nil)
+		if ctx.Err() != nil {
+			return
 		}
 	}
 }
@@ -267,15 +298,35 @@ func (r *edgeRuntime) persistReviewLocked(windows []*telemetryv1.TrafficWindow, 
 }
 
 func (r *edgeRuntime) producerHealth() *unitv1.ProducerHealth {
-	health := &unitv1.ProducerHealth{HealthyProjectionVersions: append([]string(nil), edgecore.ProducerCapabilities().GetProjectionVersions()...)}
+	health := &unitv1.ProducerHealth{HealthyProjectionVersions: append([]string(nil), r.capabilities().GetProjectionVersions()...)}
 	if r.spool != nil {
 		health.BufferedCriticalEvents, health.BufferedOrdinarySamples, health.DroppedCriticalEvents, health.DroppedOrdinarySamples = r.spool.ProductionStats()
 	}
 	if r.modelQueue != nil {
-		health.DroppedLocalBypassItems = r.modelQueue.Dropped()
+		snapshot := r.modelQueue.Snapshot()
+		health.DroppedLocalBypassItems = snapshot.Dropped()
+		health.EffectiveModelIngressWindow = snapshot.Effective
+		health.ModelIngressWindowState = snapshot.State
+		health.ModelIngressDegradationReasons = snapshot.DegradationReasons
+		health.ModelIngressQueuedItems = snapshot.QueuedItems
+		health.ModelIngressQueuedBytes = snapshot.QueuedBytes
+		health.ModelIngressInFlightItems = snapshot.InFlightItems
+		health.ModelIngressInFlightBytes = snapshot.InFlightBytes
+		health.ModelIngressOldestAgeMillis = uint64(snapshot.OldestAge.Milliseconds())
+		health.ModelIngressDrops = snapshot.Drops
+	} else {
+		health.ModelIngressWindowState = unitv1.ModelIngressWindowState_MODEL_INGRESS_WINDOW_STATE_DISABLED
 	}
 	health.DroppedOrdinarySamples += r.droppedObserve.Load()
 	return health
+}
+
+func (r *edgeRuntime) capabilities() *unitv1.ProducerCapabilities {
+	hardLimit := r.modelHardLimit
+	if hardLimit == nil {
+		hardLimit = kernel.DefaultModelIngressHardLimit()
+	}
+	return edgecore.ProducerCapabilitiesWithModelIngressHardLimit(hardLimit)
 }
 
 func (r *edgeRuntime) applyPlan(plan *artifactv1.UnitListenPlan, pub ed25519.PublicKey, cachePath string) error {
@@ -291,6 +342,11 @@ func (r *edgeRuntime) applyPlan(plan *artifactv1.UnitListenPlan, pub ed25519.Pub
 	binding, err := r.buildBinding(plan)
 	if err != nil {
 		return err
+	}
+	if r.modelQueue != nil {
+		if err := r.modelQueue.Configure(plan.GetModelIngressWindow()); err != nil {
+			return err
+		}
 	}
 	r.current.Store(binding)
 	if previous != nil && previous.GetListenAddress() != plan.GetListenAddress() {

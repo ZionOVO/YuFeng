@@ -165,6 +165,9 @@ export function SetupPage() {
   const [alertThreshold, setAlertThreshold] = useState('0.9')
   const [reviewFloor, setReviewFloor] = useState('0.5')
   const [allowedHeaders, setAllowedHeaders] = useState('accept, content-type, user-agent')
+  const [modelWindowItems, setModelWindowItems] = useState('4096')
+  const [modelWindowMemoryMiB, setModelWindowMemoryMiB] = useState('128')
+  const [modelWindowAgeSeconds, setModelWindowAgeSeconds] = useState('2')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -252,6 +255,9 @@ export function SetupPage() {
     const normalizedModelVersion = modelVersion.trim()
     const alert = Number(alertThreshold)
     const floor = Number(reviewFloor)
+    const windowItems = Number(modelWindowItems)
+    const windowMemoryMiB = Number(modelWindowMemoryMiB)
+    const windowAgeSeconds = Number(modelWindowAgeSeconds)
     if (normalizedUnitId === '' || normalizedUnitId.length > 64) return { error: 'Edge 单元标识必须为 1–64 个字符。' }
     if (normalizedAssetId === '' || normalizedAssetId.length > 128) return { error: '资产标识必须为 1–128 个字符。' }
     if (key === '') return { error: '请填写流量键。' }
@@ -261,6 +267,15 @@ export function SetupPage() {
     }
     if (!Number.isFinite(alert) || !Number.isFinite(floor) || floor < 0 || alert > 1 || floor >= alert) {
       return { error: '复核下限必须不小于 0，且小于不超过 1 的告警阈值。' }
+    }
+    if (!Number.isInteger(windowItems) || windowItems < 1 || windowItems > 65536) {
+      return { error: 'Edge 缓存窗口条目数必须是 1–65536 的整数。' }
+    }
+    if (!Number.isInteger(windowMemoryMiB) || windowMemoryMiB < 1 || windowMemoryMiB > 256) {
+      return { error: 'Edge 缓存窗口内存必须是 1–256 MiB 的整数。' }
+    }
+    if (!Number.isFinite(windowAgeSeconds) || windowAgeSeconds < 0.01 || windowAgeSeconds > 300) {
+      return { error: 'Edge 缓存窗口年龄必须在 0.01–300 秒之间。' }
     }
     const cidrs = [...new Set(trustedProxyCidrs.split(/[\s,]+/).map((value) => value.trim()).filter(Boolean))].sort()
     if (cidrs.some((value) => !validCIDR(value))) return { error: '可信代理必须是有效的 IPv4 或 IPv6 CIDR。' }
@@ -285,6 +300,11 @@ export function SetupPage() {
         maxBodyBytes: 65536,
         reviewNewRoutes: true,
         reviewInsufficientCoverage: true,
+      },
+      modelIngressWindow: {
+        maxItems: windowItems,
+        maxRetainedBytes: String(windowMemoryMiB * 1024 * 1024),
+        maxQueueAge: `${windowAgeSeconds}s`,
       },
     }
     if (posture === 'INGRESS_POSTURE_EXT_AUTHZ') {
@@ -734,6 +754,42 @@ export function SetupPage() {
                     初始采样固定为五分钟窗口、每单元最多四个代表、同方法和路由只保留最高风险代表；最大正文 65536 字节。
                   </p>
                 </div>
+              </div>
+              <div className="border-t border-[#1d252a] pt-3">
+                <p className="mb-3 text-xs text-[#8b98a1]">Edge 模型输入缓存窗口</p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Input
+                    label="窗口条目数"
+                    type="number"
+                    min={1}
+                    max={65536}
+                    radius="md"
+                    value={modelWindowItems}
+                    onValueChange={setModelWindowItems}
+                  />
+                  <Input
+                    label="窗口内存（MiB）"
+                    type="number"
+                    min={1}
+                    max={256}
+                    radius="md"
+                    value={modelWindowMemoryMiB}
+                    onValueChange={setModelWindowMemoryMiB}
+                  />
+                  <Input
+                    label="最长排队（秒）"
+                    type="number"
+                    min={0.01}
+                    max={300}
+                    step={0.01}
+                    radius="md"
+                    value={modelWindowAgeSeconds}
+                    onValueChange={setModelWindowAgeSeconds}
+                  />
+                </div>
+                <p className="mt-2 text-xs leading-5 text-[#8b98a1]">
+                  默认 4096 条、128 MiB、2 秒；超过目标 Edge 的本机硬上限时会自动收窄并报告降级。
+                </p>
               </div>
               <Button
                 color="primary"

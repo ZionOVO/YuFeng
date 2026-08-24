@@ -113,7 +113,7 @@ func TestProducerCapabilityHealthIsProjectedWithoutGrantingAssetBinding(t *testi
 	if _, err := registry.Heartbeat(ctx, heartbeat); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.Pool().Exec(ctx, `UPDATE units SET health='tap_silent' WHERE unit_id=$1`, unitID); err != nil {
+	if _, err := st.Pool().Exec(ctx, `UPDATE units SET health='tap_silent',current_listen_plan_version=7 WHERE unit_id=$1`, unitID); err != nil {
 		t.Fatal(err)
 	}
 	var bindingCount, grantCount int
@@ -134,7 +134,7 @@ func TestProducerCapabilityHealthIsProjectedWithoutGrantingAssetBinding(t *testi
 		t.Fatalf("unit projections=%d", len(detail.GetUnits()))
 	}
 	projection := detail.GetUnits()[0]
-	if projection.GetHealth() != commonv1.UnitHealth_UNIT_HEALTH_TAP_SILENT || projection.GetPosture() != commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY || projection.GetProducerHealth().GetBufferedCriticalEvents() != 3 || projection.GetProducerHealth().GetDroppedOrdinarySamples() != 2 || projection.GetCurrentGenerationId() != loadedGenerationID || projection.GetCurrentGenerationSeq() != 1 {
+	if projection.GetHealth() != commonv1.UnitHealth_UNIT_HEALTH_TAP_SILENT || projection.GetPosture() != commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY || projection.GetProducerHealth().GetBufferedCriticalEvents() != 3 || projection.GetProducerHealth().GetDroppedOrdinarySamples() != 2 || projection.GetCurrentGenerationId() != loadedGenerationID || projection.GetCurrentGenerationSeq() != 1 || projection.GetCurrentListenPlanVersion() != 7 {
 		t.Fatalf("unit projection=%+v", projection)
 	}
 

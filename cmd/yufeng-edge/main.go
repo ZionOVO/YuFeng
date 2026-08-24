@@ -24,27 +24,38 @@ import (
 )
 
 func main() {
+	modelIngressDefaults, err := modelIngressDefaultsFromEnvironment()
+	if err != nil {
+		log.Fatal(err)
+	}
 	var (
-		adminAddr     = flag.String("admin-addr", ":19092", "管理面监听地址")
-		pubkeyHex     = flag.String("pubkey", "", "验签公钥（hex 文件）")
-		brainURL      = flag.String("brain", "", "中台地址；非空则注册并从 brain 拉取发布/上报遥测")
-		unitID        = flag.String("unit", "", "单元标识（brain 模式）")
-		unitVer       = flag.String("unit-version", firstNonEmpty(os.Getenv("YUFENG_UNIT_VERSION"), "unknown"), "单元版本（brain 模式）")
-		devMode       = flag.Bool("dev-insecure", false, "允许连接明文中台（仅本地开发）")
-		bootTokenFile = flag.String("bootstrap-token-file", "", "首次注册用的部署级引导令牌文件")
-		dataDir       = flag.String("data-dir", firstNonEmpty(os.Getenv("YUFENG_DATA_DIR"), ".tmp"), "发布缓存与会话目录")
-		spoolDir      = flag.String("spool-dir", firstNonEmpty(os.Getenv("YUFENG_SPOOL_DIR"), ""), "遥测分段目录；空则落在 data-dir/spool")
-		tlsCA         = flag.String("tls-ca", os.Getenv("YUFENG_TLS_CA"), "中台 TLS 权威")
-		tlsCert       = flag.String("tls-cert", os.Getenv("YUFENG_TLS_CERT"), "单元客户端证书")
-		tlsKey        = flag.String("tls-key", os.Getenv("YUFENG_TLS_KEY"), "单元客户端私钥")
-		sourceKey     = flag.String("source-hmac-key", os.Getenv("YUFENG_SOURCE_HMAC_KEY"), "来源假名 32 字节密钥文件")
-		modelSide     = flag.String("modelside", firstNonEmpty(os.Getenv("YUFENG_MODELSIDE_ENDPOINT"), "unix://"+kernel.DefaultModelSideSocket), "ModelSide 地址；空则关闭旁路")
-		modelSideCA   = flag.String("modelside-tls-ca", os.Getenv("YUFENG_MODELSIDE_TLS_CA"), "跨主机 ModelSide TLS 权威")
-		modelSideCert = flag.String("modelside-tls-cert", os.Getenv("YUFENG_MODELSIDE_TLS_CERT"), "跨主机 ModelSide 客户端证书")
-		modelSideKey  = flag.String("modelside-tls-key", os.Getenv("YUFENG_MODELSIDE_TLS_KEY"), "跨主机 ModelSide 客户端私钥")
+		adminAddr           = flag.String("admin-addr", ":19092", "管理面监听地址")
+		pubkeyHex           = flag.String("pubkey", "", "验签公钥（hex 文件）")
+		brainURL            = flag.String("brain", "", "中台地址；非空则注册并从 brain 拉取发布/上报遥测")
+		unitID              = flag.String("unit", "", "单元标识（brain 模式）")
+		unitVer             = flag.String("unit-version", firstNonEmpty(os.Getenv("YUFENG_UNIT_VERSION"), "unknown"), "单元版本（brain 模式）")
+		devMode             = flag.Bool("dev-insecure", false, "允许连接明文中台（仅本地开发）")
+		bootTokenFile       = flag.String("bootstrap-token-file", "", "首次注册用的部署级引导令牌文件")
+		dataDir             = flag.String("data-dir", firstNonEmpty(os.Getenv("YUFENG_DATA_DIR"), ".tmp"), "发布缓存与会话目录")
+		spoolDir            = flag.String("spool-dir", firstNonEmpty(os.Getenv("YUFENG_SPOOL_DIR"), ""), "遥测分段目录；空则落在 data-dir/spool")
+		tlsCA               = flag.String("tls-ca", os.Getenv("YUFENG_TLS_CA"), "中台 TLS 权威")
+		tlsCert             = flag.String("tls-cert", os.Getenv("YUFENG_TLS_CERT"), "单元客户端证书")
+		tlsKey              = flag.String("tls-key", os.Getenv("YUFENG_TLS_KEY"), "单元客户端私钥")
+		sourceKey           = flag.String("source-hmac-key", os.Getenv("YUFENG_SOURCE_HMAC_KEY"), "来源假名 32 字节密钥文件")
+		modelSide           = flag.String("modelside", firstNonEmpty(os.Getenv("YUFENG_MODELSIDE_ENDPOINT"), "unix://"+kernel.DefaultModelSideSocket), "ModelSide 地址；空则关闭旁路")
+		modelSideCA         = flag.String("modelside-tls-ca", os.Getenv("YUFENG_MODELSIDE_TLS_CA"), "跨主机 ModelSide TLS 权威")
+		modelSideCert       = flag.String("modelside-tls-cert", os.Getenv("YUFENG_MODELSIDE_TLS_CERT"), "跨主机 ModelSide 客户端证书")
+		modelSideKey        = flag.String("modelside-tls-key", os.Getenv("YUFENG_MODELSIDE_TLS_KEY"), "跨主机 ModelSide 客户端私钥")
+		modelWindowMaxItems = flag.Uint64("model-ingress-window-max-items", modelIngressDefaults.maxItems, "Edge 模型输入缓存窗口本机条目硬上限")
+		modelWindowMaxBytes = flag.Uint64("model-ingress-window-max-bytes", modelIngressDefaults.maxBytes, "Edge 模型输入缓存窗口本机保留字节硬上限")
+		modelWindowMaxAge   = flag.Duration("model-ingress-window-max-age", modelIngressDefaults.maxAge, "Edge 模型输入缓存窗口本机排队年龄硬上限")
 	)
 	development := registerEdgeDevelopmentFlags()
 	flag.Parse()
+	modelHardLimit, err := modelIngressHardLimit(*modelWindowMaxItems, *modelWindowMaxBytes, *modelWindowMaxAge)
+	if err != nil {
+		log.Fatalf("Edge 模型输入缓存窗口配置: %v", err)
+	}
 	if err := validateLaunchMode(*brainURL, *development.localDemo, *devMode); err != nil {
 		log.Fatal(err)
 	}
@@ -90,7 +101,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("注册引导令牌: %v", err)
 		}
-		if err := runBrainMode(sigCtx, *brainURL, *adminAddr, *unitID, *unitVer, bootToken, *dataDir, *spoolDir, pub, source, hc, modelSender); err != nil {
+		if err := runBrainMode(sigCtx, *brainURL, *adminAddr, *unitID, *unitVer, bootToken, *dataDir, *spoolDir, pub, source, hc, modelSender, modelHardLimit); err != nil {
 			log.Fatalf("brain 模式: %v", err)
 		}
 		return

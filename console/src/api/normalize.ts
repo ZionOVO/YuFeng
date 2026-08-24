@@ -52,6 +52,8 @@ import type {
   TrafficFindingDisposition,
   TrafficReviewMode,
   TrafficReviewPolicyStatus,
+  ModelIngressWindow,
+  ModelIngressWindowStatus,
   Transport,
   TriageReason,
   UnitProjection,
@@ -311,6 +313,8 @@ function normalizeUnitProjection(raw: unknown): UnitProjection {
       maxInFlightRequests: asNumber(capabilities.maxInFlightRequests),
       maxSpoolBytes: asString(capabilities.maxSpoolBytes) || String(asNumber(capabilities.maxSpoolBytes)),
       maxEvidenceEntries: asNumber(capabilities.maxEvidenceEntries),
+      modelIngressHardLimit: capabilities.modelIngressHardLimit === undefined ? undefined : normalizeModelIngressWindow(capabilities.modelIngressHardLimit),
+      maxModelIngressBatchItems: asNumber(capabilities.maxModelIngressBatchItems),
     },
     producerHealth: {
       bufferedCriticalEvents: asString(health.bufferedCriticalEvents) || String(asNumber(health.bufferedCriticalEvents)),
@@ -320,12 +324,45 @@ function normalizeUnitProjection(raw: unknown): UnitProjection {
       droppedLocalBypassItems: asString(health.droppedLocalBypassItems) || String(asNumber(health.droppedLocalBypassItems)),
       projectionFailures: asString(health.projectionFailures) || String(asNumber(health.projectionFailures)),
       healthyProjectionVersions: asArray(health.healthyProjectionVersions).map(asString),
+      effectiveModelIngressWindow: health.effectiveModelIngressWindow === undefined ? undefined : normalizeModelIngressWindow(health.effectiveModelIngressWindow),
+      modelIngressWindowState: (asString(health.modelIngressWindowState) || 'MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED') as UnitProjection['producerHealth']['modelIngressWindowState'],
+      modelIngressDegradationReasons: asArray(health.modelIngressDegradationReasons).map(asString) as UnitProjection['producerHealth']['modelIngressDegradationReasons'],
+      modelIngressQueuedItems: asString(health.modelIngressQueuedItems) || String(asNumber(health.modelIngressQueuedItems)),
+      modelIngressQueuedBytes: asString(health.modelIngressQueuedBytes) || String(asNumber(health.modelIngressQueuedBytes)),
+      modelIngressInFlightItems: asString(health.modelIngressInFlightItems) || String(asNumber(health.modelIngressInFlightItems)),
+      modelIngressInFlightBytes: asString(health.modelIngressInFlightBytes) || String(asNumber(health.modelIngressInFlightBytes)),
+      modelIngressOldestAgeMillis: asString(health.modelIngressOldestAgeMillis) || String(asNumber(health.modelIngressOldestAgeMillis)),
+      modelIngressDrops: normalizeModelIngressDrops(health.modelIngressDrops),
     },
     posture: (asString(unit.posture) || 'INGRESS_POSTURE_UNSPECIFIED') as UnitProjection['posture'],
     trafficKey: asString(unit.trafficKey),
     lastHeartbeatAt: typeof unit.lastHeartbeatAt === 'string' ? unit.lastHeartbeatAt : undefined,
     currentGenerationId: optionalString(unit.currentGenerationId),
     currentGenerationSeq: asString(unit.currentGenerationSeq) || '0',
+    currentListenPlanVersion: asString(unit.currentListenPlanVersion) || '0',
+  }
+}
+
+function normalizeModelIngressWindow(raw: unknown): ModelIngressWindow {
+  const src = asObj(raw)
+  return {
+    maxItems: asNumber(src.maxItems),
+    maxRetainedBytes: asString(src.maxRetainedBytes) || String(asNumber(src.maxRetainedBytes)),
+    maxQueueAge: asString(src.maxQueueAge),
+  }
+}
+
+function normalizeModelIngressDrops(raw: unknown): UnitProjection['producerHealth']['modelIngressDrops'] {
+  const src = asObj(raw)
+  const counter = (value: unknown) => asString(value) || String(asNumber(value))
+  return {
+    evictedOldest: counter(src.evictedOldest),
+    expired: counter(src.expired),
+    itemTooLarge: counter(src.itemTooLarge),
+    inFlightCapacity: counter(src.inFlightCapacity),
+    transportFailed: counter(src.transportFailed),
+    modelsideRejected: counter(src.modelsideRejected),
+    admissionBudget: counter(src.admissionBudget),
   }
 }
 
@@ -473,6 +510,21 @@ export function normalizeTrafficReviewPolicyStatus(raw: unknown): TrafficReviewP
     generationSeq: asString(src.generationSeq) || '0',
     policyDigest: asString(src.policyDigest),
     edgeSupported: asBool(src.edgeSupported),
+  }
+}
+
+/** normalizeModelIngressWindowStatus 补齐窗口、监听计划版本与降级原因。 */
+export function normalizeModelIngressWindowStatus(raw: unknown): ModelIngressWindowStatus {
+  const src = asObj(raw)
+  return {
+    assetId: asString(src.assetId),
+    unitId: asString(src.unitId),
+    desired: normalizeModelIngressWindow(src.desired),
+    effective: src.effective === undefined ? undefined : normalizeModelIngressWindow(src.effective),
+    desiredListenPlanVersion: asString(src.desiredListenPlanVersion) || String(asNumber(src.desiredListenPlanVersion)),
+    appliedListenPlanVersion: asString(src.appliedListenPlanVersion) || String(asNumber(src.appliedListenPlanVersion)),
+    state: (asString(src.state) || 'MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED') as ModelIngressWindowStatus['state'],
+    degradationReasons: asArray(src.degradationReasons).map(asString) as ModelIngressWindowStatus['degradationReasons'],
   }
 }
 

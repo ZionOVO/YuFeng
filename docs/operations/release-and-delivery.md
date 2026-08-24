@@ -2,7 +2,7 @@
 
 本文把软件版本发布和具体环境验收拆成两个互不冒充的证明域。仓库声明版本只读取根目录 [`VERSION`](../../VERSION)；对外已发布版本只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest) 中非草稿、资产集合完整且发布清单复核通过的 Release。
 
-`v0.1.0` 已于 2026-08-24 [正式公开](https://github.com/ZionOVO/YuFeng/releases/tag/v0.1.0)，其 13 文件合同保留为历史冻结记录。`v0.1.1` 的公开状态始终以 GitHub Releases 为准；公开软件 Release 不代表任何客户现场已经完成网络、证书、切换和回退验收。
+`v0.1.1` 已于 2026-08-24 [正式公开](https://github.com/ZionOVO/YuFeng/releases/tag/v0.1.1)，其 13 文件合同保留为历史冻结记录。`v0.1.2` 的公开状态始终以 GitHub Releases 为准；公开软件 Release 不代表任何客户现场已经完成网络、证书、切换和回退验收。
 
 ## 1. 软件发布的信任对象
 
@@ -20,9 +20,9 @@
 
 Git 提交、Git 树和工作流运行标识只记录来源。最终信任根是发布清单中每个实际上传文件的名称、字节数和安全哈希算法 256 位摘要。
 
-## 2. `v0.1.1` 冻结发布验收合同
+## 2. `v0.1.2` 冻结发布验收合同
 
-[`VERSION`](../../VERSION) 当前声明为 `v0.1.1`。本节记录该版本仅有的自动阻断条件；准备下一版本时，版本拉取请求必须先用新版本合同替换本节，不能在发布执行期间临时扩张门禁。
+[`VERSION`](../../VERSION) 当前声明为 `v0.1.2`。本节记录该版本仅有的自动阻断条件；准备下一版本时，版本拉取请求必须先用新版本合同替换本节，不能在发布执行期间临时扩张门禁。
 
 - 精确 `main` 持续集成中的 Go 构建与测试、`yufeng_dev` 构建标签、格式化、综合静态分析、漏洞检查、Protocol Buffers 消息契约、控制台测试与构建、零 C 语言互操作交叉编译任一失败；
 - 版本声明不一致，目标版本不是合法语义版本，或同名远端标签、Draft Release、公开 Release 已存在；
@@ -36,7 +36,27 @@ Git 提交、Git 树和工作流运行标识只记录来源。最终信任根是
 
 ## 3. 精确软件资产
 
-`v0.1.1` Release 固定包含以下 13 个文件：
+`v0.1.2` Release 固定包含以下 13 个文件：
+
+- `yufeng-v0.1.2-linux-amd64.tar.gz`
+- `yufeng-v0.1.2-linux-arm64.tar.gz`
+- `yufeng-v0.1.2-linux-mips.tar.gz`
+- `yufeng-v0.1.2-windows-amd64.tar.gz`
+- `yufeng-v0.1.2-darwin-amd64.tar.gz`
+- `yufeng-v0.1.2-darwin-arm64.tar.gz`
+- `yufeng-v0.1.2-console.tar.gz`
+- `yufeng-v0.1.2-modelside-python.tar.gz`
+- `yufeng-v0.1.2-deployment.tar.gz`
+- `yufeng-v0.1.2-edge-image-linux-amd64.tar.gz`
+- `yufeng-v0.1.2-modelside-image-linux-amd64.tar.gz`
+- `yufeng-v0.1.2-release-manifest.json`
+- `yufeng-v0.1.2-checksums.txt`
+
+发布清单模式固定为 `yufeng.software-release/v1`，记录版本、源码提交、构建工作流运行、生成时间和前 11 个分发归档的名称、字节数与摘要。校验文件覆盖 11 个分发归档和发布清单，因此不会形成自引用摘要。
+
+## 4. 历史冻结记录
+
+`v0.1.1` 的自动阻断范围是持续集成失败、版本声明或同名远端对象冲突、软件资产集合与归档或摘要无效、原生程序与 Python wheel 或控制台和容器镜像不可用、工作流制品无法证明逐字节一致，以及时间敏感测试只允许在拉取请求已通过同一测试时对同一提交重跑一次完整 Go 门禁。该 Release 固定保留以下 13 个文件：
 
 - `yufeng-v0.1.1-linux-amd64.tar.gz`
 - `yufeng-v0.1.1-linux-arm64.tar.gz`
@@ -51,10 +71,6 @@ Git 提交、Git 树和工作流运行标识只记录来源。最终信任根是
 - `yufeng-v0.1.1-modelside-image-linux-amd64.tar.gz`
 - `yufeng-v0.1.1-release-manifest.json`
 - `yufeng-v0.1.1-checksums.txt`
-
-发布清单模式固定为 `yufeng.software-release/v1`，记录版本、源码提交、构建工作流运行、生成时间和前 11 个分发归档的名称、字节数与摘要。校验文件覆盖 11 个分发归档和发布清单，因此不会形成自引用摘要。
-
-## 4. `v0.1.0` 历史冻结记录
 
 `v0.1.0` 当时冻结的自动阻断范围是持续集成失败、版本声明或同名远端对象冲突、软件资产集合与归档或摘要无效、原生程序与 Python wheel 或控制台和容器镜像不可用，以及工作流制品无法证明逐字节一致；不包含 `v0.1.1` 新增的单次时间敏感门禁重跑规则。该 Release 固定保留以下 13 个文件：
 
@@ -78,7 +94,7 @@ Git 提交、Git 树和工作流运行标识只记录来源。最终信任根是
 
 版本拉取请求合入且精确 `main` 持续集成成功后，在 GitHub Actions 手动触发 `.github/workflows/release.yml`：
 
-1. 不填写恢复运行标识时，工作流构建、验证并上传名为 `yufeng-v0.1.1-release-bundle` 的不可变工作流制品；
+1. 不填写恢复运行标识时，工作流构建、验证并上传名为 `yufeng-v0.1.2-release-bundle` 的不可变工作流制品；
 2. 工作流创建指向该精确 `main` 的注解标签和 Draft Release，上传同一目录中的 13 个文件；
 3. 工作流从 Draft Release 下载全部资产到新目录，重新验证文件集合、归档安全、清单与校验文件；
 4. 复核成功后将 Release 公开并标记为 latest；

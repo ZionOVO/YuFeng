@@ -254,6 +254,35 @@ export type ProducerOutput =
 
 export type SensorType = 'SENSOR_TYPE_UNSPECIFIED' | 'SENSOR_TYPE_HTTP' | 'SENSOR_TYPE_CORAZA'
 
+export interface ModelIngressWindow {
+  maxItems: number
+  maxRetainedBytes: string
+  maxQueueAge: string
+}
+
+export type ModelIngressWindowState =
+  | 'MODEL_INGRESS_WINDOW_STATE_UNSPECIFIED'
+  | 'MODEL_INGRESS_WINDOW_STATE_APPLIED'
+  | 'MODEL_INGRESS_WINDOW_STATE_DEGRADED'
+  | 'MODEL_INGRESS_WINDOW_STATE_CONVERGING'
+  | 'MODEL_INGRESS_WINDOW_STATE_DISABLED'
+
+export type ModelIngressDegradationReason =
+  | 'MODEL_INGRESS_DEGRADATION_REASON_UNSPECIFIED'
+  | 'MODEL_INGRESS_DEGRADATION_REASON_MAX_ITEMS'
+  | 'MODEL_INGRESS_DEGRADATION_REASON_MAX_RETAINED_BYTES'
+  | 'MODEL_INGRESS_DEGRADATION_REASON_MAX_QUEUE_AGE'
+
+export interface ModelIngressDropCounters {
+  evictedOldest: string
+  expired: string
+  itemTooLarge: string
+  inFlightCapacity: string
+  transportFailed: string
+  modelsideRejected: string
+  admissionBudget: string
+}
+
 export interface ProducerCapabilities {
   outputs: ProducerOutput[]
   projectionVersions: string[]
@@ -265,6 +294,8 @@ export interface ProducerCapabilities {
   maxInFlightRequests: number
   maxSpoolBytes: string
   maxEvidenceEntries: number
+  modelIngressHardLimit?: ModelIngressWindow
+  maxModelIngressBatchItems: number
 }
 
 export interface ProducerHealth {
@@ -275,6 +306,15 @@ export interface ProducerHealth {
   droppedLocalBypassItems: string
   projectionFailures: string
   healthyProjectionVersions: string[]
+  effectiveModelIngressWindow?: ModelIngressWindow
+  modelIngressWindowState: ModelIngressWindowState
+  modelIngressDegradationReasons: ModelIngressDegradationReason[]
+  modelIngressQueuedItems: string
+  modelIngressQueuedBytes: string
+  modelIngressInFlightItems: string
+  modelIngressInFlightBytes: string
+  modelIngressOldestAgeMillis: string
+  modelIngressDrops: ModelIngressDropCounters
 }
 
 export interface UnitProjection {
@@ -289,6 +329,18 @@ export interface UnitProjection {
   lastHeartbeatAt?: string
   currentGenerationId?: string
   currentGenerationSeq?: string
+  currentListenPlanVersion?: string
+}
+
+export interface ModelIngressWindowStatus {
+  assetId: string
+  unitId: string
+  desired: ModelIngressWindow
+  effective?: ModelIngressWindow
+  desiredListenPlanVersion: string
+  appliedListenPlanVersion: string
+  state: ModelIngressWindowState
+  degradationReasons: ModelIngressDegradationReason[]
 }
 
 export type TrafficReviewMode =

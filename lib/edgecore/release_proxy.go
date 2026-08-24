@@ -135,7 +135,7 @@ func (p *ReleaseProxy) DecideRequest(ctx context.Context, req Request, requestID
 		ring.Put(requestID, []byte(req.Query), time.Now())
 	}
 	if modelQueue != nil {
-		profile, profileDigest := p.set.ModelProfile()
+		profile, profileDigest := p.set.modelProfileSnapshot()
 		item := NewNormalizedModelTraffic(requestID, req.UnitID, p.assetID, dec.GenerationID, dec.GenerationSeq,
 			profile, profileDigest, view, time.Now())
 		if item != nil {

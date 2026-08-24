@@ -17,6 +17,11 @@ describe('Edge 人工部署规格契约', () => {
     const common = {
       unitId: 'edge-1',
       assetId: 'asset-1',
+      modelIngressWindow: {
+        maxItems: 4096,
+        maxRetainedBytes: String(128 * 1024 * 1024),
+        maxQueueAge: '2s',
+      },
       modelProfile: {
         profileId: 'http/default',
         modelGroup: 'http',

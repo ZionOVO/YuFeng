@@ -56,6 +56,8 @@ import type {
   WorkerEnrollmentRecord,
   TrafficReviewMode,
   TrafficReviewPolicyStatus,
+  ModelIngressWindow,
+  ModelIngressWindowStatus,
 } from '../../api/types'
 import { emptyAccess, hasTool } from '../../api/access'
 import {
@@ -358,6 +360,7 @@ export class ConsoleClientFixture implements ConsoleClient {
   private session: Session | null = null
   private modelTestFailsLeft = 0
   private trafficReviewPolicies = new Map<string, TrafficReviewPolicyStatus>()
+  private modelIngressWindows = new Map<string, ModelIngressWindowStatus>()
 
   constructor(opts: { token?: string | null; onboardingState?: OnboardingState } = {}) {
     this.state = freshState(opts.onboardingState ?? 'ONBOARDING_STATE_COMPLETED')
@@ -838,6 +841,57 @@ export class ConsoleClientFixture implements ConsoleClient {
     }
     this.trafficReviewPolicies.set(assetId, next)
     this.audit('asset.traffic_review_policy.update', 'asset', assetId, actor.username)
+    return structuredClone(next)
+  }
+
+  async getModelIngressWindow(assetId: string, unitId: string): Promise<ModelIngressWindowStatus> {
+    this.requireAsset('console.read', assetId)
+    const detail = this.findAsset(assetId)
+    const unit = detail.units.find((candidate) => candidate.unitId === unitId && candidate.kind.toLowerCase() === 'edge')
+    if (unit === undefined) throw err('not_found', `edge ${unitId} is not attached to ${assetId}`)
+    const key = `${assetId}\u0000${unitId}`
+    const desired: ModelIngressWindow = { maxItems: 4096, maxRetainedBytes: String(128 * 1024 * 1024), maxQueueAge: '2s' }
+    return structuredClone(this.modelIngressWindows.get(key) ?? {
+      assetId,
+      unitId,
+      desired,
+      effective: desired,
+      desiredListenPlanVersion: unit.currentListenPlanVersion ?? '1',
+      appliedListenPlanVersion: unit.currentListenPlanVersion ?? '1',
+      state: 'MODEL_INGRESS_WINDOW_STATE_APPLIED',
+      degradationReasons: [],
+    })
+  }
+
+  async updateModelIngressWindow(assetId: string, unitId: string, desired: ModelIngressWindow, expectedListenPlanVersion = ''): Promise<ModelIngressWindowStatus> {
+    const actor = this.requireAsset('asset.update', assetId)
+    const current = await this.getModelIngressWindow(assetId, unitId)
+    if (expectedListenPlanVersion !== '' && expectedListenPlanVersion !== current.desiredListenPlanVersion) throw err('failed_precondition', 'listen_plan_version_mismatch')
+    const unit = this.findAsset(assetId).units.find((candidate) => candidate.unitId === unitId)
+    const hard = unit?.capabilities.modelIngressHardLimit
+    if (unit === undefined || hard === undefined) throw err('failed_precondition', 'edge does not advertise model ingress window capability')
+    const desiredAge = Number(desired.maxQueueAge.replace(/s$/, ''))
+    const hardAge = Number(hard.maxQueueAge.replace(/s$/, ''))
+    const reasons: ModelIngressWindowStatus['degradationReasons'] = []
+    if (desired.maxItems > hard.maxItems) reasons.push('MODEL_INGRESS_DEGRADATION_REASON_MAX_ITEMS')
+    if (Number(desired.maxRetainedBytes) > Number(hard.maxRetainedBytes)) reasons.push('MODEL_INGRESS_DEGRADATION_REASON_MAX_RETAINED_BYTES')
+    if (desiredAge > hardAge) reasons.push('MODEL_INGRESS_DEGRADATION_REASON_MAX_QUEUE_AGE')
+    const next: ModelIngressWindowStatus = {
+      assetId,
+      unitId,
+      desired: structuredClone(desired),
+      effective: {
+        maxItems: Math.min(desired.maxItems, hard.maxItems),
+        maxRetainedBytes: String(Math.min(Number(desired.maxRetainedBytes), Number(hard.maxRetainedBytes))),
+        maxQueueAge: `${Math.min(desiredAge, hardAge)}s`,
+      },
+      desiredListenPlanVersion: String(Number(current.desiredListenPlanVersion) + 1),
+      appliedListenPlanVersion: current.appliedListenPlanVersion,
+      state: 'MODEL_INGRESS_WINDOW_STATE_CONVERGING',
+      degradationReasons: reasons,
+    }
+    this.modelIngressWindows.set(`${assetId}\u0000${unitId}`, next)
+    this.audit('asset.model_ingress_window.update', 'asset', assetId, actor.username)
     return structuredClone(next)
   }
 

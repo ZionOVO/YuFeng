@@ -26,6 +26,7 @@ func TestDataPlaneDocumentationAligned(t *testing.T) {
 	requireContains(t, "glossary.md#async-detection-worker", glossary, `<a id="async-detection-worker"></a>`, "ModelSide", "不持 Gate", "消息服务器", "数据库")
 	requireContains(t, "glossary.md#http-inspection-profile", glossary, `<a id="http-inspection-profile"></a>`, "四种入口壳")
 	requireContains(t, "glossary.md#local-async-bypass", glossary, `<a id="local-async-bypass"></a>`, "纯 Go")
+	requireContains(t, "glossary.md#model-ingress-window", glossary, `<a id="model-ingress-window"></a>`, "至多一次", "淘汰最旧")
 
 	section4 := section(architecture, "## 4. ", "## 5. ")
 	requireContains(t, "architecture.md §4", section4,
@@ -35,7 +36,7 @@ func TestDataPlaneDocumentationAligned(t *testing.T) {
 		t.Fatal("architecture.md must record ADR-027")
 	}
 	requireContains(t, "architecture.md §13", section(architecture, "## 13. ", "默认凭证策略"),
-		"预算", "ModelBypassP99Budget", "ModelSideIngressQueueMax", "ModelSideResultQueueMax", "ExtAuthzHalfOpenPerSec")
+		"预算", "ModelBypassP99Budget", "ModelBypassCPUPercentBudget", "ModelIngressDefaultItems", "ModelIngressLocalMaxBytes", "ModelSideResultQueueMax", "ExtAuthzHalfOpenPerSec")
 
 	section1812 := section(api, "### 18.1.2", "### 18.2")
 	requireContains(t, "api.md §18.1.2", section1812,

@@ -81,6 +81,9 @@ func ValidateUnitListenPlan(plan *artifactv1.UnitListenPlan) error {
 	if !slices.Equal(cidrs, normalized) {
 		return fmt.Errorf("listen plan client_source must be normalized")
 	}
+	if _, err := kernel.NormalizeModelIngressWindow(plan.GetModelIngressWindow()); err != nil {
+		return fmt.Errorf("listen plan model_ingress_window is invalid: %w", err)
+	}
 	return nil
 }
 

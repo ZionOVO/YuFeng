@@ -4,6 +4,7 @@ syntax = "proto3";
 package yufeng.onboarding.v1;
 
 import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
 import "yufeng/common/v1/v1.proto";
 import "yufeng/model/v1/model.proto";
 
@@ -165,6 +166,8 @@ message PutDeploymentSpecificationRequest {
   }
   repeated string trusted_proxy_cidrs = 7;
   ModelProfileSpecification model_profile = 8;
+  // model_ingress_window 省略时由 Brain 写入平台默认值。
+  yufeng.artifact.v1.ModelIngressWindow model_ingress_window = 9;
 }
 
 // PutDeploymentSpecificationResponse 返回人工安装后 Edge 应装载的版本坐标。

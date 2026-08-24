@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"yufeng/lib/kernel"
 	artifactv1 "yufeng/proto/gen/artifactv1"
 	commonv1 "yufeng/proto/gen/commonv1"
 )
@@ -49,12 +50,27 @@ func TestListenPlanRequiresNormalizedTrustedProxyCIDRs(t *testing.T) {
 	plan := &artifactv1.UnitListenPlan{
 		UnitId: "unit-a", Posture: commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY,
 		TrafficKey: "site-a", Version: 1, ListenAddress: ":18080", UpstreamUrl: "http://app:8080",
-		ClientSource: &artifactv1.ClientSourcePolicy{TrustedProxyCidrs: []string{"10.1.2.3/8"}},
+		ClientSource:       &artifactv1.ClientSourcePolicy{TrustedProxyCidrs: []string{"10.1.2.3/8"}},
+		ModelIngressWindow: kernel.DefaultModelIngressWindow(),
 	}
 	if err := ValidateUnitListenPlan(plan); err == nil {
 		t.Fatal("signed listen plan must not carry non-canonical trusted proxy cidrs")
 	}
 	plan.ClientSource.TrustedProxyCidrs = []string{"10.0.0.0/8"}
+	if err := ValidateUnitListenPlan(plan); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListenPlanRequiresExplicitModelIngressWindow(t *testing.T) {
+	plan := &artifactv1.UnitListenPlan{
+		UnitId: "unit-a", Posture: commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY,
+		TrafficKey: "site-a", Version: 1, ListenAddress: ":18080", UpstreamUrl: "http://app:8080",
+	}
+	if err := ValidateUnitListenPlan(plan); err == nil {
+		t.Fatal("signed listen plan must contain an explicit model ingress window")
+	}
+	plan.ModelIngressWindow = kernel.DefaultModelIngressWindow()
 	if err := ValidateUnitListenPlan(plan); err != nil {
 		t.Fatal(err)
 	}

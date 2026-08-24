@@ -248,6 +248,12 @@ func (s *ReleaseSet) ModelProfile() (*artifactv1.ModelProfile, string) {
 	return proto.Clone(s.modelProfile).(*artifactv1.ModelProfile), s.modelDigest
 }
 
+func (s *ReleaseSet) modelProfileSnapshot() (*artifactv1.ModelProfile, string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.modelProfile, s.modelDigest
+}
+
 // Digest 返回证据摘要配置。
 func (s *ReleaseSet) Digest() *artifactv1.EvidenceDigest {
 	s.mu.RLock()

@@ -25,6 +25,7 @@ func TestListUnitListenPlansScopesToAuthenticatedUnit(t *testing.T) {
 	plan := &artifactv1.UnitListenPlan{
 		UnitId: unitID, Posture: commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY,
 		TrafficKey: "site-a", Version: 1, ListenAddress: ":18080", UpstreamUrl: "http://app:8080",
+		ModelIngressWindow: kernel.DefaultModelIngressWindow(),
 	}
 	if err := kernel.SignUnitListenPlan(plan, priv); err != nil {
 		t.Fatal(err)
