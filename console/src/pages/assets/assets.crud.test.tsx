@@ -41,7 +41,7 @@ describe('资产增删改查角色', () => {
     renderApp({ route: '/assets/asset-01', client })
 
     expect(await screen.findByRole('region', { name: '模型输入缓存窗口' })).toBeInTheDocument()
-    const items = screen.getByLabelText('窗口条目数')
+    const items = await screen.findByLabelText('窗口条目数')
     await user.clear(items)
     await user.type(items, '8192')
     await user.click(screen.getByRole('button', { name: '签发窗口配置' }))

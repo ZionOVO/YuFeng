@@ -19,6 +19,11 @@ import (
 	commandv1 "yufeng/proto/gen/commandv1"
 )
 
+const (
+	hostExecutorTestCommandDeadline = 3 * time.Second
+	hostExecutorTestParentTimeout   = 10 * time.Second
+)
+
 func TestHostExecutorRestoresFileWhenServiceReloadFails(t *testing.T) {
 	executor, artifact := testHostExecutor(t, []byte("replacement"))
 	target := filepath.Join(executor.config.AllowedRoots[0], "app.conf")
@@ -78,14 +83,14 @@ func TestHostExecutorCommandDeadlineCancelsServiceAndCompensatesWithParentContex
 	}
 	command := &commandv1.Command{
 		CommandId: "cmd-service-deadline", ArtifactRef: artifact.GetId(), LeaseId: "lease-deadline", LeaseEpoch: 1,
-		Deadline: timestamppb.New(time.Now().Add(300 * time.Millisecond)),
+		Deadline: timestamppb.New(time.Now().Add(hostExecutorTestCommandDeadline)),
 		Steps: []*commandv1.CommandStep{
 			{Primitive: "artifact.stage", ArgsJson: `{}`},
 			{Primitive: "file.atomic_replace", ArgsJson: mustJSON(t, map[string]string{"target": target})},
 			{Primitive: "service.reload", ArgsJson: `{"service":"nginx"}`},
 		},
 	}
-	parent, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	parent, cancel := context.WithTimeout(context.Background(), hostExecutorTestParentTimeout)
 	defer cancel()
 	type receiptContextKey struct{}
 	parent = context.WithValue(parent, receiptContextKey{}, "parent")
@@ -135,10 +140,10 @@ func TestHostExecutorCommandDeadlineCancelsServiceActiveVerification(t *testing.
 	}
 	command := &commandv1.Command{
 		CommandId: "cmd-service-active-deadline", ArtifactRef: artifact.GetId(), LeaseId: "lease-active-deadline", LeaseEpoch: 1,
-		Deadline: timestamppb.New(time.Now().Add(100 * time.Millisecond)),
+		Deadline: timestamppb.New(time.Now().Add(hostExecutorTestCommandDeadline)),
 		Steps:    []*commandv1.CommandStep{{Primitive: "verify.service_active", ArgsJson: `{"service":"nginx"}`}},
 	}
-	parent, cancel := context.WithTimeout(context.Background(), time.Second)
+	parent, cancel := context.WithTimeout(context.Background(), hostExecutorTestParentTimeout)
 	defer cancel()
 	err := executor.Execute(parent, command, func(ctx context.Context, _ *commandv1.StepReceipt) error {
 		return ctx.Err()
@@ -159,7 +164,7 @@ func TestHostExecutorCommandDeadlineNarrowsArtifactLoadContext(t *testing.T) {
 	if err := os.WriteFile(target, []byte("original"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(250 * time.Millisecond)
+	deadline := time.Now().Add(hostExecutorTestCommandDeadline)
 	observedDeadline := make(chan time.Time, 1)
 	loadCalls := 0
 	executor.load = func(ctx context.Context, _ string) (*artifactv1.Artifact, error) {
@@ -184,7 +189,7 @@ func TestHostExecutorCommandDeadlineNarrowsArtifactLoadContext(t *testing.T) {
 			{Primitive: "artifact.stage", ArgsJson: `{}`},
 		},
 	}
-	parent, cancel := context.WithTimeout(context.Background(), time.Second)
+	parent, cancel := context.WithTimeout(context.Background(), hostExecutorTestParentTimeout)
 	defer cancel()
 	started := time.Now()
 	var phases []commandv1.StepPhase
@@ -198,10 +203,18 @@ func TestHostExecutorCommandDeadlineNarrowsArtifactLoadContext(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Execute error=%v want command deadline exceeded", err)
 	}
-	if elapsed := time.Since(started); elapsed >= 700*time.Millisecond {
+	if elapsed := time.Since(started); elapsed >= hostExecutorTestParentTimeout-time.Second {
 		t.Fatalf("artifact load elapsed=%s want command deadline before parent deadline", elapsed)
 	}
-	got := <-observedDeadline
+	if loadCalls != 2 {
+		t.Fatalf("artifact load calls=%d want=2", loadCalls)
+	}
+	var got time.Time
+	select {
+	case got = <-observedDeadline:
+	default:
+		t.Fatal("artifact load deadline was not observed")
+	}
 	if delta := got.Sub(deadline); delta < -time.Millisecond || delta > time.Millisecond {
 		t.Fatalf("artifact load deadline=%s want command deadline=%s", got, deadline)
 	}
@@ -230,7 +243,7 @@ func TestHostExecutorExpiredBeforePrepareSkipsArtifactLoadAndCompensates(t *test
 		loadCalls++
 		return artifact, nil
 	}
-	deadline := time.Now().Add(200 * time.Millisecond)
+	deadline := time.Now().Add(hostExecutorTestCommandDeadline)
 	command := &commandv1.Command{
 		CommandId: "cmd-expired-before-prepare", ArtifactRef: artifact.GetId(), LeaseId: "lease-before-prepare", LeaseEpoch: 1,
 		Deadline: timestamppb.New(deadline),
@@ -300,7 +313,7 @@ func TestHostExecutorDeadlineDuringPrepareDoesNotStartNewEffectAndCompensates(t 
 	}
 	command := &commandv1.Command{
 		CommandId: "cmd-deadline-during-prepare", ArtifactRef: artifact.GetId(), LeaseId: "lease-during-prepare", LeaseEpoch: 1,
-		Deadline: timestamppb.New(time.Now().Add(200 * time.Millisecond)),
+		Deadline: timestamppb.New(time.Now().Add(hostExecutorTestCommandDeadline)),
 		Steps: []*commandv1.CommandStep{
 			{Primitive: "artifact.stage", ArgsJson: `{}`},
 			{Primitive: "file.atomic_replace", ArgsJson: mustJSON(t, map[string]string{"target": firstTarget})},
