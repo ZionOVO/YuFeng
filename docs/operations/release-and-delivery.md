@@ -1,10 +1,12 @@
-# 软件发布与部署验收证据
+# 软件发布与交付证据
 
-本文把软件版本发布和具体环境验收拆成两个互不冒充的证明域。仓库目标版本只读取根目录 [`VERSION`](../VERSION)；对外已发布版本只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest) 中非草稿、资产集合完整且发布清单复核通过的 Release。
+本文把软件版本发布和具体环境验收拆成两个互不冒充的证明域。仓库声明版本只读取根目录 [`VERSION`](../../VERSION)；对外已发布版本只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest) 中非草稿、资产集合完整且发布清单复核通过的 Release。
+
+`v0.1.0` 已于 2026-08-24 [正式公开](https://github.com/ZionOVO/YuFeng/releases/tag/v0.1.0)，下列 13 文件合同保留为该版本的冻结发布记录。公开软件 Release 不代表任何客户现场已经完成网络、证书、切换和回退验收。
 
 ## 1. 软件发布的信任对象
 
-软件发布证明的对象是[软件发布制品集](glossary.md#software-release-artifact-set)，不是 Git 分支图、合并父提交、本机工作树或某次客户现场运行。
+软件发布证明的对象是[软件发布制品集](../glossary.md#software-release-artifact-set)，不是 Git 分支图、合并父提交、本机工作树或某次客户现场运行。
 
 发布任务必须满足以下不变量：
 
@@ -20,7 +22,7 @@ Git 提交、Git 树和工作流运行标识只记录来源。最终信任根是
 
 ## 2. `v0.1.0` 冻结发布验收合同
 
-[`VERSION`](../VERSION) 当前目标为 `v0.1.0`。该版本只有下列有限条件能够自动阻断软件发布：
+[`VERSION`](../../VERSION) 当前声明为 `v0.1.0`。本节记录该已发布版本冻结时仅有的自动阻断条件；准备下一版本时，版本拉取请求必须先用新版本合同替换本节，不能在发布执行期间临时扩张门禁。
 
 - 精确 `main` 持续集成中的 Go 构建与测试、`yufeng_dev` 构建标签、格式化、综合静态分析、漏洞检查、Protocol Buffers 消息契约、控制台测试与构建、零 C 语言互操作交叉编译任一失败；
 - 四个版本源不一致，目标版本不是合法语义版本，或同名远端标签、Draft Release、公开 Release 已存在；
@@ -75,6 +77,6 @@ Git 提交、Git 树和工作流运行标识只记录来源。最终信任根是
 - `scripts/performance-live.sh live` 的五场景容量和第 99 百分位延迟；
 - `deploy/envoy/run-integration.sh` 的真实网关路径；
 - `scripts/backup-restore-live.sh live` 的独立恢复与源数据库保持不变；
-- [`deploy/pilot-change-record.md`](../deploy/pilot-change-record.md) 中真实上游、代理网段、证书、网络核对与变更责任人。
+- [`deploy/pilot-change-record.md`](../../deploy/pilot-change-record.md) 中真实上游、代理网段、证书、网络核对与变更责任人。
 
 这些结果绑定发布清单摘要、现场标识、环境和时间。不同环境互不继承；失败只表示该部署尚未验收，不撤销或改写已经公开的软件 Release。

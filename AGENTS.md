@@ -10,7 +10,7 @@
 
 - 平台二进制：`yufeng-brain`（后端控制面）、`yufeng-edge`（数据面）、`yufeng-host`（资产侧）、`yufeng-jarvis`（独立编排智能代理进程）、`yufeng-agentd`（执行实例监督进程）、`yufeng-run`（短命执行智能代理）和 `yufeng-dataplane`（本机数据面监督器），外加命令行工具 `yfctl`；智能代理进程与中台只走网络契约；贾维斯不持 Docker；
 - 技术选型状态以 architecture.md §7 为准：当前基座为 Go 1.27.0、Connect 远程过程调用框架、Protocol Buffers 消息契约与 Buf 工具链、内嵌 NATS 消息服务器、PostgreSQL 数据库与 pgx 驱动、goose 数据库迁移工具；sqlc 生成层尚无业务调用方；Coraza 仅检测模式已引入，引擎命中本身不返回拒绝响应。控制台正式采用 Tailwind CSS 与 HeroUI；Connect-ES（Connect 协议的 TypeScript 客户端生成与运行库）已选定，但当前交付也允许手写 Connect JSON 调用；
-- 硬约束：`edge` 与 `host` 不使用 C 语言互操作；补丁知识写进 `procedures/` 数据制品，**禁止写进平台代码**；完整负面清单见 architecture.md §11。流量拦截层的生产语义以 [`docs/design.md`](docs/design.md) 第 4 节为准（检测键、检查覆盖度、资产世代、形状语言、Inspector、Gate、入口姿态）；第一阶段正则闭环只是演示。仓库目标版本只读取根目录 [`VERSION`](VERSION)，对外已发布状态只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest)；只有同名非草稿 Release 的发布清单与全部软件制品摘要复核通过，才可宣称该软件版本已发布。客户上线仍要求现场负责人填写真实代理网段、上游、证书、网络核对结果和变更责任人；软件发布与部署证据的边界见 [`docs/delivery-evidence.md`](docs/delivery-evidence.md)。Python 不得进平台二进制；可选中台亲和异步检测见 architecture.md 的架构决策记录 027。
+- 硬约束：`edge` 与 `host` 不使用 C 语言互操作；补丁知识写进 `procedures/` 数据制品，**禁止写进平台代码**；完整负面清单见 architecture.md §11。流量拦截层的架构语义以 [`docs/architecture.md`](docs/architecture.md) 第 4 节为准，网络结果与失败语义以 [`docs/api.md`](docs/api.md) 第 18.1.2、21 节为准（检测键、检查覆盖度、资产世代、形状语言、Inspector、Gate、入口姿态）；第一阶段正则闭环只是演示。仓库目标版本只读取根目录 [`VERSION`](VERSION)，对外已发布状态只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest)；只有同名非草稿 Release 的发布清单与全部软件制品摘要复核通过，才可宣称该软件版本已发布。客户上线仍要求现场负责人填写真实代理网段、上游、证书、网络核对结果和变更责任人；软件发布与部署证据的边界见 [`docs/operations/release-and-delivery.md`](docs/operations/release-and-delivery.md)。Python 不得进平台二进制；可选中台亲和异步检测见 architecture.md 的架构决策记录 027。
 
 ## 1. 设计模式策略（已定稿，不再讨论）
 
@@ -51,7 +51,7 @@
 - 产品文档与说明；
 - 测试里对产品文档的锁句。
 
-实施计划的每个条目都写明相关文档章节、源文件与符号。实现时按这些定位全仓追踪消息、字段和消费者，不靠把计划标题烙进代码反查。
+[GitHub Issues](https://github.com/ZionOVO/YuFeng/issues) 中已经明确排期的工作必须写明相关文档章节、源文件、符号与验收条件。实现时按这些定位全仓追踪消息、字段和消费者，不靠把 Issue 标题烙进代码反查。历史设想和未排期能力只作为当前边界记录，不批量转成任务。
 
 有明确定义的数字包括文档章节、架构决策记录号、修复连续谱层级、数据库迁移顺序、协议版本和线上枚举值。首次使用修复连续谱层级或协议枚举时，必须链接术语表或接口契约。
 
@@ -62,7 +62,7 @@
 | 架构文档写「见第二批」 | 写 `ModelGatewayService.CompleteChat`（`docs/api.md` 第 19.4 节） |
 | 对话里说「做完设置项」 | 说「完成控制台 `/app/setup` 六步引导」 |
 
-新增或改写 [`implementation-plan.md`](implementation-plan.md) 条目必须带定位和验收。删掉标题后，单靠定位仍应能找到要改的文档章节、源文件与符号。
+新增或改写 GitHub Issue 必须使用完整行为名称，并带定位和验收。删掉标题后，单靠定位仍应能找到要改的文档章节、源文件与符号。
 
 ### 分支模型
 
@@ -79,7 +79,7 @@
 1. 禁止直接推送、强制推送或删除 `main`；所有修改通过短命工作分支拉取请求合入；
 2. `continuous-integration / required` 是唯一必需状态入口，其依赖构建、测试、格式化、综合静态检查、消息契约、控制台和交叉编译全部成功；
 3. `main` 推送复验同一持续集成清单并留下精确提交结论。发布任务只接受该结论成功且仍为远端最新 `main` 的提交；
-4. 更新 `VERSION` 的拉取请求必须同步控制台与 ModelSide 版本，并在 `docs/delivery-evidence.md` 冻结该版本有限的发布验收合同；智能代理不得在发布执行期间自行增加阻断条件；
+4. 更新 `VERSION` 的拉取请求必须同步控制台与 ModelSide 版本，并在 `docs/operations/release-and-delivery.md` 冻结该版本有限的发布验收合同；智能代理不得在发布执行期间自行增加阻断条件；
 5. 只有违反冻结合同的安全边界、数据完整性、网络契约、构建失败或制品不可用问题才自动阻断。其它新发现必须报告并进入后续版本；是否升级为当前版本阻断项由用户明确决定；
 6. 发布任务构建一次软件发布制品集，验证并保存为不可变工作流制品后才创建注解标签和 Draft Release；禁止覆盖同名资产。上传中断只能复用原工作流制品恢复，禁止重新构建同一候选；
 7. Draft Release 下载复核全部摘要后立即公开。已公开标签和资产不可移动、删除或覆盖；修复使用递增补丁版本；
@@ -144,7 +144,7 @@ func SignArtifact(a Artifact, key ed25519.PrivateKey) (Artifact, error)
 // 无凭据的副作用；回执丢失视为步骤失败，进补偿分支。
 ```
 
-**层级四 · 已知缺口**：不使用任务标签。注释只写当前限制、触发条件和失败边界；需要排期的工作在 [`implementation-plan.md`](implementation-plan.md) 用完整语义标题、定位和验收记录：
+**层级四 · 已知缺口**：不使用任务标签。注释只写当前限制、触发条件和失败边界；需要排期的工作在 [GitHub Issues](https://github.com/ZionOVO/YuFeng/issues) 使用完整语义标题，并记录定位和验收：
 
 ```go
 // 沙箱演练目前仅覆盖 Debian 软件包；遇到 RPM 软件包管理器格式时失败关闭。

@@ -35,7 +35,7 @@ console/coverage/
 __pycache__/
 *.pyc
 
-# 公开流量数据集本地缓存（见 docs/test/model-scoring-and-agent-rule-datasets.md）
+# 公开流量数据集本地缓存（见 docs/development/testing/model-scoring-and-agent-rule-datasets.md）
 testdata/traffic-datasets/
 
 # os / editor

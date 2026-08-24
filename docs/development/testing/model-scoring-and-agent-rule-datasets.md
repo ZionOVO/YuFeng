@@ -5,7 +5,7 @@
 1. Edge 把已解密请求规范化后，通过有界非阻塞队列交给邻近 `yufeng-modelside` 推理。
 2. Brain 接收类型化 `MODEL_ALERT` 或 `REVIEW_SAMPLE`，聚合案件；需要研判时，贾维斯只看冻结的脱敏检查票据并给出治理建议。
 
-公开材料下载到仓库根的 `testdata/traffic-datasets/`，该目录不入库。一键拉取使用 `./scripts/fetch-traffic-datasets.sh`。权威语义见 [`architecture.md`](../architecture.md) 第 4 节、[`api.md`](../api.md) 第 21.5 节和 [`design.md`](../design.md) 第 4 节。
+公开材料下载到仓库根的 `testdata/traffic-datasets/`，该目录不入库。一键拉取使用 `./scripts/fetch-traffic-datasets.sh`。数据面架构语义见 [`architecture.md`](../../architecture.md) 第 4 节，网络行为见 [`api.md`](../../api.md) 第 18.1.2、21.5 节。
 
 ## 1. 实际数据路径
 

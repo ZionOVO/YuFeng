@@ -1,6 +1,6 @@
 #!/bin/sh
 # 拉取 Edge 邻近 ModelSide 打分与智能代理治理建议所用的公开 HTTP 材料。
-# 用法与取舍见 docs/test/model-scoring-and-agent-rule-datasets.md。
+# 用法与取舍见 docs/development/testing/model-scoring-and-agent-rule-datasets.md。
 set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)

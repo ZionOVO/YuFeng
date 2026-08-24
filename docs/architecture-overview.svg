@@ -241,6 +241,6 @@
   <text x="1552" y="924" text-anchor="end" font-size="11" fill="#8494ab">铁律：智能在中台侧 · 设备上只有哑执行器 · Agent 不在数据路径</text>
 
   <text x="48" y="952" font-size="11" fill="#8494ab">数据路径：流量 → 壳 → 规范视图 → Inspect → Gate → 放行或 403。edge 只上传 Event；brain 冻结 CheckTicket 并派分析/研判/run，回闸必须经新世代。</text>
-  <text x="48" y="974" font-size="11" fill="#8494ab">扩展公式：易变物走签名制品。同步新算法才发版；路外算力走契约服务。检测器不得返回拦截动作。历史概念图见 architecture.svg，不约束实现。</text>
+  <text x="48" y="974" font-size="11" fill="#8494ab">扩展公式：易变物走签名制品。同步新算法才发版；路外算力走契约服务。检测器不得返回拦截动作。</text>
   <text x="48" y="996" font-size="10.5" fill="#5a6b83">更新节奏：原语（平台发版 · 年级）→ 程序 / 工具制品（热更新 · 周月）→ 技能提示词（制品 · 天）。中台可加副本（共享库 / 信任根）。入口机与资产均可 ×N。</text>
 </svg>

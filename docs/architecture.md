@@ -2,7 +2,7 @@
 
 > 本文是御锋 2.0 的**架构设计文档（含技术选型）**，是架构与技术选型的唯一权威文档。
 > 网络行为与状态语义以 [`api.md`](api.md) 为权威，可编译的线上字段与编码以 `proto/` 为权威；两者冲突时必须阻止合入并人工对齐。
-> [`product-vision-history.md`](product-vision-history.md) 与 [`architecture.svg`](architecture.svg) 为历史概念材料，**非权威、不约束实现**。本节总览图是 [`architecture-overview.svg`](architecture-overview.svg)，仍从属于正文；传输、进程边界与选型以本文和 [`api.md`](api.md) 为准。
+> 本节总览图是 [`architecture-overview.svg`](architecture-overview.svg)，仍从属于正文；实现状态只看 [`development/code-map.md`](development/code-map.md)，不得用目标架构冒充已交付能力。
 > 参考实现（仅概念资产，代码不复用）：sentry-docker、safeshield；插件组合模式参考 DeepSeek Harness / Cordis。
 
 ---
@@ -17,11 +17,11 @@
 
 **一条扩展公式：数据制品承载一切易变物。** 规则、画像、提示词、工具描述、补丁程序、技能——全是签名制品，走同一条治理管道；代码面保持小而稳。
 
-下图为目标架构总览：中台、独立 Agent 进程、两类边缘、五种契约与可选算力。**图从属于正文**；进程边界、传输与状态语义以本节和 [`api.md`](api.md) 为准。贾维斯画在中台框外。数据面按 §4.1 拆成壳、发现（Inspect）、闸（Gate）。历史概念图仍见 [`architecture.svg`](architecture.svg)。
+下图为目标架构总览：中台、独立 Agent 进程、两类边缘、五种契约与可选算力。**图从属于正文**；进程边界、传输与状态语义以本节和 [`api.md`](api.md) 为准。贾维斯画在中台框外。数据面按 §4.1 拆成壳、发现（Inspect）、闸（Gate）。
 
 ![御锋目标架构总览](architecture-overview.svg)
 
-除明确标注“当前”外，§1–§6 描述目标架构，不代表相应能力已经落地；技术项现状见 §7。流量拦截层工作设计与 2026-08 审查采纳见 [`design.md`](design.md)。数据面目标语义以本节 §4、[`design.md`](design.md) 第 4 节与 [`api.md`](api.md) 第 21 节为准；[`yufeng-edge-upgrade.md`](yufeng-edge-upgrade.md) 是愿景与文献备忘，已拍板项以本节吸收的正文为准。当前软件支持单站点[企业试点](glossary.md#enterprise-pilot)：客户入口终止业务传输层安全协议，反向代理首发，一个中台、一个拦截单元、人工批准生效。仓库目标版本只读取根目录 [`VERSION`](../VERSION)，已发布状态只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest)；只有同名非草稿 Release 的精确提交证据资产复核通过，才可宣称对应版本的软件发布与机器验收闭环。客户现场仍须记录真实上游、精确代理网段、证书核对、切换与回退责任人，才能宣布现场交付完成。
+除明确标注“当前”外，§1–§6 描述目标架构，不代表相应能力已经落地；技术项现状见 §7，功能定位与完成状态见 [`development/code-map.md`](development/code-map.md)。数据面架构语义以本节 §4 为准，网络结果与失败语义以 [`api.md`](api.md) 第 18.1.2、21 节为准，线上字段以 `proto/` 为准。当前软件支持单站点[企业试点](glossary.md#enterprise-pilot)：客户入口终止业务传输层安全协议，反向代理首发，一个中台、一个拦截单元、人工批准生效。仓库目标版本只读取根目录 [`VERSION`](../VERSION)，已发布状态只读取 [GitHub Releases](https://github.com/ZionOVO/YuFeng/releases/latest)；只有同名非草稿 Release 的精确提交证据资产复核通过，才可宣称对应版本的软件发布与机器验收闭环。客户现场仍须记录真实上游、精确代理网段、证书核对、切换与回退责任人，才能宣布现场交付完成。
 
 ---
 
@@ -100,6 +100,8 @@
 **发现（Inspect）** 与 **闸（Gate）** 分离。同步口是进程内 [Inspector](glossary.md#inspector)：只出完整检测键与每面检查覆盖度，**不**返回拦截动作。接口刻意不进 proto。`Action` 只属于 [Gate](glossary.md#gate)。回放硬保证：同一规范请求视图 + 同一客户端来源元数据 + 同一 `activeGeneration` + 同一入口姿态 + 同一 `unit_id` ⇒ 同一发现集 + 同一每面覆盖度 + 同一闸门动作。活路径是 `Inspector.Inspect` + `Gate`：世代清单选装眼睛，监听计划决定入口姿态与绑定，与发布状态拆开。
 
 **五层眼睛**见[检测器档位](glossary.md#detector-tiers)。同步层：Coraza 核心规则集（永远 DetectionOnly）+ 可选纯 Go 画像核（后接，未装载则清单里没有）。异步深度学习由邻近的 `yufeng-modelside` 执行：Edge 从反向代理、外部授权或已解密流量复制入口取得真实 HTTP 请求，形成版本化[规范化模型流量](glossary.md#normalized-model-traffic)，在同步 Inspect + Gate 完成后把正文缓冲的一次有界所有权交给非阻塞队列。队列满、modelside 空闲或满载、brain 断连、磁盘变慢都不得改变当前请求；满时丢旁路并计数。modelside 不进 Edge 二进制、不持 Gate 权限，结果只能影响后续案件与新世代。调查执行实例由 brain 创建，短命、窄权，不回改本次请求。hold-and-forward 默认永不做。
+
+**边缘观察与中台研判是两层语义。** 边缘只报告同步发现、无发现、覆盖不足或检测器失败；brain 再结合钉死世代与独立证据形成 `TRIAGE_REASON_*` 研判原因。普通完整无发现只进入签名流量审查统计，不创建 Agent 指令；高风险模型结果、人工报告、漏洞复现、回放、上游防护发现或可信情报复现只有满足 [`api.md`](api.md) 第 18.1.2 节的独立证据条件时，才能把同步无发现解释为疑似漏检。
 
 **403** 只允许四件事同时成立：入口姿态允许拦截 ∧ 发布状态允许 block ∧ 策略或形状为 block ∧ 检查覆盖度满足要求。观察壳永远缺第一项，硬闸不得 403。`blocks_total` 只计真 403。自动晋升只数拦截单元。观察单元必须装完整世代，才能产出 `would_have_blocked`。覆盖度不足时的状态码见 [`api.md`](api.md) 第 21.2 节矩阵：反代拦截超体 413、畸形 400；外部授权拦截这两类写网关 403（Envoy DENIED）。不当 503，不当「无发现放行」。
 
@@ -340,7 +342,7 @@ yufeng/
 ├── bpf/              # 内核侧 BPF 预留（当前无 C 源或预编译对象）
 ├── console/          # Vite + React；交付路径由 brain 托管 /app，不是第二条产品轨道
 ├── deploy/           # compose / helm / 家用交叉编译
-└── docs/             # 权威正文 architecture.md（总览图 architecture-overview.svg）；流量拦截工作设计 design.md；architecture.svg 和 product-vision-history.md 为非权威概念材料
+└── docs/             # 权威正文与按产品用户、交付运维、开发者组织的指南和参考资料
 ```
 
 **扩展面**：①数据制品（主通道，承载绝大多数变化）；②现有契约服务族——异步检测、感知源、Agent、工具、制品、模型和修复执行是七类扩展职责，**不是七种新契约**，全部经 brain 的现有注册、遥测、工作、模型和工具控制面通信；③外部模块装载（**待命**：模块协议设计文档在库，第一个真实外部消费者出现时提炼启用，不预建）。第一方组件不持有任何私有接口——契约好不好用，第一方先当普通用户。
@@ -389,7 +391,7 @@ Kafka、Redis（运行时）、LangChain 系、把 Python 编进平台二进制�
 - **扩展运行时约束和冷补丁**：在流量拦截层稳定后实现运行时约束与冷补丁编排，不得用新增检测算法掩盖协议、身份或执行安全缺口；
 - **平台化交付**：异步检测工作进程、沙箱、受约束的蒸馏环与家庭场景打包。
 
-L1 生产关闭的工作设计与审查采纳见 [`design.md`](design.md)。生产 Agent 写路径（策略/形状提案）之前必须先关闭身份、授予、双令牌与生产 TLS，并走完初次配置引导。
+L1 生产数据面不变量见 §4，网络结果与失败语义见 [`api.md`](api.md) 第 18.1.2、21 节。生产 Agent 写路径（策略/形状提案）之前必须先关闭身份、授予、双令牌与生产 TLS，并走完初次配置引导。
 
 ---
 
@@ -420,7 +422,7 @@ L1 生产关闭的工作设计与审查采纳见 [`design.md`](design.md)。生�
 | 021 | Agent 运行时是独立进程，brain 只做控制面 | 贾维斯与 run 不嵌入 yufeng-brain；brain 提供指令队列、run 队列、认知账本、模型网关、工具网关与能力令牌；贾维斯和 agentd 通过长轮询领取，后端永不反向调用 Agent 运行时 |
 | 022 | Agent 协议统一，授权只看令牌 | 不区分贾维斯与普通 Agent 的调用协议；Agent 对中台的所有操作统一为 ToolGateway 工具调用或受 Scopes 约束的 HTTP API，角色差异由中台签发的能力令牌决定 |
 | 023 | 控制面唯一网络对等体 + 人机同一授权格子 | 贾维斯与 agentd 只连 brain，run 只连 agentd 本地监督代理；命令从中台拉取，双向 TLS 加在 Agent/worker 主动发起的连接上。人与 Agent 都用 Tools × Bindings，不靠加角色名来填对象权限；Edge 邻近模型旁路由架构决策记录 036 单独约束 |
-| 024 | L1 生产契约按 2026-08 审查收紧 | 漏检须独立证据；策略匹配检测键而非攻击类；检查覆盖度与 HTTP 规范化是拦截前提；发布单位改为资产世代；生产禁止任意正则；canary 按稳定分片；身份与 `Signer` 先于生产 Agent 写；brain 先做权限隔离、暂不拆三个部署单元。工作设计见 design.md 第 0、4 节 |
+| 024 | L1 生产契约按 2026-08 审查收紧 | 漏检须独立证据；策略匹配检测键而非攻击类；检查覆盖度与 HTTP 规范化是拦截前提；发布单位改为资产世代；生产禁止任意正则；canary 按稳定分片；身份与 `Signer` 先于生产 Agent 写；brain 先做权限隔离、暂不拆三个部署单元。架构正文见 §4，网络行为见 `api.md` 第 18.1.2、21 节 |
 | 025 | 长轮询编排保留专用租约表；River 只做中台内部 job | `PollInstructions` / `PollWork` / `PollCommands` 必须原子领取、下发能力令牌并按租约回执，与 River 的后台 worker 模型不是同一协议。三张表的恢复语义是 `FOR UPDATE SKIP LOCKED` + 到期重领。River 只承载无客户端协议的背景任务：调度滴答、发件箱重试、模型 worker 派发。禁止再静默自建第四张编排队列 |
 | 026 | 单机 Docker Compose 人机交付：聊天补全只从中台[模型网关](glossary.md#modelgateway)出网；引导是硬门禁 | 一台服务器即可交付；Edge 生命周期与模型旁路位置由架构决策记录 036 取代本记录中原有的本机监督器方案。Connect-ES 与 Google Agent Development Kit 进程内运行时不属于本次试点必交 |
 | 027 | 数据面检测与裁决分离，入口姿态与发布状态保持两条正交轴；Python 机器学习不进边缘二进制、不引入 Redis、不直接返回拒绝响应 | 新检测器不得自动获得拦截权；高成本方法只追加记录。Python 服务的位置与输入由架构决策记录 036 收紧为 Edge 邻近旁路 |
