@@ -1,0 +1,13 @@
+version: v2
+plugins:
+  # 生成 Go 数据代码到 proto/gen/（提交入库，保证 go build 不依赖 buf 工具链）。
+  # module=yufeng/proto：按 go_package 前缀裁剪输出路径。
+  - local: protoc-gen-go
+    out: .
+    opt:
+      - module=yufeng/proto
+  # 生成 ConnectRPC Go service 客户端与服务端接口。
+  - local: protoc-gen-connect-go
+    out: .
+    opt:
+      - module=yufeng/proto

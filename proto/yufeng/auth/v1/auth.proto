@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+// 认证契约：用户名密码登录、会话恢复、自助改密与可选注册。
+package yufeng.auth.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "yufeng/common/v1/v1.proto";
+import "yufeng/grant/v1/grant.proto";
+
+option go_package = "yufeng/proto/gen/authv1";
+
+service AuthService {
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc GetMe(GetMeRequest) returns (GetMeResponse);
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc GetLoginConfig(GetLoginConfigRequest) returns (GetLoginConfigResponse);
+}
+
+message User {
+  string user_id = 1;
+  string username = 2;
+  string display_name = 3;
+  yufeng.common.v1.UserRole role = 4;
+  yufeng.common.v1.UserState state = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp last_login_at = 8;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  User user = 3;
+  yufeng.grant.v1.EffectiveAccess access = 4;
+}
+
+message LogoutRequest {}
+message LogoutResponse {}
+
+message GetMeRequest {}
+message GetMeResponse {
+  User user = 1;
+  yufeng.grant.v1.EffectiveAccess access = 2;
+}
+
+message ChangePasswordRequest {
+  string old_password = 1;
+  string new_password = 2;
+}
+message ChangePasswordResponse {}
+
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+  string display_name = 3;
+}
+message RegisterResponse {
+  User user = 1;
+}
+
+message GetLoginConfigRequest {}
+message GetLoginConfigResponse {
+  bool allow_self_registration = 1;
+  int32 password_min_length = 2;
+  google.protobuf.Duration session_ttl = 3;
+}

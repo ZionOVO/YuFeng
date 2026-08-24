@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+// Run 查询面：控制台与 Agent 观察执行实例。
+package yufeng.run.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "yufeng/proto/gen/runv1";
+
+service RunService {
+  rpc CreateRun(CreateRunRequest) returns (CreateRunResponse);
+  rpc GetRun(GetRunRequest) returns (GetRunResponse);
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+  rpc WatchRun(WatchRunRequest) returns (stream WatchRunResponse);
+  rpc ListRunEvents(ListRunEventsRequest) returns (ListRunEventsResponse);
+}
+
+message CreateRunRequest {
+  string run_id = 1;
+  string role = 2;
+  string plan_ref = 3;
+  repeated string toolset = 4;
+  string budget = 5;
+  string ttl = 6;
+  repeated string bindings = 7;
+  string created_by = 8;
+  string agent_id = 9;
+  string agent_config_digest = 10;
+  string case_id = 11;
+}
+message CreateRunResponse {
+  string run_id = 1;
+  string state = 2;
+  string turn_id = 3;
+}
+
+message GetRunRequest {
+  string run_id = 1;
+}
+message RunRecord {
+  string run_id = 1;
+  string state = 2;
+  string role = 3;
+  string plan_ref = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp deadline = 6;
+  string error = 7;
+  string turn_id = 8;
+  RunBudgetSnapshot budget_snapshot = 9;
+  string agent_id = 10;
+  string agent_config_digest = 11;
+  string case_id = 12;
+}
+
+// RunBudgetLimits 是服务端冻结的 run 多维硬上限；每个字段都必须有实际值，零值不表示无限。
+message RunBudgetLimits {
+  int64 max_steps = 1;
+  int64 max_model_calls = 2;
+  int64 max_input_tokens = 3;
+  int64 max_output_tokens = 4;
+  int64 max_tool_calls = 5;
+  int64 max_tool_result_bytes = 6;
+  int64 max_cost_microunits = 7;
+  int64 max_active_milliseconds = 8;
+}
+
+// RunBudgetUsage 是已结算与在途预留的权威用量。
+message RunBudgetUsage {
+  int64 steps_used = 1;
+  int64 steps_reserved = 2;
+  int64 model_calls_used = 3;
+  int64 model_calls_reserved = 4;
+  int64 input_tokens_used = 5;
+  int64 input_tokens_reserved = 6;
+  int64 output_tokens_used = 7;
+  int64 output_tokens_reserved = 8;
+  int64 tool_calls_used = 9;
+  int64 tool_calls_reserved = 10;
+  int64 tool_result_bytes_used = 11;
+  int64 tool_result_bytes_reserved = 12;
+  int64 cost_microunits_used = 13;
+  int64 cost_microunits_reserved = 14;
+  int64 active_milliseconds_used = 15;
+}
+
+// RunBudgetSnapshot 是可查询的持久预算账户投影。
+message RunBudgetSnapshot {
+  string budget_id = 1;
+  string state = 2;
+  RunBudgetLimits limits = 3;
+  RunBudgetUsage usage = 4;
+  google.protobuf.Timestamp execution_deadline = 5;
+}
+message GetRunResponse {
+  RunRecord run = 1;
+}
+
+message ListRunsRequest {
+  string state = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListRunsResponse {
+  repeated RunRecord runs = 1;
+  string next_page_token = 2;
+}
+
+message CancelRunRequest {
+  string run_id = 1;
+}
+message CancelRunResponse {
+  RunRecord run = 1;
+}
+
+message WatchRunRequest {
+  string run_id = 1;
+}
+message WatchRunResponse {
+  RunRecord run = 1;
+}
+
+message ListRunEventsRequest {
+  string run_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message RunEvent {
+  int64 sequence = 1;
+  string run_id = 2;
+  string kind = 3;
+  string payload_ref = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+}
+message ListRunEventsResponse {
+  repeated RunEvent events = 1;
+  string next_page_token = 2;
+}

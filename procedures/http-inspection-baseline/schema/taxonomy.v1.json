@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yufeng://procedures/http-inspection-baseline/schema/taxonomy.v1.json",
+  "title": "TaxonomyMapperV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["taxonomy_version", "rules"],
+  "properties": {
+    "taxonomy_version": { "type": "string", "const": "tax/v1" },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "attack_class"],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "attack_class": {
+            "type": "string",
+            "enum": ["sqli", "xss", "path_traversal", "ssrf", "cmdi", "unmapped"]
+          }
+        }
+      }
+    }
+  }
+}

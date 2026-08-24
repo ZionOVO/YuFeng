@@ -1,0 +1,246 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+  <defs>
+    <radialGradient id="glowC" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#38bdf8" stop-opacity=".07"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></radialGradient>
+    <radialGradient id="glowV" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#a78bfa" stop-opacity=".05"/><stop offset="1" stop-color="#a78bfa" stop-opacity="0"/></radialGradient>
+    <marker id="m-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#38bdf8"/></marker>
+    <marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#a78bfa"/></marker>
+    <marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#fbbf24"/></marker>
+    <marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#f87171"/></marker>
+    <marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#4ade80"/></marker>
+    <marker id="m-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#7c8ba1"/></marker>
+  </defs>
+
+  <rect width="1600" height="1100" fill="#07090d"/>
+  <ellipse cx="770" cy="390" rx="560" ry="280" fill="url(#glowC)"/>
+  <ellipse cx="260" cy="860" rx="360" ry="200" fill="url(#glowV)"/>
+
+  <text x="48" y="42" font-size="22" font-weight="700" fill="#cdd8e6">御锋 2.0 · 目标架构总览</text>
+  <text x="48" y="66" font-size="13" fill="#8494ab">一个中台 · 两类边缘 · 五种契约 · brain 唯一投影路由 · Agent 运行时独立 · 图从属于 docs/architecture.md</text>
+
+  <!-- ===== top: externals ===== -->
+  <rect x="48" y="84" width="300" height="58" rx="10" fill="rgba(124,139,161,.04)" stroke="#3d4c61" stroke-dasharray="5 4"/>
+  <text x="64" y="108" font-size="13" font-weight="600" fill="#cdd8e6">模型端点 · 外部依赖</text>
+  <text x="64" y="128" font-size="10.5" fill="#8494ab">仅 brain 模型网关出网 · 贾维斯无密钥</text>
+
+  <rect x="650" y="84" width="300" height="58" rx="10" fill="rgba(74,222,128,.06)" stroke="#4ade80" stroke-opacity=".5"/>
+  <text x="800" y="108" text-anchor="middle" font-size="13" font-weight="600" fill="#4ade80">人 · 浏览器 / 控制台</text>
+  <text x="800" y="128" text-anchor="middle" font-size="10.5" fill="#8494ab">登录 · 审批 · 会话 · 授予</text>
+
+  <rect x="1140" y="84" width="412" height="58" rx="10" fill="rgba(124,139,161,.03)" stroke="#3d4c61" stroke-dasharray="6 5"/>
+  <text x="1156" y="108" font-size="13" font-weight="600" fill="#cdd8e6">外部情报源</text>
+  <text x="1156" y="128" font-size="10.5" fill="#8494ab">库 / 接口 / 开源情报 · 溯源后入库为制品</text>
+
+  <!-- ===== left: data plane ===== -->
+  <rect x="40" y="168" width="380" height="424" rx="14" fill="#0d1218" stroke="#233246"/>
+  <text x="56" y="194" font-size="14" font-weight="700" fill="#60a5fa">边缘 · 数据面单元</text>
+  <text x="56" y="212" font-size="10.5" fill="#5a6b83">yufeng-edge · 入口机可 ×N · 钉在流量路径</text>
+
+  <rect x="56" y="226" width="88" height="22" rx="11" fill="#101826" stroke="#1c2635"/>
+  <text x="100" y="241" text-anchor="middle" font-size="10.5" fill="#8494ab">外部流量</text>
+  <line x1="148" y1="237" x2="176" y2="237" stroke="#5a6b83" stroke-width="1.5" marker-end="url(#m-slate)"/>
+
+  <rect x="180" y="222" width="108" height="30" rx="8" fill="rgba(96,165,250,.08)" stroke="#60a5fa" stroke-opacity=".4"/>
+  <text x="234" y="241" text-anchor="middle" font-size="11" fill="#60a5fa">反代壳</text>
+  <rect x="296" y="222" width="108" height="30" rx="8" fill="rgba(96,165,250,.08)" stroke="#60a5fa" stroke-opacity=".4"/>
+  <text x="350" y="241" text-anchor="middle" font-size="11" fill="#60a5fa">外部授权壳</text>
+
+  <rect x="56" y="264" width="348" height="36" rx="8" fill="#101826" stroke="#1c2635"/>
+  <text x="230" y="286" text-anchor="middle" font-size="11.5" fill="#cdd8e6">同一 HTTP 检查配置档 → 规范请求视图</text>
+
+  <rect x="56" y="312" width="168" height="58" rx="10" fill="rgba(96,165,250,.07)" stroke="#60a5fa" stroke-opacity=".45"/>
+  <text x="140" y="336" text-anchor="middle" font-size="12.5" font-weight="600" fill="#60a5fa">Inspect</text>
+  <text x="140" y="356" text-anchor="middle" font-size="10" fill="#8494ab">发现 + 覆盖度 · 不 403</text>
+
+  <rect x="236" y="312" width="168" height="58" rx="10" fill="rgba(248,113,113,.07)" stroke="#f87171" stroke-opacity=".45"/>
+  <text x="320" y="336" text-anchor="middle" font-size="12.5" font-weight="600" fill="#f87171">Gate</text>
+  <text x="320" y="356" text-anchor="middle" font-size="10" fill="#8494ab">检测键策略 / 形状 · 唯一闸</text>
+
+  <line x1="230" y1="370" x2="230" y2="390" stroke="#5a6b83" stroke-width="1.5" marker-end="url(#m-slate)"/>
+  <rect x="56" y="394" width="348" height="44" rx="10" fill="#101826" stroke="#1c2635"/>
+  <text x="230" y="414" text-anchor="middle" font-size="12" fill="#cdd8e6">受保护应用</text>
+  <text x="230" y="430" text-anchor="middle" font-size="10" fill="#5a6b83">反代才转发 · 外部授权由已有网关转发</text>
+
+  <rect x="56" y="450" width="348" height="56" rx="8" fill="rgba(251,191,36,.04)" stroke="#fbbf24" stroke-opacity=".5" stroke-dasharray="4 4"/>
+  <text x="230" y="472" text-anchor="middle" font-size="11" fill="#fbbf24">资产世代缓存 · 断网自治</text>
+  <text x="230" y="492" text-anchor="middle" font-size="10" fill="#8494ab">采样/证据/转发随世代签名 · 失败留上一份</text>
+
+  <text x="56" y="528" font-size="10" fill="#5a6b83">管理面独立端口 · 业务路径不做隐式绕过</text>
+  <text x="56" y="546" font-size="10" fill="#5a6b83">Agent / 大语言模型不在本进程 · 仅异步旁路到邻近 ModelSide</text>
+
+  <rect x="40" y="604" width="380" height="68" rx="12" fill="#0d1218" stroke="#23415c"/>
+  <text x="56" y="630" font-size="12.5" font-weight="600" fill="#38bdf8">Edge 邻近异步推理 · yufeng-modelside</text>
+  <text x="56" y="650" font-size="10.5" fill="#8494ab">规范 HTTP 副本 → 有界推理 → 无原文结果</text>
+  <text x="56" y="664" font-size="10" fill="#5a6b83">技术人员管理 · 无 Gate · 不直连数据库或消息服务器</text>
+
+  <!-- ===== center: brain ===== -->
+  <rect x="500" y="168" width="540" height="424" rx="16" fill="#0d1218" stroke="#233246"/>
+  <text x="518" y="194" font-size="15" font-weight="700" fill="#38bdf8">中台 · yufeng-brain</text>
+  <text x="1022" y="194" text-anchor="end" font-size="10.5" fill="#5a6b83">唯一集成体 · 不跑 Agent 循环</text>
+
+  <rect x="516" y="210" width="248" height="50" rx="10" fill="#101826" stroke="#1c2635"/>
+  <text x="528" y="230" font-size="12.5" font-weight="600" fill="#cdd8e6">控制台 /app</text>
+  <text x="528" y="248" font-size="10.5" fill="#8494ab">态势 · 审批 · 引导六步</text>
+
+  <rect x="776" y="210" width="248" height="50" rx="10" fill="#101826" stroke="#1c2635"/>
+  <text x="788" y="230" font-size="12.5" font-weight="600" fill="#cdd8e6">认证 / 授予 / 用户</text>
+  <text x="788" y="248" font-size="10.5" fill="#8494ab">会话令牌 · Tools × Bindings</text>
+
+  <rect x="516" y="272" width="508" height="48" rx="10" fill="rgba(167,139,250,.07)" stroke="#a78bfa" stroke-opacity=".4"/>
+  <text x="528" y="292" font-size="12.5" font-weight="600" fill="#a78bfa">治理内核</text>
+  <text x="528" y="310" font-size="10.5" fill="#8494ab">Signer · 能力令牌 · 发布状态机 · 审计哈希链 · 凭据保险库</text>
+
+  <rect x="516" y="332" width="508" height="48" rx="10" fill="rgba(96,165,250,.05)" stroke="#23415c"/>
+  <text x="528" y="352" font-size="12.5" font-weight="600" fill="#60a5fa">三本账 PostgreSQL</text>
+  <text x="528" y="370" font-size="10.5" fill="#8494ab">事件（不可变）· CheckTicket 投影 · 资产/世代 · 发布 · 发件箱</text>
+
+  <rect x="516" y="392" width="248" height="50" rx="10" fill="rgba(124,139,161,.06)" stroke="#3d4c61"/>
+  <text x="528" y="412" font-size="12.5" font-weight="600" fill="#cdd8e6">模型网关</text>
+  <text x="528" y="430" font-size="10.5" fill="#8494ab">Generate 目标 · CompleteChat 迁移 · 唯一出网</text>
+
+  <rect x="776" y="392" width="248" height="50" rx="10" fill="rgba(74,222,128,.05)" stroke="#4ade80" stroke-opacity=".35"/>
+  <text x="788" y="412" font-size="12.5" font-weight="600" fill="#4ade80">Agent 控制面</text>
+  <text x="788" y="430" font-size="10.5" fill="#8494ab">Turn / 分析 / run / 工具 · 类型化车道</text>
+
+  <rect x="516" y="454" width="248" height="46" rx="10" fill="#101826" stroke="#1c2635"/>
+  <text x="528" y="473" font-size="12" font-weight="600" fill="#cdd8e6">情报摄取</text>
+  <text x="528" y="490" font-size="10" fill="#8494ab">三类源 · 溯源入库</text>
+
+  <rect x="776" y="454" width="248" height="46" rx="10" fill="#101826" stroke="#1c2635"/>
+  <text x="788" y="473" font-size="12" font-weight="600" fill="#cdd8e6">评测 / 回放门禁</text>
+  <text x="788" y="490" font-size="10" fill="#8494ab">与 edge 共用 Inspect + Gate</text>
+
+  <text x="770" y="522" text-anchor="middle" font-size="10.5" font-style="italic" fill="#5a6b83">内部总线 NATS JetStream —— 仅中台内部，边缘不接入</text>
+  <text x="770" y="540" text-anchor="middle" font-size="10" fill="#5a6b83">生产私钥由 keys / signer 持有 · brain 不读私钥文件 · 不转发业务流量</text>
+
+  <!-- ===== right: independent processes ===== -->
+  <rect x="1080" y="168" width="472" height="70" rx="12" fill="#0d1218" stroke="#4ade80" stroke-opacity=".4"/>
+  <text x="1096" y="192" font-size="13" font-weight="700" fill="#4ade80">yufeng-jarvis · 贾维斯</text>
+  <text x="1096" y="212" font-size="10.5" fill="#8494ab">长驻编排 · 只连 brain · 不持 Docker / 模型密钥</text>
+  <text x="1096" y="228" font-size="10.5" fill="#8494ab">PollInstructions · Generate · InvokeTool · 可恢复 Turn</text>
+
+  <rect x="1080" y="250" width="228" height="78" rx="12" fill="#0d1218" stroke="#4ade80" stroke-opacity=".3" stroke-dasharray="5 4"/>
+  <text x="1096" y="274" font-size="12.5" font-weight="600" fill="#4ade80">yufeng-agentd</text>
+  <text x="1096" y="294" font-size="10.5" fill="#8494ab">PollWork · 监督孵化</text>
+  <text x="1096" y="312" font-size="10" fill="#5a6b83">run 监督进程</text>
+
+  <rect x="1324" y="250" width="228" height="78" rx="12" fill="#0d1218" stroke="#4ade80" stroke-opacity=".3" stroke-dasharray="5 4"/>
+  <text x="1340" y="274" font-size="12.5" font-weight="600" fill="#4ade80">yufeng-run</text>
+  <text x="1340" y="294" font-size="10.5" fill="#8494ab">短命执行实例</text>
+  <text x="1340" y="312" font-size="10" fill="#5a6b83">委托书 + 预算 · 做完即焚</text>
+
+  <rect x="1080" y="340" width="228" height="118" rx="14" fill="rgba(124,139,161,.03)" stroke="#7c8ba1" stroke-opacity=".55" stroke-dasharray="6 5"/>
+  <text x="1096" y="364" font-size="12.5" font-weight="700" fill="#cdd8e6">案件研判 · 算力 Y</text>
+  <text x="1096" y="384" font-size="10.5" fill="#8494ab">Brain 冻结无原文 CheckTicket</text>
+  <text x="1096" y="402" font-size="10.5" fill="#8494ab">贾维斯编排 · 短命 run 调查</text>
+  <text x="1096" y="420" font-size="10.5" fill="#8494ab">只追加结论 · 不改原事件</text>
+  <text x="1096" y="440" font-size="10" fill="#5a6b83">不接规范流量或完整正文</text>
+
+  <rect x="1324" y="340" width="228" height="118" rx="14" fill="rgba(248,113,113,.03)" stroke="#f87171" stroke-opacity=".35" stroke-dasharray="6 5"/>
+  <text x="1340" y="364" font-size="12.5" font-weight="700" fill="#cdd8e6">沙箱 · 算力 Z</text>
+  <text x="1340" y="384" font-size="10.5" fill="#8494ab">漏洞复现 · 程序演练</text>
+  <text x="1340" y="402" font-size="10.5" fill="#8494ab">Landlock / seccomp</text>
+  <text x="1340" y="420" font-size="10.5" fill="#8494ab">默认无网</text>
+  <text x="1340" y="440" font-size="10" fill="#5a6b83">跑不可信代码的独立单元</text>
+
+  <rect x="1080" y="470" width="472" height="122" rx="12" fill="rgba(56,189,248,.04)" stroke="#38bdf8" stroke-opacity=".25"/>
+  <text x="1096" y="494" font-size="12" font-weight="600" fill="#38bdf8">人工交付（控制面与数据面分离）</text>
+  <text x="1096" y="516" font-size="11" fill="#cdd8e6">控制面：postgres · keys · signer · brain · jarvis · agentd</text>
+  <text x="1096" y="536" font-size="10.5" fill="#8494ab">技术人员显式启停：edge · modelside（同机或连接远端 Brain）</text>
+  <text x="1096" y="556" font-size="10.5" fill="#8494ab">禁止边：Brain / 贾维斯 ↛ Edge 生命周期 · 原始流量 ↛ Brain</text>
+  <text x="1096" y="576" font-size="10" fill="#5a6b83">Agent 控制面不计入五种边缘契约 · brain 永不向 Agent 拨号</text>
+
+  <!-- ===== contracts: edge <-> brain ===== -->
+  <text x="458" y="236" text-anchor="middle" font-size="11" fill="#38bdf8">① 注册</text>
+  <line x1="424" y1="246" x2="496" y2="246" stroke="#38bdf8" stroke-width="2" marker-end="url(#m-cyan)"/>
+  <text x="458" y="264" text-anchor="middle" font-size="9.5" fill="#5a6b83">生产能力广告 · 心跳（不授权）</text>
+
+  <text x="458" y="304" text-anchor="middle" font-size="11" fill="#a78bfa">② 制品</text>
+  <line x1="496" y1="314" x2="424" y2="314" stroke="#a78bfa" stroke-width="2" marker-end="url(#m-violet)"/>
+  <text x="458" y="332" text-anchor="middle" font-size="9.5" fill="#5a6b83">资产世代 · 验签装载</text>
+
+  <text x="458" y="372" text-anchor="middle" font-size="11" fill="#fbbf24">③ 遥测</text>
+  <line x1="424" y1="382" x2="496" y2="382" stroke="#fbbf24" stroke-width="2" marker-end="url(#m-amber)"/>
+  <text x="458" y="400" text-anchor="middle" font-size="9.5" fill="#5a6b83">脱敏事件 · 断网补传</text>
+
+  <!-- human ⑤ -->
+  <line x1="800" y1="142" x2="800" y2="164" stroke="#4ade80" stroke-width="2" marker-end="url(#m-green)"/>
+  <text x="812" y="158" font-size="11" fill="#4ade80">⑤ 会话</text>
+
+  <!-- modelgateway egress：从中台左边缝上翻，不穿过会话箭头 -->
+  <polyline points="516,417 470,417 470,150 352,150" fill="none" stroke="#7c8ba1" stroke-width="1.6" marker-end="url(#m-slate)"/>
+  <text x="430" y="144" font-size="9.5" fill="#5a6b83">模型调用 · 唯一出网点</text>
+
+  <!-- intel in：落到中台顶边，不斜穿贾维斯 -->
+  <polyline points="1140,142 1140,160 1040,160 1040,168" fill="none" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#m-cyan)"/>
+  <text x="1088" y="156" font-size="9.5" fill="#5a6b83">情报入库</text>
+
+  <!-- jarvis to brain -->
+  <line x1="1076" y1="200" x2="1044" y2="200" stroke="#4ade80" stroke-width="1.8" marker-end="url(#m-green)"/>
+  <text x="1060" y="192" text-anchor="end" font-size="9.5" fill="#4ade80">Poll / 工具</text>
+
+  <!-- agentd to brain -->
+  <line x1="1076" y1="280" x2="1044" y2="412" stroke="#4ade80" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#m-green)"/>
+
+  <!-- Edge 到同机 ModelSide 的原始流量旁路 -->
+  <line x1="230" y1="592" x2="230" y2="600" stroke="#38bdf8" stroke-width="1.6" marker-end="url(#m-cyan)"/>
+  <text x="244" y="598" font-size="9.5" fill="#38bdf8">有界规范流量</text>
+  <!-- ModelSide 只向 Brain 返回无原文结果 -->
+  <polyline points="420,638 470,638 470,540 496,540" fill="none" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#m-amber)"/>
+  <text x="438" y="632" font-size="9.5" fill="#fbbf24">无原文结果</text>
+
+  <!-- async event stream -->
+  <line x1="1044" y1="360" x2="1076" y2="360" stroke="#fbbf24" stroke-width="1.6" marker-end="url(#m-amber)"/>
+  <line x1="1076" y1="430" x2="1044" y2="470" stroke="#fbbf24" stroke-width="1.4" marker-end="url(#m-amber)"/>
+  <text x="1058" y="352" text-anchor="end" font-size="9" fill="#8494ab">事件流</text>
+
+
+  <!-- ===== bottom: executor ===== -->
+  <rect x="40" y="692" width="1512" height="200" rx="14" fill="rgba(13,18,24,.55)" stroke="#1c2635" stroke-dasharray="7 6"/>
+  <text x="56" y="716" font-size="13" font-weight="700" fill="#cdd8e6">边缘 · 执行单元 —— 被保护资产的三种接入模式</text>
+  <text x="1534" y="716" text-anchor="end" font-size="10.5" fill="#5a6b83">同一修复计划 · 同一程序制品 · 只换通道</text>
+
+  <rect x="56" y="732" width="470" height="140" rx="10" fill="#101826" stroke="#23415c"/>
+  <text x="72" y="756" font-size="12.5" font-weight="700" fill="#4ade80">embedded · 在机</text>
+  <text x="72" y="778" font-size="11.5" font-weight="600" fill="#cdd8e6">yufeng-host</text>
+  <text x="72" y="798" font-size="10.5" fill="#8494ab">原语执行器 · sys.probe · 制品缓存</text>
+  <text x="72" y="816" font-size="10.5" fill="#8494ab">④ PollCommands / ReportStep</text>
+  <rect x="72" y="832" width="438" height="26" rx="7" fill="rgba(74,222,128,.05)" stroke="#4ade80" stroke-opacity=".3"/>
+  <text x="291" y="850" text-anchor="middle" font-size="10.5" fill="#4ade80">可用面：L1（仍走 edge）· L2 全链 · L3 本地原语</text>
+
+  <rect x="546" y="732" width="470" height="140" rx="10" fill="#101826" stroke="#fbbf24" stroke-opacity=".35"/>
+  <text x="562" y="756" font-size="12.5" font-weight="700" fill="#fbbf24">remote · 可达（免代理）</text>
+  <text x="562" y="778" font-size="11.5" font-weight="600" fill="#cdd8e6">SSH / 厂商接口适配器</text>
+  <text x="562" y="798" font-size="10.5" fill="#8494ab">设备上不装程序 · 凭据在中台保险库</text>
+  <text x="562" y="816" font-size="10.5" fill="#8494ab">由绑定该资产的 host 通道执行</text>
+  <rect x="562" y="832" width="438" height="26" rx="7" fill="rgba(251,191,36,.05)" stroke="#fbbf24" stroke-opacity=".3"/>
+  <text x="781" y="850" text-anchor="middle" font-size="10.5" fill="#fbbf24">可用面：L2 部分 · L3 远程原语 · 不做本机 L1</text>
+
+  <rect x="1036" y="732" width="496" height="140" rx="10" fill="#101826" stroke="#3d4c61"/>
+  <text x="1052" y="756" font-size="12.5" font-weight="700" fill="#7c8ba1">network · 旁路</text>
+  <text x="1052" y="778" font-size="11.5" font-weight="600" fill="#cdd8e6">哑设备（摄像头 · 物联网）</text>
+  <text x="1052" y="798" font-size="10.5" fill="#8494ab">无 host · 镜像 SPAN 可作被动感知</text>
+  <text x="1052" y="816" font-size="10.5" fill="#8494ab">由入口数据面单元代理保护</text>
+  <rect x="1052" y="832" width="464" height="26" rx="7" fill="rgba(124,139,161,.05)" stroke="#7c8ba1" stroke-opacity=".3"/>
+  <text x="1284" y="850" text-anchor="middle" font-size="10.5" fill="#7c8ba1">可用面：仅 L1 + 被动感知 · 引导升级接入</text>
+
+  <!-- brain -> host ④ ② -->
+  <line x1="700" y1="592" x2="700" y2="688" stroke="#f87171" stroke-width="2" marker-end="url(#m-red)"/>
+  <text x="712" y="640" font-size="10.5" fill="#f87171">④ 指令 · 逐步回执</text>
+  <line x1="620" y1="592" x2="620" y2="688" stroke="#a78bfa" stroke-width="1.6" marker-end="url(#m-violet)"/>
+  <text x="516" y="640" font-size="10.5" fill="#a78bfa">② 程序制品</text>
+  <line x1="860" y1="688" x2="860" y2="592" stroke="#fbbf24" stroke-width="1.6" marker-end="url(#m-amber)"/>
+  <text x="872" y="640" font-size="10.5" fill="#fbbf24">③ 传感</text>
+
+  <!-- ===== footer ===== -->
+  <rect x="48" y="914" width="10" height="10" rx="2" fill="#38bdf8"/><text x="64" y="924" font-size="11" fill="#8494ab">① 注册</text>
+  <rect x="128" y="914" width="10" height="10" rx="2" fill="#a78bfa"/><text x="144" y="924" font-size="11" fill="#8494ab">② 制品</text>
+  <rect x="208" y="914" width="10" height="10" rx="2" fill="#fbbf24"/><text x="224" y="924" font-size="11" fill="#8494ab">③ 遥测</text>
+  <rect x="288" y="914" width="10" height="10" rx="2" fill="#f87171"/><text x="304" y="924" font-size="11" fill="#8494ab">④ 指令</text>
+  <rect x="368" y="914" width="10" height="10" rx="2" fill="#4ade80"/><text x="384" y="924" font-size="11" fill="#8494ab">⑤ 会话</text>
+  <text x="470" y="924" font-size="10.5" fill="#5a6b83">虚线框 = 可选 / 独立分布 · 实线绿框 = 独立 Agent 进程（不在 brain 地址空间）</text>
+  <text x="1552" y="924" text-anchor="end" font-size="11" fill="#8494ab">铁律：智能在中台侧 · 设备上只有哑执行器 · Agent 不在数据路径</text>
+
+  <text x="48" y="952" font-size="11" fill="#8494ab">数据路径：流量 → 壳 → 规范视图 → Inspect → Gate → 放行或 403。edge 只上传 Event；brain 冻结 CheckTicket 并派分析/研判/run，回闸必须经新世代。</text>
+  <text x="48" y="974" font-size="11" fill="#8494ab">扩展公式：易变物走签名制品。同步新算法才发版；路外算力走契约服务。检测器不得返回拦截动作。历史概念图见 architecture.svg，不约束实现。</text>
+  <text x="48" y="996" font-size="10.5" fill="#5a6b83">更新节奏：原语（平台发版 · 年级）→ 程序 / 工具制品（热更新 · 周月）→ 技能提示词（制品 · 天）。中台可加副本（共享库 / 信任根）。入口机与资产均可 ×N。</text>
+</svg>

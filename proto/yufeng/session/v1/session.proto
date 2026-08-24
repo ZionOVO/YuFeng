@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+// 会话契约：人、控制台与贾维斯之间的消息队列。
+package yufeng.session.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "yufeng/proto/gen/sessionv1";
+
+service SessionService {
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc PollMessages(PollMessagesRequest) returns (PollMessagesResponse);
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+}
+
+message CreateSessionRequest {
+  string title = 1;
+  string owner = 2;
+}
+message CreateSessionResponse {
+  string session_id = 1;
+}
+
+message SendMessageRequest {
+  string session_id = 1;
+  string sender = 2;
+  string content = 3;
+}
+message SendMessageResponse {
+  int64 message_sequence = 1;
+}
+
+message SessionMessage {
+  int64 sequence = 1;
+  string session_id = 2;
+  string sender = 3;
+  string content = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+  repeated SessionAttachment attachments = 6;
+}
+
+enum SessionAttachmentKind {
+  SESSION_ATTACHMENT_KIND_UNSPECIFIED = 0;
+  SESSION_ATTACHMENT_KIND_CASE = 1;
+  SESSION_ATTACHMENT_KIND_APPROVAL = 2;
+  SESSION_ATTACHMENT_KIND_RUN = 3;
+  SESSION_ATTACHMENT_KIND_FINDING = 4;
+  SESSION_ATTACHMENT_KIND_SHADOW_RELEASE = 5;
+  SESSION_ATTACHMENT_KIND_WORKER_ENROLLMENT = 6;
+  SESSION_ATTACHMENT_KIND_WORKER_CAPACITY = 7;
+}
+
+message SessionAttachment {
+  SessionAttachmentKind kind = 1;
+  string ref_id = 2;
+  string module_id = 3;
+}
+
+message PollMessagesRequest {
+  string session_id = 1;
+  string cursor = 2;
+  int32 long_poll_seconds = 3;
+}
+message PollMessagesResponse {
+  repeated SessionMessage messages = 1;
+  string next_cursor = 2;
+}
+
+message ListMessagesRequest {
+  string session_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListMessagesResponse {
+  repeated SessionMessage messages = 1;
+  string next_page_token = 2;
+}

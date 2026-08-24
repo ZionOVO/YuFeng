@@ -1,0 +1,37 @@
+[Unit]
+Description=YuFeng edge-near asynchronous model inference
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yufeng
+Group=yufeng
+EnvironmentFile=/etc/yufeng/modelside.env
+ExecStart=/opt/yufeng/modelside/bin/yufeng-modelside \
+  --listen=${YUFENG_MODELSIDE_LISTEN} \
+  --modelside-id=${YUFENG_MODELSIDE_ID} \
+  --brain=${YUFENG_BRAIN_URL} \
+  --brain-token-file=/etc/yufeng/credentials/modelside-result-token \
+  --brain-ca=/etc/yufeng/tls/brain-ca.crt \
+  --brain-cert=/etc/yufeng/tls/modelside-client.crt \
+  --brain-key=/etc/yufeng/tls/modelside-client.key \
+  --weights=${YUFENG_MODELSIDE_WEIGHTS_DIR} \
+  --workers=${YUFENG_MODELSIDE_WORKERS}
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/yufeng /var/lib/yufeng/modelside
+RuntimeDirectory=yufeng
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+StateDirectory=yufeng/modelside
+StateDirectoryMode=0750
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

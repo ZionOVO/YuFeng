@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+// 修复计划契约（RepairPlan）：Strategist 角色的输出、执行实例的输入。
+// 一份计划 = 针对一个漏洞发现的多层修复动作组合（流量 + 运行时 + 冷补丁）。
+package yufeng.plan.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/planv1";
+
+// RepairPlan 是一份人可审、机器可执行的修复方案。
+message RepairPlan {
+  // 计划标识（如 RP-0042）。
+  string id = 1;
+  // 关联的漏洞发现标识（情报匹配 / 感知产物）。
+  string finding_id = 2;
+  // 修复动作组合。
+  repeated Action actions = 3;
+  // 决策叙述：为什么这么组合（人审时的主要阅读材料）。
+  string rationale = 4;
+  // 创建时间。
+  google.protobuf.Timestamp created_at = 5;
+  // 创建者：产出本计划的 Strategist 执行实例标识。
+  string created_by = 6;
+}
+
+// Action 是一个修复动作：在某个修复面上发布某个制品。
+message Action {
+  // 修复面。
+  yufeng.common.v1.Plane plane = 1;
+  // 制品引用（内容寻址 sha256）。
+  string artifact_ref = 2;
+  // 目标生效状态。治理管道无论目标为何都从 shadow（只记录）起步，
+  // 逐步推进到目标状态。
+  yufeng.common.v1.ReleaseMode mode = 3;
+  // 本动作产物的存活时限（临时修复到期自动退休）。
+  google.protobuf.Duration ttl = 4;
+  // 是否必须人工授权。冷补丁（修复面为 PLANE_PATCH）恒为 true。
+  bool requires_auth = 5;
+  // 被本动作取代的制品 id（如冷补丁落地后退休的虚拟补丁）。
+  string supersedes = 6;
+}

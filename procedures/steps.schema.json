@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yufeng/procedure/steps/v1",
+  "title": "修复程序步骤体（ProcedureV1.steps_json 的校验 Schema）",
+  "description": "步骤体是数据不是契约：新增能力原语时只发制品、不改 proto（决策记录 014）。",
+  "type": "array",
+  "minItems": 1,
+  "items": { "$ref": "#/$defs/step" },
+  "$defs": {
+    "step": {
+      "type": "object",
+      "required": ["prim", "args"],
+      "additionalProperties": false,
+      "properties": {
+        "prim": {
+          "type": "string",
+          "description": "能力原语名，如 pkg.upgrade / service.restart / artifact.apply"
+        },
+        "args": {
+          "type": "object",
+          "description": "原语参数，结构由各原语自行定义"
+        },
+        "guard": {
+          "type": "object",
+          "description": "执行守卫，如 {\"drain\": true} 表示先摘除流量再执行"
+        },
+        "confirm": {
+          "type": "boolean",
+          "default": false,
+          "description": "引导式执行时该步须人工确认后才能继续（决策记录 011）"
+        },
+        "on_fail": {
+          "enum": ["abort", "rollback", "continue"],
+          "default": "rollback",
+          "description": "失败策略：中止 / 走补偿分支 / 继续（仅只读步骤允许 continue）"
+        },
+        "rollback": {
+          "type": "object",
+          "description": "本步的补偿动作，覆盖程序级 rollback_ref"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,348 @@
+syntax = "proto3";
+
+// 共享枚举与基础类型：修复层级、修复面、资产接入模式、手段生效语义。
+// 术语含义见 docs/glossary.md（术语表，含稳定锚点）。
+package yufeng.common.v1;
+
+option go_package = "yufeng/proto/gen/commonv1";
+
+// 修复连续谱层级：决定一类修复手段的表达域与授权方式。
+enum Tier {
+  TIER_UNSPECIFIED = 0;
+  // 只出报告，不修复。
+  TIER_L0_REPORT = 1;
+  // 虚拟补丁·流量拦截：免重启，在流量路径上拦截（临时修复）。
+  TIER_L1_TRAFFIC = 2;
+  // 虚拟补丁·运行时约束：免重启，在资产侧内核/系统调用层施加约束（临时修复）。
+  TIER_L2_RUNTIME = 3;
+  // 冷补丁：直接修复业务软件，可含重启，永远需要人工授权。
+  TIER_L3_COLD_PATCH = 4;
+}
+
+// 修复面：一个修复动作生效的位置。
+enum Plane {
+  PLANE_UNSPECIFIED = 0;
+  // 数据面：入口机上的检测与拦截。
+  PLANE_TRAFFIC = 1;
+  // 资产侧运行时：内核态 / 系统调用层约束。
+  PLANE_RUNTIME = 2;
+  // 资产侧软件包 / 配置：冷补丁。
+  PLANE_PATCH = 3;
+}
+
+// 资产接入模式：决定该资产可用的修复面与执行通道。
+enum AccessMode {
+  ACCESS_MODE_UNSPECIFIED = 0;
+  // 在机：资产上装有 yufeng-host 宿主程序，本地执行。
+  ACCESS_MODE_EMBEDDED = 1;
+  // 远程可达：免代理，经 SSH / 厂商接口操作。
+  ACCESS_MODE_REMOTE = 2;
+  // 仅网络旁路：只能被流量路径上的数据面保护。
+  ACCESS_MODE_NETWORK = 3;
+}
+
+// 手段生效语义：约束何时对目标进程起作用。
+// 免重启承诺只由 live 类手段承担（见 docs/architecture.md 决策记录 010）。
+enum EffectSemantics {
+  EFFECT_SEMANTICS_UNSPECIFIED = 0;
+  // 对运行中进程立即生效（eBPF、nftables）。
+  EFFECT_SEMANTICS_LIVE = 1;
+  // 仅在进程启动时生效（seccomp、LD_PRELOAD），适用于可重启场景。
+  EFFECT_SEMANTICS_SPAWN_TIME = 2;
+}
+
+// 制品发布的三种生效状态（治理管道按 只记录 → 小比例 → 全量 推进）。
+enum ReleaseMode {
+  RELEASE_MODE_UNSPECIFIED = 0;
+  // 只记录不生效：观察误伤。
+  RELEASE_MODE_SHADOW = 1;
+  // 小比例生效：按稳定分桶放量。
+  RELEASE_MODE_CANARY = 2;
+  // 全量生效。
+  RELEASE_MODE_ENFORCE = 3;
+}
+
+// 发布生命周期状态（治理运行时状态；ReleaseMode 只表达生效方式）。
+enum ReleaseState {
+  RELEASE_STATE_UNSPECIFIED = 0;
+  // 起草：无签名、无最终 artifact_id。
+  RELEASE_STATE_DRAFT = 1;
+  // 已签名：门禁通过、回放报告写入、全信封 id 已计算。
+  RELEASE_STATE_SIGNED = 2;
+  // 影子：只记录不生效。
+  RELEASE_STATE_SHADOW = 3;
+  // 小比例：按稳定分桶部分生效。
+  RELEASE_STATE_CANARY = 4;
+  // 全量生效。
+  RELEASE_STATE_ENFORCE = 5;
+  // 已退休。
+  RELEASE_STATE_RETIRED = 6;
+}
+
+// 发布退休原因。
+enum RetireReason {
+  RETIRE_REASON_UNSPECIFIED = 0;
+  // 回滚。
+  RETIRE_REASON_ROLLBACK = 1;
+  // 人工退休。
+  RETIRE_REASON_MANUAL = 2;
+  // 存活时限到期（演示 KIND_RULE 的单一 ttl；生产策略禁止再用本原因自动卸闸）。
+  RETIRE_REASON_TTL = 3;
+  // 被新制品取代。
+  RETIRE_REASON_SUPERSEDED = 4;
+  // 生产硬过期按 expiry_behavior=retire 执行。
+  RETIRE_REASON_HARD_EXPIRED = 5;
+}
+
+// 单元健康状态。
+enum UnitHealth {
+  UNIT_HEALTH_UNSPECIFIED = 0;
+  UNIT_HEALTH_HEALTHY = 1;
+  UNIT_HEALTH_DEGRADED = 2;
+  // 已声明流量键上连续两个周期无请求，且同键拦截单元在跑。
+  UNIT_HEALTH_TAP_SILENT = 3;
+  // 观察流与拦截流方法×路由模板 Top-N 集合 Jaccard < 0.5。
+  UNIT_HEALTH_TAP_SKEW = 4;
+}
+
+// IngressPosture 是入口姿态：这个进程怎么挂到线上，不是发布是否全量生效。
+enum IngressPosture {
+  INGRESS_POSTURE_UNSPECIFIED = 0;
+  // 反代拦截：壳可写 403。
+  INGRESS_POSTURE_REVERSE_PROXY = 1;
+  // 外部授权拦截：壳把裁决交给网关。
+  INGRESS_POSTURE_EXT_AUTHZ = 2;
+  // 侧载只告警：永远 200，可报 would_have_blocked。
+  INGRESS_POSTURE_TAP_ALERT = 3;
+  // 镜像或 SPAN 只观察：只记事件，不得 403。
+  INGRESS_POSTURE_MIRROR_OBSERVE = 4;
+}
+
+// ForwardPolicyKind 是脱敏事件是否进入后续 Agent 调查的世代策略。
+enum ForwardPolicyKind {
+  FORWARD_POLICY_KIND_UNSPECIFIED = 0;
+  // 不升级。
+  FORWARD_POLICY_KIND_NONE = 1;
+  FORWARD_POLICY_KIND_WORKER_SCORE = 2 [deprecated = true];
+  FORWARD_POLICY_KIND_MODELGW_SCORE = 3 [deprecated = true];
+  // 创建短命调查执行实例。
+  FORWARD_POLICY_KIND_AGENT_INVESTIGATE = 4;
+}
+
+// EvidencePolicyTier 是证据可见档；默认 home。
+enum EvidencePolicyTier {
+  EVIDENCE_POLICY_TIER_UNSPECIFIED = 0;
+  EVIDENCE_POLICY_TIER_HOME = 1;
+  EVIDENCE_POLICY_TIER_PRIVATE = 2;
+  EVIDENCE_POLICY_TIER_BREAK_GLASS = 3;
+}
+
+// EvidenceDigestAlgorithm 是证据摘要算法闭集。
+enum EvidenceDigestAlgorithm {
+  EVIDENCE_DIGEST_ALGORITHM_UNSPECIFIED = 0;
+  EVIDENCE_DIGEST_ALGORITHM_SPAN_SHA256 = 1;
+  EVIDENCE_DIGEST_ALGORITHM_NGRAM3_HASH = 2;
+  EVIDENCE_DIGEST_ALGORITHM_CHARSET_HIST = 3;
+}
+
+// 用户固定角色。
+enum UserRole {
+  USER_ROLE_UNSPECIFIED = 0;
+  USER_ROLE_ADMIN = 1;
+  USER_ROLE_OPERATOR = 2;
+  USER_ROLE_VIEWER = 3;
+}
+
+// 用户账户状态。
+enum UserState {
+  USER_STATE_UNSPECIFIED = 0;
+  USER_STATE_ACTIVE = 1;
+  USER_STATE_DISABLED = 2;
+  USER_STATE_DELETED = 3;
+}
+
+// 单条推进门槛检查结果。
+message GateCheck {
+  string gate_key = 1;
+  bool passed = 2;
+  string required = 3;
+  string actual = 4;
+  string message = 5;
+}
+
+// 推进门槛检查汇总，经 Connect error details 返回。
+message GateResult {
+  repeated GateCheck gates = 1;
+}
+
+// InspectionSurface 是规范请求视图上的检查面。
+enum InspectionSurface {
+  INSPECTION_SURFACE_UNSPECIFIED = 0;
+  // 路径。
+  INSPECTION_SURFACE_PATH = 1;
+  // 查询串。
+  INSPECTION_SURFACE_QUERY = 2;
+  // 请求体。
+  INSPECTION_SURFACE_BODY = 3;
+  // 请求头。
+  INSPECTION_SURFACE_HEADER = 4;
+}
+
+// CoverageStatus 是单个检查面的覆盖度。
+enum CoverageStatus {
+  COVERAGE_STATUS_UNSPECIFIED = 0;
+  // 完整检查。
+  COVERAGE_STATUS_FULL = 1;
+  // 截断或部分解析。
+  COVERAGE_STATUS_PARTIAL = 2;
+  // 该面不存在。
+  COVERAGE_STATUS_ABSENT = 3;
+  // 引擎不支持该面。
+  COVERAGE_STATUS_UNSUPPORTED = 4;
+  // 解析或执行失败。
+  COVERAGE_STATUS_ERROR = 5;
+}
+
+// ObservationState 是边缘对一次请求的观察（可按位语义叠加，主状态取最高优先级）。
+enum ObservationState {
+  OBSERVATION_STATE_UNSPECIFIED = 0;
+  // 至少一个检测键命中。
+  OBSERVATION_STATE_SYNC_DETECTED = 1;
+  // 已按配置完整检查，无发现。
+  OBSERVATION_STATE_SYNC_NO_DETECTION = 2;
+  // 至少一个必查面不是 FULL。
+  OBSERVATION_STATE_INSPECTION_PARTIAL = 3;
+  // 检测器加载、解析、超时或执行失败。
+  OBSERVATION_STATE_INSPECTION_ERROR = 4;
+}
+
+// TriageReason 是中台研判原因，与边缘观察不是同一套枚举。
+enum TriageReason {
+  TRIAGE_REASON_UNSPECIFIED = 0;
+  // 有键无对应 enforce 策略。
+  TRIAGE_REASON_DETECTED_UNMITIGATED = 1;
+  // 有发现但不属自动治理五类。
+  TRIAGE_REASON_DETECTED_UNMAPPED = 2;
+  // 无键但有独立证据。
+  TRIAGE_REASON_SUSPECTED_MISS = 3;
+  // 检查不完整，不能判断漏检。
+  TRIAGE_REASON_INSPECTION_INCOMPLETE = 4;
+  // 检测器失败。
+  TRIAGE_REASON_DETECTOR_FAILURE = 5;
+}
+
+// ScopeRisk 是策略铺开半径，不是自治分级。
+enum ScopeRisk {
+  SCOPE_RISK_UNSPECIFIED = 0;
+  // 资产 + 路由 + 方法 + 检测键 + 参数。
+  SCOPE_RISK_EXACT = 1;
+  // 资产 + 路由 + 方法。
+  SCOPE_RISK_ROUTE = 2;
+  // 路径前缀。
+  SCOPE_RISK_PREFIX = 3;
+  // 整资产。
+  SCOPE_RISK_ASSET_WIDE = 4;
+  // 仅攻击类。
+  SCOPE_RISK_CLASS_ONLY = 5;
+}
+
+// EvidenceClass 是策略证据来源。
+enum EvidenceClass {
+  EVIDENCE_CLASS_UNSPECIFIED = 0;
+  // 核心规则集已映射到五类。
+  EVIDENCE_CLASS_CRS_MAPPED = 1;
+  // 核心规则集未映射。
+  EVIDENCE_CLASS_CRS_UNMAPPED = 2;
+  // 人工。
+  EVIDENCE_CLASS_HUMAN = 3;
+  // 回放。
+  EVIDENCE_CLASS_REPLAY = 4;
+  // 情报。
+  EVIDENCE_CLASS_INTEL = 5;
+  // 模型。
+  EVIDENCE_CLASS_MODEL = 6;
+}
+
+// ExpiryBehavior 是 hard_expires_at 到期后的行为。
+enum ExpiryBehavior {
+  EXPIRY_BEHAVIOR_UNSPECIFIED = 0;
+  // 退休。
+  EXPIRY_BEHAVIOR_RETIRE = 1;
+  // 被取代前保留。
+  EXPIRY_BEHAVIOR_KEEP_UNTIL_SUPERSEDED = 2;
+  // 告警后保留。
+  EXPIRY_BEHAVIOR_ALERT_KEEP = 3;
+}
+
+// AttackClass 是第一批自动治理五类加未映射；只用于展示与技能路由。
+enum AttackClass {
+  ATTACK_CLASS_UNSPECIFIED = 0;
+  // 结构化查询语言注入。
+  ATTACK_CLASS_SQLI = 1;
+  // 跨站脚本。
+  ATTACK_CLASS_XSS = 2;
+  // 路径穿越。
+  ATTACK_CLASS_PATH_TRAVERSAL = 3;
+  // 服务端请求伪造。
+  ATTACK_CLASS_SSRF = 4;
+  // 命令注入。
+  ATTACK_CLASS_CMDI = 5;
+  // 未映射。
+  ATTACK_CLASS_UNMAPPED = 6;
+}
+
+// ProposalKind 是生产提案意图种类。
+enum ProposalKind {
+  PROPOSAL_KIND_UNSPECIFIED = 0;
+  // 检测键策略。
+  PROPOSAL_KIND_POLICY = 1;
+  // 请求形状。
+  PROPOSAL_KIND_SHAPE = 2;
+}
+
+// MissEvidenceType 是 SUSPECTED_MISS 的独立证据类型。
+enum MissEvidenceType {
+  MISS_EVIDENCE_TYPE_UNSPECIFIED = 0;
+  // 人工报告。
+  MISS_EVIDENCE_TYPE_HUMAN = 1;
+  // 回放或复现。
+  MISS_EVIDENCE_TYPE_REPLAY = 2;
+  // 情报复现。
+  MISS_EVIDENCE_TYPE_INTEL = 3;
+  // 模型高分（第一生产版不单独启用）。
+  MISS_EVIDENCE_TYPE_MODEL = 4;
+}
+
+// DetectionKey 是策略匹配键。
+message DetectionKey {
+  // 检测器标识。
+  string detector_id = 1;
+  // 检测器版本。
+  string detector_version = 2;
+  // 检测器清单内容摘要。
+  string detector_manifest_digest = 3;
+  // 原始规则标识（核心规则集为数字规则号的十进制字符串）。
+  string rule_id = 4;
+  // 引擎阶段。
+  string phase = 5;
+  // 目标检查面。
+  InspectionSurface target_location = 6;
+  // 参数选择器（query.id、json.user_id）；由服务端从发现抄写。
+  string target_selector = 7;
+  // 规范化配置档摘要。
+  string normalization_profile_digest = 8;
+}
+
+// InspectionCoverage 是单个检查面的覆盖度。
+message InspectionCoverage {
+  // 检查面。
+  InspectionSurface target = 1;
+  // 覆盖度状态。
+  CoverageStatus status = 2;
+  // 已检查字节。
+  int64 inspected_bytes = 3;
+  // 已知总字节；未知为 0。
+  int64 total_bytes_known = 4;
+  // 解析配置档摘要。
+  string parser_profile_digest = 5;
+}

@@ -1,0 +1,33 @@
+map $http_upgrade $yufeng_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+upstream yufeng_backend {
+    server yufeng-edge.internal:18080;
+    keepalive 64;
+}
+
+server {
+    listen 443 ssl;
+    server_name protected.example.com;
+
+    ssl_certificate     /etc/nginx/tls/protected.crt;
+    ssl_certificate_key /etc/nginx/tls/protected.key;
+
+    location = /application-health {
+        proxy_pass http://yufeng_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location / {
+        proxy_http_version 1.1;
+        proxy_pass http://yufeng_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $yufeng_connection_upgrade;
+    }
+}

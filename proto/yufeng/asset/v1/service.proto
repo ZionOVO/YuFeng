@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+// 资产面：手工登记、更新、删除、查询与单元绑定。
+package yufeng.asset.v1;
+
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
+import "yufeng/asset/v1/v1.proto";
+import "yufeng/unit/v1/unit.proto";
+
+option go_package = "yufeng/proto/gen/assetv1";
+
+service AssetService {
+  rpc CreateAsset(CreateAssetRequest) returns (CreateAssetResponse);
+  rpc UpdateAsset(UpdateAssetRequest) returns (UpdateAssetResponse);
+  rpc DeleteAsset(DeleteAssetRequest) returns (DeleteAssetResponse);
+  rpc ListAssets(ListAssetsRequest) returns (ListAssetsResponse);
+  rpc GetAsset(GetAssetRequest) returns (GetAssetResponse);
+  rpc AttachUnit(AttachUnitRequest) returns (AttachUnitResponse);
+  rpc DetachUnit(DetachUnitRequest) returns (DetachUnitResponse);
+  rpc GetTrafficReviewPolicy(GetTrafficReviewPolicyRequest) returns (GetTrafficReviewPolicyResponse);
+  rpc UpdateTrafficReviewPolicy(UpdateTrafficReviewPolicyRequest) returns (UpdateTrafficReviewPolicyResponse);
+}
+
+message CreateAssetRequest {
+  Asset asset = 1;
+}
+message CreateAssetResponse {
+  Asset asset = 1;
+}
+
+message UpdateAssetRequest {
+  string asset_id = 1;
+  Asset asset = 2;
+  google.protobuf.FieldMask update_mask = 3;
+  // 期望的 updated_at；不匹配则 failed_precondition + version_mismatch。
+  google.protobuf.Timestamp expected_updated_at = 4;
+}
+message UpdateAssetResponse {
+  Asset asset = 1;
+}
+
+message DeleteAssetRequest {
+  string asset_id = 1;
+}
+message DeleteAssetResponse {}
+
+message AssetDetail {
+  Asset asset = 1;
+  repeated string unit_ids = 2;
+  string health = 3;
+  int32 active_release_count = 4;
+  // 绑定单元的只读能力与生产健康投影。
+  repeated yufeng.unit.v1.UnitProjection units = 5;
+}
+
+message ListAssetsRequest {
+  string query = 1;
+  string criticality = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+message ListAssetsResponse {
+  repeated AssetDetail assets = 1;
+  string next_page_token = 2;
+}
+
+message GetAssetRequest {
+  string asset_id = 1;
+}
+message GetAssetResponse {
+  AssetDetail asset = 1;
+}
+
+message AttachUnitRequest {
+  string asset_id = 1;
+  string unit_id = 2;
+}
+message AttachUnitResponse {
+  AssetDetail asset = 1;
+}
+
+message DetachUnitRequest {
+  string asset_id = 1;
+  string unit_id = 2;
+}
+message DetachUnitResponse {
+  AssetDetail asset = 1;
+}
+
+message GetTrafficReviewPolicyRequest {
+  string asset_id = 1;
+}
+
+message TrafficReviewPolicyStatus {
+  yufeng.artifact.v1.TrafficReviewPolicy policy = 1;
+  string generation_id = 2;
+  int64 generation_seq = 3;
+  string policy_digest = 4;
+  bool edge_supported = 5;
+}
+
+message GetTrafficReviewPolicyResponse {
+  TrafficReviewPolicyStatus status = 1;
+}
+
+message UpdateTrafficReviewPolicyRequest {
+  string asset_id = 1;
+  yufeng.artifact.v1.TrafficReviewMode mode = 2;
+  string expected_generation_id = 3;
+}
+
+message UpdateTrafficReviewPolicyResponse {
+  TrafficReviewPolicyStatus status = 1;
+}

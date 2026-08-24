@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+// 注册契约：单元身份、资产绑定、心跳与按发布计数器。
+package yufeng.registry.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/asset/v1/v1.proto";
+import "yufeng/common/v1/v1.proto";
+import "yufeng/unit/v1/unit.proto";
+
+option go_package = "yufeng/proto/gen/registryv1";
+
+// RegistryService 是单元域入口：注册换会话令牌，心跳上报健康与治理计数。
+service RegistryService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+enum UnitKind {
+  UNIT_KIND_UNSPECIFIED = 0;
+  UNIT_KIND_EDGE = 1;
+  UNIT_KIND_HOST = 2;
+}
+
+message RegisterRequest {
+  string unit_id = 1;
+  UnitKind kind = 2;
+  string version = 3;
+  string contract_version = 4;
+  yufeng.asset.v1.Asset asset = 5;
+  string pubkey_hint = 6;
+  // 生产能力只作兼容性输入，不改变身份或授权。
+  yufeng.unit.v1.ProducerCapabilities capabilities = 7;
+}
+
+message RegisterResponse {
+  string unit_id = 1;
+  string asset_id = 2;
+  string token = 3;
+  int32 heartbeat_interval = 4;
+  google.protobuf.Timestamp server_time = 5;
+  string contract_version = 6;
+  // 可轮换刷新令牌；仅首次注册与 Refresh 成功时返回明文。
+  string refresh_token = 7;
+  // 访问令牌存活秒数。
+  int32 access_expires_in = 8;
+}
+
+// RefreshRequest 用刷新令牌换取新的短期访问令牌并轮换刷新令牌。
+message RefreshRequest {
+  string unit_id = 1;
+  string refresh_token = 2;
+}
+
+// RefreshResponse 返回新的访问令牌与轮换后的刷新令牌。
+message RefreshResponse {
+  string unit_id = 1;
+  string token = 2;
+  string refresh_token = 3;
+  int32 access_expires_in = 4;
+  google.protobuf.Timestamp server_time = 5;
+}
+
+message ReleaseCounter {
+  string release_id = 1;
+  string artifact_id = 2;
+  yufeng.common.v1.ReleaseMode mode = 3;
+  uint64 requests_total = 4;
+  uint64 blocks_total = 5;
+  uint64 observe_total = 6;
+  uint64 canary_selected_total = 7;
+  uint64 upstream_5xx_total = 8;
+  uint64 latency_micros_total = 9;
+  uint64 latency_samples = 10;
+  // 本单元本发布窗口第 99 百分位时延（微秒）。
+  uint64 latency_p99_micros = 11;
+}
+
+message HeartbeatRequest {
+  string unit_id = 1;
+  uint64 generation = 2;
+  repeated ReleaseCounter release_counters = 3;
+  uint32 buffered_events = 4;
+  uint32 in_flight_requests = 5;
+  uint32 loaded_release_count = 6;
+  string version = 7;
+  // 本单元入口姿态（来自监听计划，不进世代）。
+  yufeng.common.v1.IngressPosture posture = 8;
+  // 流量键。
+  string traffic_key = 9;
+  // 本心跳窗内业务请求数。
+  uint64 window_requests = 10;
+  // 镜像单元报 HTTP FULL 的比例。
+  double body_full_rate = 11;
+  // 本窗方法×路由模板 Top-N，供 tap_skew。
+  repeated string route_templates = 12;
+  // 跟随的拦截单元。
+  string follow_unit_id = 13;
+  // 当前进程能力；升级后随心跳刷新持久快照。
+  yufeng.unit.v1.ProducerCapabilities capabilities = 14;
+  // 生产缓冲、丢弃与投影健康，不携带请求原文。
+  yufeng.unit.v1.ProducerHealth producer_health = 15;
+  // Edge 已验签并原子装载的当前资产世代标识。
+  string current_generation_id = 16;
+  // 与 current_generation_id 对应的资产世代序号。
+  int64 current_generation_seq = 17;
+  // Edge 已验签并应用的单元监听计划版本。
+  uint64 current_listen_plan_version = 18;
+}
+
+message HeartbeatResponse {
+  yufeng.common.v1.UnitHealth health = 1;
+  bool artifact_pull_hint = 2;
+  bool telemetry_flush_hint = 3;
+  google.protobuf.Timestamp server_time = 4;
+}

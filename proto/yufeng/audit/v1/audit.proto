@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+// 审计面：哈希链查询与链段校验。
+package yufeng.audit.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "yufeng/proto/gen/auditv1";
+
+service AuditService {
+  rpc ListAuditEntries(ListAuditEntriesRequest) returns (ListAuditEntriesResponse);
+  rpc VerifyChain(VerifyChainRequest) returns (VerifyChainResponse);
+}
+
+message AuditEntry {
+  int64 sequence = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string actor_type = 3;
+  string actor_id = 4;
+  string action = 5;
+  string object_type = 6;
+  string object_id = 7;
+  string details = 8;
+  string previous_hash = 9;
+  string entry_hash = 10;
+  string run_id = 11;
+  string turn_id = 12;
+  int64 lease_epoch = 13;
+  string budget_id = 14;
+  string payload_digest = 15;
+  string schema_version = 16;
+}
+
+message ListAuditEntriesRequest {
+  string object_type = 1;
+  string object_id = 2;
+  string actor = 3;
+  google.protobuf.Timestamp since = 4;
+  google.protobuf.Timestamp until = 5;
+  int32 page_size = 6;
+  string page_token = 7;
+  string run_id = 8;
+  string turn_id = 9;
+}
+
+message ListAuditEntriesResponse {
+  repeated AuditEntry entries = 1;
+  string next_page_token = 2;
+}
+
+message VerifyChainRequest {
+  int64 start_sequence = 1;
+  int64 end_sequence = 2;
+}
+
+message VerifyChainResponse {
+  bool valid = 1;
+  string start_hash = 2;
+  string end_hash = 3;
+  int32 entries_checked = 4;
+}

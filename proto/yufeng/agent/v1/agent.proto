@@ -1,0 +1,367 @@
+syntax = "proto3";
+
+// Agent 控制面：所有 Agent 进程统一的注册、续期、指令轮询与确认。
+package yufeng.agent.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
+import "yufeng/grant/v1/grant.proto";
+
+option go_package = "yufeng/proto/gen/agentv1";
+
+service AgentControlService {
+  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+  rpc RefreshAccessToken(RefreshAccessTokenRequest) returns (RefreshAccessTokenResponse);
+  rpc PollInstructions(PollInstructionsRequest) returns (PollInstructionsResponse);
+  rpc ExtendInstructionLease(ExtendInstructionLeaseRequest) returns (ExtendInstructionLeaseResponse);
+  rpc GetTurn(GetTurnRequest) returns (GetTurnResponse);
+  rpc ListTurnItems(ListTurnItemsRequest) returns (ListTurnItemsResponse);
+  rpc YieldTurn(YieldTurnRequest) returns (YieldTurnResponse);
+  rpc AckInstruction(AckInstructionRequest) returns (AckInstructionResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+service AgentInteractionService {
+  rpc GetApproval(GetApprovalRequest) returns (GetApprovalResponse);
+  rpc DecideApproval(DecideApprovalRequest) returns (DecideApprovalResponse);
+}
+
+// AgentProfileService 管理可由贾维斯编排、由 agentd 承载短命 run 的调查 Agent。
+service AgentProfileService {
+  rpc ListAgentProfiles(ListAgentProfilesRequest) returns (ListAgentProfilesResponse);
+  rpc CreateAgentProfile(CreateAgentProfileRequest) returns (CreateAgentProfileResponse);
+  rpc UpdateAgentProfile(UpdateAgentProfileRequest) returns (UpdateAgentProfileResponse);
+  rpc DeleteAgentProfile(DeleteAgentProfileRequest) returns (DeleteAgentProfileResponse);
+  rpc BatchUpdateAgentProfiles(BatchUpdateAgentProfilesRequest) returns (BatchUpdateAgentProfilesResponse);
+}
+
+enum AgentProfileKind {
+  AGENT_PROFILE_KIND_UNSPECIFIED = 0;
+  AGENT_PROFILE_KIND_TRAFFIC_REVIEW = 1;
+}
+
+enum AgentProfileState {
+  AGENT_PROFILE_STATE_UNSPECIFIED = 0;
+  AGENT_PROFILE_STATE_ENABLED = 1;
+  AGENT_PROFILE_STATE_DISABLED = 2;
+  AGENT_PROFILE_STATE_TOMBSTONED = 3;
+}
+
+enum AgentExecutionMode {
+  AGENT_EXECUTION_MODE_UNSPECIFIED = 0;
+  AGENT_EXECUTION_MODE_EPHEMERAL_RUN = 1;
+}
+
+message AgentProfile {
+  string agent_id = 1;
+  string display_name = 2;
+  AgentProfileKind kind = 3;
+  AgentProfileState state = 4;
+  repeated string tools = 5;
+  repeated yufeng.grant.v1.BindingRef bindings = 6;
+  string created_by = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  AgentExecutionMode execution_mode = 10;
+  string config_digest = 11;
+  int32 active_run_count = 12;
+  google.protobuf.Timestamp last_run_at = 13;
+  google.protobuf.Timestamp tombstoned_at = 14;
+  string last_worker_id = 15;
+  string last_worker_platform = 16;
+  // can_manage 由服务端基于当前调用者的 agent.manage 与完整档案资产范围计算。
+  bool can_manage = 17;
+}
+
+message ListAgentProfilesRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListAgentProfilesResponse {
+  repeated AgentProfile profiles = 1;
+  string next_page_token = 2;
+}
+
+message CreateAgentProfileRequest {
+  string display_name = 1;
+  repeated string tools = 2;
+  repeated yufeng.grant.v1.BindingRef bindings = 3;
+}
+
+message CreateAgentProfileResponse {
+  AgentProfile profile = 1;
+}
+
+message UpdateAgentProfileRequest {
+  string agent_id = 1;
+  string display_name = 2;
+  AgentProfileState state = 3;
+  repeated string tools = 4;
+  repeated yufeng.grant.v1.BindingRef bindings = 5;
+}
+
+message UpdateAgentProfileResponse {
+  AgentProfile profile = 1;
+}
+
+message DeleteAgentProfileRequest {
+  string agent_id = 1;
+}
+
+message DeleteAgentProfileResponse {}
+
+message BatchUpdateAgentProfilesRequest {
+  repeated string agent_ids = 1;
+  repeated string tools = 2;
+  repeated yufeng.grant.v1.BindingRef bindings = 3;
+}
+
+message BatchUpdateAgentProfilesResponse {
+  repeated AgentProfile profiles = 1;
+}
+
+enum ApprovalKind {
+  APPROVAL_KIND_UNSPECIFIED = 0;
+  APPROVAL_KIND_EVIDENCE = 1;
+  APPROVAL_KIND_WORKER_CAPACITY = 2;
+}
+
+message ApprovalView {
+  string approval_id = 1;
+  ApprovalKind kind = 2;
+  string state = 3;
+  string case_id = 4;
+  string asset_id = 5;
+  string worker_id = 6;
+  string model_host = 7;
+  string model_name = 8;
+  string model_config_digest = 9;
+  repeated string allowed_fields = 10;
+  int64 max_bytes = 11;
+  int32 previous_capacity = 12;
+  int32 requested_capacity = 13;
+  google.protobuf.Timestamp expires_at = 14;
+  google.protobuf.Timestamp created_at = 15;
+}
+
+message GetApprovalRequest {
+  string approval_id = 1;
+}
+message GetApprovalResponse {
+  ApprovalView approval = 1;
+}
+
+message DecideApprovalRequest {
+  string approval_id = 1;
+  bool approved = 2;
+  string reason = 3;
+}
+
+message DecideApprovalResponse {
+  string approval_id = 1;
+  string state = 2;
+}
+
+message RegisterAgentRequest {
+  string agent_id = 1;
+  string bootstrap_token = 2;
+  string agent_public_key = 3;
+  repeated string capability_labels = 4;
+  string version = 5;
+}
+
+message RegisterAgentResponse {
+  string agent_id = 1;
+  string refresh_token = 2;
+  string access_token = 3;
+  int64 expires_in = 4;
+}
+
+message RefreshAccessTokenRequest {
+  string refresh_token = 1;
+}
+message RefreshAccessTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+}
+
+message PollInstructionsRequest {
+  string agent_id = 1;
+  int32 long_poll_seconds = 2;
+  int32 max_instructions = 3;
+}
+
+message AgentInstruction {
+  string instruction_id = 1;
+  string agent_id = 2;
+  string kind = 3;
+  string payload_ref = 4;
+  string capability_token = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp deadline = 7;
+  string lease_id = 8;
+  string budget_id = 9;
+  int64 lease_epoch = 10;
+  google.protobuf.Timestamp lease_deadline = 11;
+  // 认知指令钉死的回合；此时 payload_ref 必须与本字段相同。
+  string turn_id = 12;
+  string thread_id = 13;
+  string source_ref = 14;
+  int64 expected_item_sequence = 15;
+  string resume_generation_id = 16;
+  string step_id = 17;
+  string checkpoint_json = 18;
+}
+
+enum AgentTurnState {
+  AGENT_TURN_STATE_UNSPECIFIED = 0;
+  AGENT_TURN_STATE_PENDING = 1;
+  AGENT_TURN_STATE_RUNNING = 2;
+  AGENT_TURN_STATE_WAITING_TOOL = 3;
+  AGENT_TURN_STATE_WAITING_CHILD = 4;
+  AGENT_TURN_STATE_WAITING_APPROVAL = 5;
+  AGENT_TURN_STATE_WAITING_INPUT = 6;
+  AGENT_TURN_STATE_COMPACTING = 7;
+  AGENT_TURN_STATE_CANCELLING = 8;
+  AGENT_TURN_STATE_COMPLETED = 9;
+  AGENT_TURN_STATE_FAILED = 10;
+  AGENT_TURN_STATE_CANCELLED = 11;
+  AGENT_TURN_STATE_OUTCOME_UNKNOWN = 12;
+}
+
+enum AgentItemKind {
+  AGENT_ITEM_KIND_UNSPECIFIED = 0;
+  AGENT_ITEM_KIND_INPUT_REFERENCE = 1;
+  AGENT_ITEM_KIND_MODEL_REQUEST = 2;
+  AGENT_ITEM_KIND_MODEL_RESPONSE = 3;
+  AGENT_ITEM_KIND_TOOL_CALL = 4;
+  AGENT_ITEM_KIND_TOOL_SETTLEMENT = 5;
+  AGENT_ITEM_KIND_STEERING = 6;
+  AGENT_ITEM_KIND_FOLLOW_UP = 7;
+  AGENT_ITEM_KIND_USER_ANSWER = 8;
+  AGENT_ITEM_KIND_QUESTION = 9;
+  AGENT_ITEM_KIND_CHILD_RESULT = 10;
+  AGENT_ITEM_KIND_APPROVAL_RESULT = 11;
+  AGENT_ITEM_KIND_COMPACTION = 12;
+  AGENT_ITEM_KIND_CANCEL_REQUEST = 13;
+  AGENT_ITEM_KIND_CHECKPOINT = 14;
+  AGENT_ITEM_KIND_TERMINAL_SUMMARY = 15;
+}
+
+message AgentTurn {
+  string thread_id = 1;
+  string turn_id = 2;
+  string source_kind = 3;
+  string source_ref = 4;
+  string source_cursor_json = 5;
+  AgentTurnState state = 6;
+  string budget_id = 7;
+  int64 next_item_sequence = 8;
+  int64 next_input_sequence = 9;
+  string checkpoint_json = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message AgentItem {
+  string item_id = 1;
+  string turn_id = 2;
+  string step_id = 3;
+  int64 item_sequence = 4;
+  AgentItemKind kind = 5;
+  string content_ref = 6;
+  string content_digest = 7;
+  string payload_json = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message GetTurnRequest {
+  string turn_id = 1;
+}
+
+message GetTurnResponse {
+  AgentTurn turn = 1;
+}
+
+message ListTurnItemsRequest {
+  string turn_id = 1;
+  int64 after_sequence = 2;
+  int32 page_size = 3;
+}
+
+message ListTurnItemsResponse {
+  repeated AgentItem items = 1;
+  int64 next_after_sequence = 2;
+}
+
+message YieldTurnRequest {
+  string instruction_id = 1;
+  string turn_id = 2;
+  string lease_id = 3;
+  int64 lease_epoch = 4;
+  int64 expected_item_sequence = 5;
+  AgentTurnState wait_state = 6;
+  string checkpoint_json = 7;
+}
+
+message YieldTurnResponse {
+  AgentTurn turn = 1;
+}
+
+// TriageDisposition 是模型对钉死研判投影给出的非可信处置建议。
+enum TriageDisposition {
+  TRIAGE_DISPOSITION_UNSPECIFIED = 0;
+  TRIAGE_DISPOSITION_PROPOSE_POLICY = 1;
+  TRIAGE_DISPOSITION_PROPOSE_SHAPE = 2;
+  TRIAGE_DISPOSITION_REPORT_ONLY = 3;
+  TRIAGE_DISPOSITION_ESCALATE_HUMAN = 4;
+  TRIAGE_DISPOSITION_INSUFFICIENT_EVIDENCE = 5;
+}
+
+// TriageDecision 是生产研判 Agent 可提交的全部认知结果。
+message TriageDecision {
+  string cluster_id = 1;
+  TriageDisposition disposition = 2;
+  string rationale = 3;
+  yufeng.artifact.v1.ShapeSource optional_shape_draft = 4;
+}
+
+message PollInstructionsResponse {
+  repeated AgentInstruction instructions = 1;
+  string lease_id = 2;
+}
+
+message ExtendInstructionLeaseRequest {
+  string instruction_id = 1;
+  string lease_id = 2;
+  int64 lease_epoch = 3;
+}
+message ExtendInstructionLeaseResponse {
+  google.protobuf.Timestamp lease_deadline = 1;
+  string capability_token = 2;
+  string lease_id = 3;
+  string budget_id = 4;
+  int64 lease_epoch = 5;
+}
+
+message AckInstructionRequest {
+  string instruction_id = 1;
+  string lease_id = 2;
+  string status = 3;
+  string result_ref = 4;
+  string error = 5;
+  int64 lease_epoch = 6;
+}
+message AckInstructionResponse {}
+
+message HeartbeatRequest {
+  string agent_id = 1;
+  string version = 2;
+  uint32 active_runs = 3;
+  uint32 queue_depth = 4;
+}
+message HeartbeatResponse {
+  google.protobuf.Timestamp server_time = 1;
+}

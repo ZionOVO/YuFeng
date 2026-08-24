@@ -1,0 +1,28 @@
+{
+  "name": "owasp-crs",
+  "version": "4.25.0",
+  "git_commit": "aabf675fcfc5e489b424b844e6c9f1b39802df69",
+  "tarball_sha256": "10370cad9f461e64abfa2fbf371a48e65715078b8acc81c3f5140c09618aee6a",
+  "go_module": "github.com/corazawaf/coraza-coreruleset/v4@v4.25.0",
+  "go_sum_h1": "tqFO1lfVpTiyWtlN618OXpZMfw+nnN0Q4///W5W+/HM=",
+  "paranoia": 1,
+  "engine": "coraza/v3@v3.7.0",
+  "sec_rule_engine": "DetectionOnly",
+  "include_files": [
+    "@coraza.conf-recommended",
+    "@crs-setup.conf.example",
+    "@owasp_crs/REQUEST-901-INITIALIZATION.conf",
+    "@owasp_crs/REQUEST-930-APPLICATION-ATTACK-LFI.conf",
+    "@owasp_crs/REQUEST-931-APPLICATION-ATTACK-RFI.conf",
+    "@owasp_crs/REQUEST-932-APPLICATION-ATTACK-RCE.conf",
+    "@owasp_crs/REQUEST-934-APPLICATION-ATTACK-GENERIC.conf",
+    "@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf",
+    "@owasp_crs/REQUEST-942-APPLICATION-ATTACK-SQLI.conf"
+  ],
+  "excluded_from_auto_govern": [
+    "REQUEST-91x",
+    "REQUEST-920",
+    "REQUEST-913"
+  ],
+  "aligned_with": "sentry-docker/waf/internal/wafcore/engine.go"
+}

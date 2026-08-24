@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+// 授予：人的 Tools × Bindings 记录。不另建对象级权限产品。
+package yufeng.grant.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "yufeng/proto/gen/grantv1";
+
+service GrantService {
+  rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse);
+  rpc PutGrant(PutGrantRequest) returns (PutGrantResponse);
+  rpc RevokeGrant(RevokeGrantRequest) returns (RevokeGrantResponse);
+}
+
+// BindingRef 是一条对象范围，id 必须是具体标识，禁止 "*"。
+message BindingRef {
+  string kind = 1; // asset / unit / release
+  string id = 2;
+}
+
+// EffectiveAccess 是授予表按主体即时展开的结果。
+message EffectiveAccess {
+  repeated string tools = 1;
+  repeated BindingRef bindings = 2;
+}
+
+message Grant {
+  string grant_id = 1;
+  string subject_user_id = 2;
+  repeated string tools = 3;
+  repeated BindingRef bindings = 4;
+  string created_by = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+}
+
+message ListGrantsRequest {
+  string subject_user_id = 1; // 空 = 自己
+}
+
+message ListGrantsResponse {
+  repeated Grant grants = 1;
+}
+
+message PutGrantRequest {
+  string subject_user_id = 1;
+  repeated string tools = 2;
+  repeated BindingRef bindings = 3;
+}
+
+message PutGrantResponse {
+  Grant grant = 1;
+}
+
+message RevokeGrantRequest {
+  string grant_id = 1;
+}
+
+message RevokeGrantResponse {}

@@ -1,0 +1,253 @@
+syntax = "proto3";
+
+// 治理管道：发布生命周期、推进门槛、统计与误报举报。
+package yufeng.govern.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/governv1";
+
+service GovernService {
+  rpc ProposeArtifact(ProposeArtifactRequest) returns (ProposeArtifactResponse);
+  rpc GateArtifact(GateArtifactRequest) returns (GateArtifactResponse);
+  rpc StartShadow(StartShadowRequest) returns (StartShadowResponse);
+  rpc PromoteCanary(PromoteCanaryRequest) returns (PromoteCanaryResponse);
+  rpc PromoteEnforce(PromoteEnforceRequest) returns (PromoteEnforceResponse);
+  rpc RollbackRelease(RollbackReleaseRequest) returns (RollbackReleaseResponse);
+  rpc RetireRelease(RetireReleaseRequest) returns (RetireReleaseResponse);
+  rpc DenyFeedback(DenyFeedbackRequest) returns (DenyFeedbackResponse);
+  rpc GetRelease(GetReleaseRequest) returns (GetReleaseResponse);
+  rpc ListReleases(ListReleasesRequest) returns (ListReleasesResponse);
+  rpc GetReleaseTimeline(GetReleaseTimelineRequest) returns (GetReleaseTimelineResponse);
+  rpc GetReleaseStats(GetReleaseStatsRequest) returns (GetReleaseStatsResponse);
+  rpc ProposeCatalogArtifact(ProposeCatalogArtifactRequest) returns (ProposeCatalogArtifactResponse);
+  rpc SignCatalogArtifact(SignCatalogArtifactRequest) returns (SignCatalogArtifactResponse);
+  rpc ActivateCatalogArtifact(ActivateCatalogArtifactRequest) returns (ActivateCatalogArtifactResponse);
+  rpc RevokeCatalogArtifact(RevokeCatalogArtifactRequest) returns (RevokeCatalogArtifactResponse);
+}
+
+message ProposeArtifactRequest {
+  yufeng.artifact.v1.Kind kind = 1;
+  bytes payload = 2;
+  string payload_schema = 3;
+  yufeng.artifact.v1.Scope scope = 4;
+  google.protobuf.Duration ttl = 5 [(buf.validate.field).duration = {
+    gte: {seconds: 300}
+    lte: {seconds: 604800}
+  }];
+  string supersedes = 6;
+  repeated string evidence_refs = 7;
+  string created_by = 8;
+  // 生产路径必填。演示 --demo-triage 可走 kind/payload。
+  ProposalIntent intent = 9;
+}
+
+// ProposalIntent 是生产提案意图；身份、摘要与选择器由服务端填充。
+message ProposalIntent {
+  // policy 或 shape。
+  yufeng.common.v1.ProposalKind kind = 1;
+  // 聚类标识。
+  string cluster_id = 2;
+  // 策略意图必填；选择器字段由服务端覆盖。
+  repeated yufeng.common.v1.DetectionKey detection_keys = 3;
+  // 形状意图必填。
+  yufeng.artifact.v1.ShapeSource shape_source = 4;
+  // 可选收窄方法。
+  repeated string methods = 5;
+  // 可选收窄路由。
+  string route_template = 6;
+}
+
+message ProposeArtifactResponse {
+  string release_id = 1;
+  yufeng.common.v1.ReleaseState state = 2;
+  yufeng.artifact.v1.Artifact artifact = 3;
+}
+
+message ProposeCatalogArtifactRequest {
+  yufeng.artifact.v1.Kind kind = 1;
+  bytes payload = 2;
+  string payload_schema = 3;
+  google.protobuf.Duration ttl = 4 [(buf.validate.field).duration = {
+    gte: {seconds: 300}
+    lte: {seconds: 31536000}
+  }];
+}
+
+message ProposeCatalogArtifactResponse {
+  string release_id = 1;
+  yufeng.common.v1.ReleaseState state = 2;
+  yufeng.artifact.v1.Artifact artifact = 3;
+}
+
+message SignCatalogArtifactRequest {
+  string release_id = 1;
+}
+
+message SignCatalogArtifactResponse {
+  Release release = 1;
+}
+
+message ActivateCatalogArtifactRequest {
+  string release_id = 1;
+}
+
+message ActivateCatalogArtifactResponse {
+  Release release = 1;
+}
+
+message RevokeCatalogArtifactRequest {
+  string release_id = 1;
+}
+
+message RevokeCatalogArtifactResponse {
+  Release release = 1;
+}
+
+message GateArtifactRequest {
+  string release_id = 1;
+  string corpus_ref = 2;
+  google.protobuf.Duration budget = 3;
+}
+
+message GateArtifactResponse {
+  string release_id = 1;
+  yufeng.common.v1.ReleaseState state = 2;
+  yufeng.artifact.v1.ReplayReport replay_report = 3;
+  yufeng.artifact.v1.Artifact artifact = 4;
+}
+
+message StartShadowRequest {
+  string release_id = 1;
+}
+message StartShadowResponse {
+  Release release = 1;
+}
+
+message PromoteCanaryRequest {
+  string release_id = 1;
+  int32 canary_percent = 2 [(buf.validate.field).int32 = {lte: 25}];
+}
+message PromoteCanaryResponse {
+  Release release = 1;
+}
+
+message PromoteEnforceRequest {
+  string release_id = 1;
+}
+message PromoteEnforceResponse {
+  Release release = 1;
+}
+
+message RollbackReleaseRequest {
+  string release_id = 1;
+  string reason = 2;
+}
+message RollbackReleaseResponse {
+  Release release = 1;
+}
+
+message RetireReleaseRequest {
+  string release_id = 1;
+  string reason = 2;
+}
+message RetireReleaseResponse {
+  Release release = 1;
+}
+
+message DenyFeedbackRequest {
+  string release_id = 1;
+  string event_id = 2;
+  string note = 3;
+}
+message DenyFeedbackResponse {
+  Release release = 1;
+}
+
+message Release {
+  string release_id = 1;
+  yufeng.common.v1.ReleaseState state = 2;
+  yufeng.artifact.v1.Artifact artifact = 3;
+  google.protobuf.Timestamp proposed_at = 4;
+  google.protobuf.Timestamp signed_at = 5;
+  google.protobuf.Timestamp shadow_started_at = 6;
+  google.protobuf.Timestamp canary_started_at = 7;
+  google.protobuf.Timestamp enforced_at = 8;
+  google.protobuf.Timestamp retired_at = 9;
+  yufeng.common.v1.RetireReason retire_reason = 10;
+  string created_by = 11;
+}
+
+message GetReleaseRequest {
+  string release_id = 1;
+}
+message GetReleaseResponse {
+  Release release = 1;
+}
+
+message ListReleasesRequest {
+  repeated yufeng.common.v1.ReleaseState states = 1;
+  string asset_id = 2;
+  string query = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+message ListReleasesResponse {
+  repeated Release releases = 1;
+  string next_page_token = 2;
+}
+
+message TimelineEntry {
+  int64 sequence = 1;
+  string release_id = 2;
+  yufeng.common.v1.ReleaseState from_state = 3;
+  yufeng.common.v1.ReleaseState to_state = 4;
+  string actor = 5;
+  string reason = 6;
+  string gate_report_ref = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+}
+
+message GetReleaseTimelineRequest {
+  string release_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message GetReleaseTimelineResponse {
+  repeated TimelineEntry entries = 1;
+  string next_page_token = 2;
+}
+
+message ReleaseWindowStats {
+  google.protobuf.Duration duration = 1;
+  uint64 requests = 2;
+  uint64 blocks = 3;
+  uint64 observes = 4;
+  uint64 canary_selected = 5;
+  uint64 deny_feedback_total = 6;
+  uint64 upstream_5xx = 7;
+  uint64 p99_micros = 8;
+}
+
+message GuardStats {
+  int32 consecutive_bad_windows = 1;
+  google.protobuf.Timestamp last_bad_window_at = 2;
+  repeated string last_bad_reasons = 3;
+}
+
+message GetReleaseStatsRequest {
+  string release_id = 1;
+}
+message GetReleaseStatsResponse {
+  string release_id = 1;
+  yufeng.common.v1.ReleaseState state = 2;
+  ReleaseWindowStats shadow = 3;
+  ReleaseWindowStats canary = 4;
+  ReleaseWindowStats enforce = 5;
+  GuardStats guard = 6;
+  google.protobuf.Timestamp computed_at = 7;
+}

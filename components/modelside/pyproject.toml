@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yufeng-modelside"
+version = "0.1.0"
+description = "YuFeng Edge-near asynchronous HTTP inference service"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+tensorflow = ["tensorflow>=2.16,<3"]
+
+[project.scripts]
+yufeng-modelside = "yufeng_modelside.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["yufeng_modelside*"]

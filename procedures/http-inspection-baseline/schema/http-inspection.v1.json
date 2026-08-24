@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yufeng://procedures/http-inspection-baseline/schema/http-inspection.v1.json",
+  "title": "HttpInspectionProfileV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "normalize_path",
+    "percent_decode_rounds",
+    "encoded_slash",
+    "duplicate_query",
+    "duplicate_header",
+    "cl_te_conflict",
+    "json_duplicate_key",
+    "engine_body_limit_bytes"
+  ],
+  "properties": {
+    "normalize_path": { "type": "boolean" },
+    "percent_decode_rounds": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "encoded_slash": { "type": "string", "enum": ["reject", "keep", "decode"] },
+    "duplicate_query": { "type": "string", "enum": ["first", "last", "combine"] },
+    "duplicate_header": { "type": "string", "enum": ["first", "last", "combine"] },
+    "cl_te_conflict": { "type": "string", "enum": ["reject"] },
+    "json_duplicate_key": { "type": "string", "enum": ["reject"] },
+    "multipart_max_parts": { "type": "integer" },
+    "multipart_max_part_bytes": { "type": "integer" },
+    "decompress_algorithms": { "type": "array", "items": { "type": "string" } },
+    "decompress_max_bytes": { "type": "integer" },
+    "max_headers": { "type": "integer" },
+    "max_params": { "type": "integer" },
+    "json_max_depth": { "type": "integer" },
+    "engine_body_limit_bytes": { "type": "integer", "const": 65536 }
+  }
+}

@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+// 工具描述契约（ToolDescriptor）：Agent 看到的"工具"的完整定义。
+// 工具 = 给大模型看的说明（名字 + 描述 + 输入 JSON Schema）+ 给平台看的绑定（原语或修复程序）
+// + 给信任层看的权限申请。"Agent 能操作的工具会变"由本制品的生命周期管理（决策记录 014 同族）。
+package yufeng.tool.v1;
+
+option go_package = "yufeng/proto/gen/toolv1";
+
+// ToolEffect 约束工具是否会跨越只读边界。
+enum ToolEffect {
+  TOOL_EFFECT_UNSPECIFIED = 0;
+  TOOL_EFFECT_SAFE = 1;
+  TOOL_EFFECT_IDEMPOTENT = 2;
+  TOOL_EFFECT_EFFECTFUL = 3;
+}
+
+// ToolReplay 约束调用结果不确定时是否允许自动重放。
+enum ToolReplay {
+  TOOL_REPLAY_UNSPECIFIED = 0;
+  TOOL_REPLAY_SAFE = 1;
+  TOOL_REPLAY_NEVER = 2;
+}
+
+// ToolDescriptor 是一个可签名、可审计的 Agent 工具定义。
+message ToolDescriptor {
+  // 工具名：Agent 提示词中的调用名。
+  string name = 1;
+  // 用途说明：给大模型看的一段描述（提示词素材）。
+  string description = 2;
+  // 输入结构的 JSON Schema（调用参数严格按此校验）。
+  bytes input_schema = 3;
+  // 权限申请：能力令牌据此收窄作用域（如 incident:read / replay:run）。
+  repeated string permissions = 4;
+  // 绑定：这个工具实际执行什么。
+  Binding binding = 5;
+  // 语义化版本。
+  string version = 6;
+  // 副作用类别。
+  ToolEffect effect = 7;
+  // 结果不确定时的重放策略。
+  ToolReplay replay = 8;
+}
+
+// Binding 说明工具的执行归宿。
+message Binding {
+  oneof target {
+    // 绑定到能力原语（如 exec / pkg.query）。
+    string primitive = 1;
+    // 绑定到修复程序（工具调用 = 提交执行一份程序）。
+    string procedure = 2;
+  }
+}
+
+// SkillResource 是 Skill 按内容地址携带的只读资源。
+message SkillResource {
+  string name = 1;
+  string content_ref = 2;
+  string content_digest = 3;
+  int64 size_bytes = 4;
+  string media_type = 5;
+  bytes content = 6;
+}
+
+// SkillManifest 是可签名、可渐进加载的 Skill 定义。
+message SkillManifest {
+  string skill_id = 1;
+  string version = 2;
+  string name = 3;
+  string description = 4;
+  string content_ref = 5;
+  string content_digest = 6;
+  bytes content = 7;
+  repeated SkillResource resources = 8;
+  repeated string suggested_tools = 9;
+  repeated string required_tools = 10;
+  repeated string compatible_roles = 11;
+  string min_runtime_version = 12;
+  repeated string model_capabilities = 13;
+  int64 max_context_bytes = 14;
+  string publisher_key_id = 15;
+}

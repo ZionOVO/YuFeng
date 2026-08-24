@@ -1,0 +1,425 @@
+syntax = "proto3";
+
+// 制品契约（Artifact，继任参考实现的策略候选 PolicyCandidateV1 概念并扩展为统一制品）：一切修复能力的数据载体。
+// 制品 = 签名的数据包（规则 / 画像 / 修复程序 / 技能 / 工具描述 / 内核态对象）。
+// 身份语义（决策记录 015）：门禁通过后，对排除 id 与 signature 的确定性 proto 序列化取 sha256；
+// 因此同 payload 不同 scope/ttl/supersedes 的发布拥有不同 id。
+// supersedes 为单指针（一制品至多直接取代一个制品），多对多关系由事件账表达。
+// 制品本身不可变；发布状态（shadow/canary/enforce）是治理运行时状态，不在本结构内。
+package yufeng.artifact.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/artifactv1";
+
+// Artifact 是一个不可变的签名数据包。
+message Artifact {
+  // 制品标识："sha256:" + hex(sha256(排除 id 与 signature 后的确定性 proto 序列化字节))；
+  // 门禁通过、回放报告写入后计算并签发（规范见 lib/kernel/artifact.go）。
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  // 制品种类。
+  Kind kind = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // 制品体：按 payload_schema 引用的 JSON Schema 校验。
+  bytes payload = 3 [(buf.validate.field).bytes.min_len = 1];
+  // 制品体 JSON Schema 的引用（内容寻址）。
+  string payload_schema = 4 [(buf.validate.field).string.min_len = 1];
+  // 作用范围。
+  Scope scope = 5;
+  // 存活时限：到期由治理管道自动退休；冷补丁落地后虚拟补丁提前退休（被取代）。
+  google.protobuf.Duration ttl = 6;
+  // 单指针：被本制品取代的制品 id。禁止列表——要取代多个就发多个退休事件。
+  string supersedes = 7;
+  // 证据引用：必须 ⊆ 工具实际返回的集合（防伪造，两处独立校验）。
+  repeated string evidence_refs = 8;
+  // 回放门禁结果：发布前必须通过；写入本字段后再计算 id 并签名。
+  ReplayReport replay_report = 9;
+  // 签名。
+  Signature signature = 10;
+  // 创建时间与创建者（角色或组件标识）。
+  google.protobuf.Timestamp created_at = 11;
+  string created_by = 12;
+  // 复核时间：到点只入队复核，不卸闸。生产策略必填。
+  google.protobuf.Timestamp review_at = 13;
+  // 硬过期时间：按 expiry_behavior 执行。生产策略必填。
+  google.protobuf.Timestamp hard_expires_at = 14;
+  // 硬过期行为。
+  yufeng.common.v1.ExpiryBehavior expiry_behavior = 15;
+  // 策略范围风险（仅 KIND_POLICY / KIND_SHAPE）。
+  yufeng.common.v1.ScopeRisk scope_risk = 16;
+  // 证据类（仅 KIND_POLICY / KIND_SHAPE）。
+  yufeng.common.v1.EvidenceClass evidence_class = 17;
+}
+
+// 制品种类。
+enum Kind {
+  KIND_UNSPECIFIED = 0;
+  // 检测规则（正则 / 自定义规则集）。
+  KIND_RULE = 1;
+  // 参数画像（按接口与参数的安全阈值）。
+  KIND_PROFILE = 2;
+  // 修复程序（信封见 procedure 契约）。
+  KIND_PROCEDURE = 3;
+  // 技能（角色提示词 / 剧本）。
+  KIND_SKILL = 4;
+  // 工具描述（见 tool 契约）。
+  KIND_TOOL_DESCRIPTOR = 5;
+  // eBPF 目标文件（独立编译，签名后下发）。
+  KIND_BPF_OBJECT = 6;
+  // seccomp 配置（仅可重启场景）。
+  KIND_SECCOMP_PROFILE = 7;
+  // nftables 规则集。
+  KIND_NFTABLES_RULES = 8;
+  // 检测键策略（PolicyCandidateV1）。
+  KIND_POLICY = 9;
+  // 请求形状规则（源结构；闸前编译，不是独立编译产物）。
+  KIND_SHAPE = 10;
+  // 检测器清单（核心规则集版本、摘要、装载文件）。
+  KIND_DETECTOR_MANIFEST = 11;
+  // HTTP 检查配置档。
+  KIND_NORMALIZER_PROFILE = 12;
+  // 分类映射器（TaxonomyMapperV1）。
+  KIND_TAXONOMY_MAPPER = 13;
+  // 单元监听计划（不进资产世代；通过 ArtifactService 的单元作用域流独立下发）。
+  KIND_LISTEN_PLAN = 14;
+  // 证据策略。
+  KIND_EVIDENCE_POLICY = 15;
+  // 证据摘要算法与字段。
+  KIND_EVIDENCE_DIGEST = 16;
+  // 转发策略。
+  KIND_FORWARD_POLICY = 17;
+  // 流量统计、候选与边缘证据上限。
+  KIND_TRAFFIC_REVIEW_POLICY = 18;
+  // Edge 邻近异步模型的版本、阈值、采样与字段可见策略。
+  KIND_MODEL_PROFILE = 19;
+}
+
+// 作用范围：制品对哪些资产 / 路由生效。
+message Scope {
+  // 资产标识列表（空 = 按选择器）。
+  repeated string asset_ids = 1;
+  // 路由选择器（路径前缀 / 方法等，语义由制品种类自行定义）。
+  string route_selector = 2;
+}
+
+// 回放门禁结果：用历史语料回归验证制品效果。
+message ReplayReport {
+  // 恶意样本总数与被拦截数（要求全拦）。
+  int32 malicious_total = 1;
+  int32 malicious_blocked = 2;
+  // 良性样本总数与误伤数（要求零误伤或低于门槛）。
+  int32 benign_total = 3;
+  int32 benign_blocked = 4;
+  // 是否通过门禁。
+  bool passed = 5;
+  // 语料集引用（内容寻址）。
+  string corpus_ref = 6;
+  // 管理面样本总数与命中数（命中必须为零——治理自身路由不许被规则波及）。
+  int32 management_total = 7;
+  int32 management_blocked = 8;
+}
+
+// Ed25519 签名。
+message Signature {
+  // 签名密钥标识（公钥指纹）。
+  string key_id = 1;
+  // 签名值。
+  bytes sig = 2;
+  // 签名时间。
+  google.protobuf.Timestamp signed_at = 3;
+}
+
+// PolicyCandidate 是检测键策略制品体（payload_schema=policy/v1）。
+// 禁止只按攻击类匹配。
+message PolicyCandidate {
+  // 策略标识（服务端生成）。
+  string policy_id = 1;
+  // 生效范围。
+  PolicyScope scope = 2;
+  // 检测键谓词。
+  PolicyPredicate predicate = 3;
+  // log 或 block。
+  string action = 4;
+  // 世代依赖摘要。
+  PolicyDependencies dependencies = 5;
+  // 治理元数据。
+  PolicyGovernance governance = 6;
+  // 复核与硬过期。
+  PolicyLifecycle lifecycle = 7;
+  // 放量约束。
+  PolicyRollout rollout = 8;
+}
+
+// PolicyScope 是策略生效范围。
+message PolicyScope {
+  // 资产标识。
+  string asset_id = 1;
+  // 主机名列表。
+  repeated string hosts = 2;
+  // 路由模板。
+  string route_template = 3;
+  // 路径前缀；自动通道禁止单独为 /。
+  string path_prefix = 4;
+  // HTTP 方法。
+  repeated string methods = 5;
+  // 内容类型。
+  repeated string content_types = 6;
+  // 参数选择器（服务端从发现抄写）。
+  repeated string target_selectors = 7;
+}
+
+// PolicyPredicate 是策略匹配谓词。
+message PolicyPredicate {
+  // 必须命中的检测键；禁止只填攻击类。
+  repeated yufeng.common.v1.DetectionKey detection_keys = 1;
+  // 最低异常分数。
+  double min_anomaly_score = 2;
+  // 正向谓词：发现必须存在。
+  bool require_match_present = 3;
+  // 负向谓词要求 FULL。
+  yufeng.common.v1.CoverageStatus coverage_requirement = 4;
+}
+
+// PolicyDependencies 是策略对世代成员的摘要依赖。
+message PolicyDependencies {
+  // 检测器清单摘要。
+  string detector_manifest_digest = 1;
+  // 规范化配置档摘要。
+  string normalizer_profile_digest = 2;
+  // 最低边缘版本。
+  string min_edge_version = 3;
+}
+
+// PolicyGovernance 是策略治理元数据（由服务端填充）。
+message PolicyGovernance {
+  // 铺开半径。
+  yufeng.common.v1.ScopeRisk scope_risk = 1;
+  // 证据类。
+  yufeng.common.v1.EvidenceClass evidence_class = 2;
+  // 证据引用。
+  repeated string evidence_refs = 3;
+  // 回放清单摘要。
+  string replay_manifest_digest = 4;
+  // 提案人（服务端写入）。
+  string proposer = 5;
+  // 人类担保人。
+  string human_sponsor = 6;
+  // 理由。
+  string rationale = 7;
+}
+
+// PolicyLifecycle 是复核与硬过期。
+message PolicyLifecycle {
+  // 复核时间。
+  google.protobuf.Timestamp review_at = 1;
+  // 硬过期时间。
+  google.protobuf.Timestamp hard_expires_at = 2;
+  // 硬过期行为。
+  yufeng.common.v1.ExpiryBehavior expiry_behavior = 3;
+}
+
+// PolicyRollout 是放量约束。
+message PolicyRollout {
+  // 第一生产版只允许 unit。
+  string cohort_type = 1;
+}
+
+// TaxonomyMapper 是已签名的五类映射器（payload_schema=taxonomy/v1）。
+message TaxonomyMapper {
+  // 分类版本，默认 tax/v1。
+  string taxonomy_version = 1;
+  // 规则到闭集类的映射。
+  repeated TaxonomyRule rules = 2;
+}
+
+// TaxonomyRule 把原始规则标识映到闭集攻击类。
+message TaxonomyRule {
+  // 原始规则标识（精确匹配优先）。
+  string rule_id = 1;
+  // 闭集攻击类。
+  yufeng.common.v1.AttackClass attack_class = 2;
+  // 规则号前缀；rule_id 为空时按前缀匹配。
+  string rule_prefix = 3;
+}
+
+// ClientSourcePolicy 声明边缘可信的直接代理网段。
+message ClientSourcePolicy {
+  // 只有直接对端命中这些 CIDR 时，才从右向左解析 X-Forwarded-For。
+  repeated string trusted_proxy_cidrs = 1;
+}
+
+// UnitListenPlan 是单元作用域的签名入口合同，不进资产世代。
+message UnitListenPlan {
+  // 单元标识。
+  string unit_id = 1;
+  // 入口姿态。
+  yufeng.common.v1.IngressPosture posture = 2;
+  // 流量键：同一键至多一个拦截单元。
+  string traffic_key = 3;
+  // 跟随的拦截单元；观察壳用来算 tap_skew。
+  string follow_unit_id = 4;
+  // 单元作用域单调版本，从 1 开始。
+  uint64 version = 5;
+  // 业务监听地址，必须是数字地址或受控通配地址加端口。
+  string listen_address = 6;
+  // 反向代理的绝对 http/https 上游 URL；其他姿态必须为空。
+  string upstream_url = 7;
+  // 签名覆盖排除本字段后的确定性 proto 字节。
+  Signature signature = 8;
+  // 客户端来源取信策略；缺省时只信直接对端。
+  ClientSourcePolicy client_source = 9;
+}
+
+// EvidencePolicy 是世代内证据可见档。
+message EvidencePolicy {
+  // 档位；未指定按 home。
+  yufeng.common.v1.EvidencePolicyTier tier = 1;
+}
+
+// EvidenceDigest 是世代内证据摘要算法（签名范围内）。
+message EvidenceDigest {
+  // 算法闭集。
+  yufeng.common.v1.EvidenceDigestAlgorithm algorithm = 1;
+  // 跨度上限。
+  int32 max_span_bytes = 2;
+  // 投影字段名，如 method、route_template、selector、span_hash、charset_class。
+  repeated string fields = 3;
+}
+
+// ForwardPolicy 是世代内转发策略；缺省等于今日打分路径。
+message ForwardPolicy {
+  // 转发种类。
+  yufeng.common.v1.ForwardPolicyKind kind = 1;
+}
+
+// ModelDedupeRule 是模型复核代表的签名去重规则。
+enum ModelDedupeRule {
+  MODEL_DEDUPE_RULE_UNSPECIFIED = 0;
+  // 同方法与路由在同一窗口只保留最高风险代表。
+  MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE = 1;
+}
+
+// ModelProfile 是 Edge 邻近 ModelSide 的签名运行合同。
+message ModelProfile {
+  string profile_id = 1;
+  string model_group = 2;
+  string model_type = 3;
+  string model_version = 4;
+  double alert_threshold = 5;
+  double review_floor = 6;
+  int32 review_window_seconds = 7;
+  int32 max_review_per_unit = 8;
+  int32 max_review_per_route = 9;
+  ModelDedupeRule dedupe_rule = 10;
+  repeated string allowed_headers = 11;
+  int32 max_body_bytes = 12;
+  bool review_new_routes = 13;
+  bool review_insufficient_coverage = 14;
+}
+
+// TrafficReviewMode 是按资产逐级开启流量审查能力的闭集。
+enum TrafficReviewMode {
+  TRAFFIC_REVIEW_MODE_UNSPECIFIED = 0;
+  TRAFFIC_REVIEW_MODE_OFF = 1;
+  TRAFFIC_REVIEW_MODE_STATISTICS_ONLY = 2;
+  TRAFFIC_REVIEW_MODE_REDACTED_CASES = 3;
+  TRAFFIC_REVIEW_MODE_EVIDENCE_ON_APPROVAL = 4;
+  TRAFFIC_REVIEW_MODE_SHADOW_CANDIDATES = 5;
+}
+
+// TrafficReviewPolicy 是资产世代内流量审查模式与生产上限。
+message TrafficReviewPolicy {
+  // 统计窗秒数；生产默认 300。
+  int32 window_seconds = 1;
+  // 每窗保留的方法与路由组合上限；生产默认 32。
+  int32 top_route_cells = 2;
+  // 单元每窗最多产生的审查候选；生产默认 4。
+  int32 max_candidates_per_window = 3;
+  // 单候选可固定的原始证据字节；生产默认 8192。
+  int32 max_evidence_bytes = 4;
+  // 边缘加密证据库总字节；生产默认 268435456。
+  int64 vault_max_bytes = 5;
+  // 证据有效期秒数；生产默认 86400。
+  int64 evidence_ttl_seconds = 6;
+  // 按资产启用档位；未指定与 off 都失败关闭流量审查新路径。
+  TrafficReviewMode mode = 7;
+}
+
+// HttpInspectionProfile 是反代与外部授权共用的规范化配置档。
+message HttpInspectionProfile {
+  // 路径是否折叠重复斜杠并去掉点段。
+  bool normalize_path = 1;
+  // 百分号解码轮数；生产默认 2。
+  int32 percent_decode_rounds = 2;
+  // 编码斜杠策略：reject / keep / decode。
+  string encoded_slash = 3;
+  // 重复查询键：first / last / combine。
+  string duplicate_query = 4;
+  // 重复头：first / last / combine。
+  string duplicate_header = 5;
+  // Content-Length 与 Transfer-Encoding 冲突：reject。
+  string cl_te_conflict = 6;
+  // JSON 重复键：reject。
+  string json_duplicate_key = 7;
+  // multipart 段数上限。
+  int32 multipart_max_parts = 8;
+  // 单段上限（字节）。
+  int32 multipart_max_part_bytes = 9;
+  // 解压算法白名单（空 = 不解压）。
+  repeated string decompress_algorithms = 10;
+  // 解压后体上限。
+  int32 decompress_max_bytes = 11;
+  // 头数量上限。
+  int32 max_headers = 12;
+  // 参数数量上限。
+  int32 max_params = 13;
+  // JSON 深度上限。
+  int32 json_max_depth = 14;
+  // 进引擎体上限（字节）；必须等于 kernel.EngineBodyLimitBytes。
+  int32 engine_body_limit_bytes = 15;
+}
+
+// ShapeSource 是受限正向形状源文（仅 SUSPECTED_MISS）。
+message ShapeSource {
+  // HTTP 方法闭集。
+  repeated string methods = 1;
+  // 路由模板。
+  string route_template = 2;
+  // 至少两段且非根的路径前缀。
+  string path_prefix = 3;
+  // 选择器约束，最多 16 条。
+  repeated ShapeConstraint constraints = 4;
+}
+
+// ShapeConstraint 是单个选择器约束。
+message ShapeConstraint {
+  // 服务端从事件抄写的选择器。
+  string selector = 1;
+  // 长度下界。
+  int32 min_len = 2;
+  // 长度上界（必填）。
+  int32 max_len = 3;
+  // ascii_print / digit / alpha / hex / uuid。
+  string charset = 4;
+}
+
+// DetectorManifest 是世代内核心规则集清单。
+message DetectorManifest {
+  // 检测器标识。
+  string detector_id = 1;
+  // 核心规则集版本。
+  string version = 2;
+  // 官方源码包 SHA-256。
+  string tarball_sha256 = 3;
+  // Go 嵌入模块。
+  string go_module = 4;
+  // paranoia 档。
+  int32 paranoia = 5;
+  // 允许 Include 的文件。
+  repeated string include_files = 6;
+}

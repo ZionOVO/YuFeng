@@ -1,0 +1,11 @@
+.git
+.github
+.grok
+.demo
+.tmp
+.env
+console/node_modules
+console/dist
+research
+*.log
+coverage

@@ -1,0 +1,276 @@
+syntax = "proto3";
+
+// 事件契约（Event，继任参考实现 sentry-docker 的 DetectionEventV1 与 ParsedTrafficV1，合并双写）：中台事件账的统一事件结构。
+// 事件一经入库不可修改（不可变账本），因此本文件是全仓改起来最贵的契约。
+// AI 流量按决策记录 014 只定信封（provider/model/角色数/工具调用摘要），载荷细节后补。
+package yufeng.event.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/eventv1";
+
+// Event 是一切感知的统一记录：流量观测、资产侧传感、情报命中、Agent 动作。
+message Event {
+  // 事件标识（128 位随机十六进制），产生方生成，入库后不变。
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  // 事件发生时间（产生方时钟）。
+  google.protobuf.Timestamp occurred_at = 2 [(buf.validate.field).required = true];
+  // 关联资产标识（资产账主键）。
+  string asset_id = 3 [(buf.validate.field).string.min_len = 1];
+  // 产生方标识：yufeng-edge / yufeng-host / 组件名 / Agent 角色名。
+  string source = 4;
+  // 事件大类。
+  Kind kind = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // 处置结果。
+  Verdict verdict = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // 流量载荷：HTTP 与 AI 流量的统一容器（非流量事件留空）。
+  oneof traffic {
+    Http http = 10;
+    Ai ai = 11;
+  }
+  // 命中本事件的检测结论（可多条，来自不同检测器）。
+  repeated Detection detections = 12;
+  // 附加标签（campaign 关联、情报源、采样原因等）。
+  map<string, string> labels = 13;
+  // 产生单元标识（单元账主键）。
+  string unit_id = 14;
+  // 请求/操作关联标识；流量事件为边缘生成并回写响应头的 x-request-id。
+  string request_id = 15;
+  // 关键事件（BLOCK/OBSERVE/ESCALATE）涉及的发布轨迹；纯 ALLOW 事件可省略。
+  repeated ReleaseTrace release_traces = 16;
+  // 各检查面覆盖度。
+  repeated yufeng.common.v1.InspectionCoverage coverage = 17;
+  // 边缘观察状态。
+  yufeng.common.v1.ObservationState observation = 18;
+  // 中台研判原因；边缘上报时可空，由中台填写。
+  yufeng.common.v1.TriageReason triage_reason = 19;
+  // 当时生效的资产世代标识。
+  string generation_id = 20;
+  // 当时生效的资产世代序号。
+  int64 generation_seq = 21;
+  // 聚类标识（入队后回填）。
+  string cluster_id = 22;
+  // 观察壳上闸门本会 403。
+  bool would_have_blocked = 23;
+  // 当时入口姿态。
+  yufeng.common.v1.IngressPosture ingress_posture = 24;
+  // 监听计划上的流量键。
+  string traffic_key = 25;
+}
+
+// ReleaseTrace 是一次事件与发布状态的关系：统计口径的主体是心跳计数器，
+// 本结构只用于关键事件归属、误报举报校验与前端展示。
+message ReleaseTrace {
+  // 发布标识（治理主键）。
+  string release_id = 1 [(buf.validate.field).string.min_len = 1];
+  // 制品标识（全信封内容地址）。
+  string artifact_id = 2;
+  // 事件发生时该发布对请求的生效状态。
+  yufeng.common.v1.ReleaseMode mode = 3;
+  // canary 分桶百分比（mode=canary 时有效）。
+  int32 canary_percent = 4;
+  // 该请求是否命中 canary 分桶。
+  bool canary_selected = 5;
+  // 该请求是否命中此发布。
+  bool matched = 6;
+}
+
+// 事件大类。
+enum Kind {
+  KIND_UNSPECIFIED = 0;
+  // 流量观测 / 拦截。
+  KIND_TRAFFIC = 1;
+  // 资产侧传感（进程 / 连接 / 文件 / 能力探针）。
+  KIND_SENSOR = 2;
+  // 情报命中（漏洞知识库、开源情报匹配）。
+  KIND_INTEL = 3;
+  // Agent 动作（编排、提案、执行回执）。
+  KIND_AGENT = 4;
+  // Edge 邻近模型达到签名告警阈值的异步结果。
+  KIND_MODEL_ALERT = 5;
+  // Edge 邻近模型按签名策略保留的有界复核代表。
+  KIND_MODEL_REVIEW_SAMPLE = 6;
+}
+
+// 处置结果。
+enum Verdict {
+  VERDICT_UNSPECIFIED = 0;
+  // 放行。
+  VERDICT_ALLOW = 1;
+  // 拦截 / 阻断。
+  VERDICT_BLOCK = 2;
+  // 观察：放行但标记（shadow 态制品的典型输出）。
+  VERDICT_OBSERVE = 3;
+  // 升级：转交上一档处理（如异步小模型升级采样给大模型）。
+  VERDICT_ESCALATE = 4;
+}
+
+// HTTP 流量载荷（已脱敏：敏感头、查询参数、请求体均按脱敏规则处理后才入账）。
+message Http {
+  string method = 1;
+  string path = 2;
+  // 查询串摘要（脱敏后）。
+  string query_redacted = 3;
+  // 关键头（脱敏后，白名单键）。
+  map<string, string> headers_redacted = 4;
+  // 请求体片段（脱敏 + 截断至证据预算内）。
+  bytes body_redacted = 5;
+  // 源地址（假名化处理，非明文 IP）。
+  string src_pseudonym = 6;
+  // 目的地址与端口。
+  string dst = 7;
+  // 上游响应码（响应阶段补记，请求阶段为 0）。
+  int32 status_code = 8;
+  // 处理耗时（微秒）。
+  int64 latency_micros = 9;
+}
+
+// AI 流量信封：只描述形状，不记对话载荷（细节字段在需要时以不破坏账本的方式追加）。
+message Ai {
+  // 模型供应商标识（经中台模型网关调用）。
+  string provider = 1;
+  // 模型名。
+  string model = 2;
+  // 各角色消息数计数（system / user / assistant / tool）。
+  map<string, int32> role_counts = 3;
+  // 工具调用摘要（只记名称与参数摘要，不记原文）。
+  repeated ToolCall tool_calls = 4;
+}
+
+// 工具调用摘要。
+message ToolCall {
+  string name = 1;
+  // 参数摘要（长度与指纹，不含明文参数）。
+  string args_digest = 2;
+}
+
+// ModelInference 是异步模型追加记录，禁止写回 Event 原文字节。
+message ModelInference {
+  // 追加记录标识。
+  string inference_id = 1;
+  // 原始事件标识。
+  string event_id = 2;
+  // 模型组。
+  string model_group = 3;
+  // 模型类型。
+  string model_type = 4;
+  // 模型版本。
+  string model_version = 5;
+  // 制品内阈值。
+  double threshold = 6;
+  // 本次分数。
+  double score = 7;
+  // 可选分类；不得单独出策略。
+  yufeng.common.v1.AttackClass attack_class = 8;
+  // 映射器版本。
+  string taxonomy_version = 9;
+  // 写入时间。
+  google.protobuf.Timestamp recorded_at = 10;
+  // 签名模型档案制品摘要。
+  string model_profile_digest = 11;
+  // 原始请求关联标识，不包含请求内容。
+  string request_id = 12;
+  // 结果种类全名（MODEL_ALERT / REVIEW_SAMPLE）。
+  string result_kind = 13;
+}
+
+// EvidenceProjection 是与证据摘要同一函数的特征投影，禁止含请求原文。
+message EvidenceProjection {
+  // 摘要算法。
+  yufeng.common.v1.EvidenceDigestAlgorithm algorithm = 1;
+  // 跨度上限。
+  int32 max_span_bytes = 2;
+  // 字段投影（method / route_template / selector / span_hash / charset_class）。
+  map<string, string> fields = 3;
+}
+
+// CheckTicket 是事件的脱敏研判投影，不是模型流量契约。
+message CheckTicket {
+  // 原始事件标识。
+  string event_id = 1;
+  // 资产标识。
+  string asset_id = 2;
+  // 单元标识。
+  string unit_id = 3;
+  // 当时世代标识。
+  string generation_id = 4;
+  // 当时世代序号。
+  int64 generation_seq = 5;
+  // 入口姿态。
+  yufeng.common.v1.IngressPosture posture = 6;
+  // 各面覆盖度。
+  repeated yufeng.common.v1.InspectionCoverage coverage = 7;
+  // 同步发现（已脱敏）。
+  repeated Detection detections = 8;
+  // 证据摘要投影；研判不得只带 event_id。
+  EvidenceProjection evidence = 9;
+  // 路由模板。
+  string route_template = 10;
+  // HTTP 方法。
+  string method = 11;
+  // 转发策略。
+  yufeng.common.v1.ForwardPolicyKind forward = 12;
+  // 审查候选标识。
+  string review_candidate_id = 13;
+  // 资产绑定案件标识。
+  string case_id = 14;
+  // 边缘证据句柄；只可由 EvidenceService 消费。
+  string evidence_handle = 15;
+  // 证据摘要。
+  string evidence_digest = 16;
+  // 证据过期时间。
+  google.protobuf.Timestamp evidence_expires_at = 17;
+}
+
+// ScoreRequest 是打分 worker 请求；必须带检查票据。
+message ScoreRequest {
+  // 脱敏投影。
+  CheckTicket ticket = 1;
+}
+
+// ScoreResponse 是打分 worker 响应；只追加推理记录。
+message ScoreResponse {
+  // 追加记录。
+  ModelInference inference = 1;
+}
+
+// 单个检测器的结论。
+message Detection {
+  // 检测器标识（检测器注册表主键）。
+  string detector_id = 1;
+  // 命中规则 / 画像约束标识。
+  string rule_id = 2;
+  // 置信度 [0,1]。
+  double confidence = 3 [(buf.validate.field).double = {
+    gte: 0
+    lte: 1
+  }];
+  // 人可读说明。
+  string message = 4;
+  // 检测所属修复层级（见 common.Tier；流量检测为 L1）。
+  yufeng.common.v1.Tier tier = 5;
+  // 策略匹配键；生产路径必填。
+  yufeng.common.v1.DetectionKey key = 6;
+  // 原始规则标签。
+  repeated string raw_tags = 7;
+  // 闭集攻击类；未映射为 ATTACK_CLASS_UNMAPPED。
+  yufeng.common.v1.AttackClass attack_class = 8;
+  // 分类映射器版本。
+  string taxonomy_version = 9;
+  // 异常分数。
+  double anomaly_score = 10;
+  // 命中变量名。
+  string matched_variable = 11;
+  // 证据跨度（位置与长度，不含原文）。
+  string evidence_span = 12;
+  // 对应检查面覆盖度引用（path/query/body/header）。
+  string inspection_coverage_ref = 13;
+}

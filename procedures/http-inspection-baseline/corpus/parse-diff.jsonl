@@ -1,0 +1,12 @@
+{"id":"p-cl-te","kind":"cl_te_conflict","headers":{"Content-Length":"4","Transfer-Encoding":"chunked"},"body":"0\r\n\r\n","expect":"reject_or_absent_body"}
+{"id":"p-dup-cl","kind":"duplicate_content_length","raw_headers":["Content-Length: 4","Content-Length: 10"],"expect":"reject"}
+{"id":"p-dup-query","kind":"duplicate_query","query":"id=1&id=2","expect":"first=1"}
+{"id":"p-multi-encode","kind":"multi_url_encode","query":"name=%252e%252e%252fetc%252fpasswd","expect":"two_round_decode"}
+{"id":"p-encoded-slash","kind":"encoded_slash","path":"/files%2fsecret","expect":"reject"}
+{"id":"p-json-dup","kind":"json_duplicate_key","body":"{\"id\":1,\"id\":2}","content_type":"application/json","expect":"reject"}
+{"id":"p-bad-multipart","kind":"malformed_multipart","content_type":"multipart/form-data; boundary=--x","body":"not-a-multipart","expect":"error_or_absent"}
+{"id":"p-ctype-mismatch","kind":"content_type_confusion","content_type":"application/json","body":"id=1+UNION+SELECT+1","expect":"json_error_or_unparsed"}
+{"id":"p-zipbomb","kind":"compression_bomb","content_encoding":"gzip","note":"oversized inflate stops at decompress_max_bytes","expect":"partial_or_error"}
+{"id":"p-64k","kind":"body_truncate_64kib","body_bytes":65536,"expect":"full"}
+{"id":"p-64k-plus","kind":"body_truncate_64kib","body_bytes":65537,"expect":"partial"}
+{"id":"p-h2-pseudo","kind":"http2_pseudo","pseudo":{":method":"GET",":path":"/api/items?id=1",":authority":"app.example"},"expect":"same_view_as_http11"}

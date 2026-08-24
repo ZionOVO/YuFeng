@@ -1,0 +1,41 @@
+[Unit]
+Description=YuFeng manually managed edge data plane
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yufeng
+Group=yufeng
+EnvironmentFile=/etc/yufeng/edge.env
+ExecStart=/usr/local/bin/yufeng-edge \
+  -brain=${YUFENG_BRAIN_URL} \
+  -unit=${YUFENG_EDGE_UNIT} \
+  -unit-version=${YUFENG_EDGE_VERSION} \
+  -bootstrap-token-file=/etc/yufeng/credentials/unit-bootstrap-token \
+  -pubkey=/etc/yufeng/trust/artifact-pubkey.hex \
+  -tls-ca=/etc/yufeng/tls/brain-ca.crt \
+  -tls-cert=/etc/yufeng/tls/edge-client.crt \
+  -tls-key=/etc/yufeng/tls/edge-client.key \
+  -source-hmac-key=/etc/yufeng/credentials/source-hmac.key \
+  -modelside=${YUFENG_MODELSIDE_ENDPOINT} \
+  -data-dir=/var/lib/yufeng/edge \
+  -spool-dir=/var/lib/yufeng/telemetry \
+  -admin-addr=127.0.0.1:19092
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/yufeng/edge /var/lib/yufeng/telemetry /run/yufeng
+RuntimeDirectory=yufeng
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+StateDirectory=yufeng/edge yufeng/telemetry
+StateDirectoryMode=0750
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

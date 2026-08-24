@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+// 修复程序契约（Procedure）：怎么在一种设备上安全地执行修复或施加约束。
+// 边界（决策记录 014）：本文件只定义信封（强类型）；步骤体是数据，
+// 存于 steps_json 并由 steps_schema 引用的 JSON Schema 校验——
+// 新增能力原语时发制品即可，不改契约。
+// 步骤体的 JSON Schema 见 procedures/steps.schema.json；
+// 其中步骤可带 confirm=true（引导式执行时该步须人工确认，决策记录 011）。
+package yufeng.procedure.v1;
+
+import "google/protobuf/duration.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/procedurev1";
+
+// Procedure 是一个可回放验证、可回滚的修复程序（签名制品的一种载荷形态）。
+message Procedure {
+  // 程序标识（如 proc:deb.upgrade-libcurl）。
+  string id = 1;
+  // 语义化版本。
+  string version = 2;
+  // 目标画像：本程序适用于什么设备 / 系统。
+  Target target = 3;
+  // 前置要求：需要哪些能力原语、接入模式、生效语义。
+  Requires requires = 4;
+  // 步骤体：JSON 数组（每步 = 原语调用 + 参数 + 守卫 + 是否需人工确认 + 失败策略）。
+  bytes steps_json = 5;
+  // 步骤体 JSON Schema 引用（内容寻址）。
+  string steps_schema = 6;
+  // 验证声明：执行后怎么证明修好了（健康检查 / 漏洞复验失败）。
+  string verify_json = 7;
+  // 回滚程序引用（同样是程序标识）；回滚本身也是程序，可回放验证。
+  string rollback_ref = 8;
+  // 存活时限：长期约束类程序到期滚动续期。
+  google.protobuf.Duration ttl = 9;
+}
+
+// 目标画像：程序与资产的匹配依据。
+message Target {
+  // 操作系统族（如 debian>=11）。
+  string os_family = 1;
+  // 包管理器（apt / yum / apk / opkg；空 = 不限）。
+  string pkg_manager = 2;
+  // 设备类（如 camera / nas / server；空 = 不限）。
+  string device_class = 3;
+  // 最低内核版本（空 = 不限）。
+  string min_kernel = 4;
+}
+
+// 前置要求：修复计划匹配时逐项核对，做不到的计划不会被执行。
+message Requires {
+  // 需要的能力原语列表（如 pkg.upgrade、service.restart）。
+  repeated string primitives = 1;
+  // 可接受的接入模式。
+  repeated yufeng.common.v1.AccessMode access = 2;
+  // 可接受的手段生效语义——免重启场景只接受 live。
+  repeated yufeng.common.v1.EffectSemantics effect = 3;
+}

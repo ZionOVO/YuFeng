@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+// 遥测上行契约：批量事件、逐条去重与拒因。
+package yufeng.telemetry.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
+import "yufeng/event/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/telemetryv1";
+
+service TelemetryService {
+  rpc UploadEvents(UploadEventsRequest) returns (UploadEventsResponse);
+  rpc UploadTrafficWindows(UploadTrafficWindowsRequest) returns (UploadTrafficWindowsResponse);
+  rpc UploadReviewCandidates(UploadReviewCandidatesRequest) returns (UploadReviewCandidatesResponse);
+}
+
+message UploadEventsRequest {
+  repeated yufeng.event.v1.Event events = 1;
+}
+
+message RejectedEvent {
+  string event_id = 1;
+  string code = 2;
+  string message = 3;
+  bool retryable = 4;
+  string payload_digest = 5;
+}
+
+message UploadEventsResponse {
+  int32 accepted = 1;
+  int32 deduped = 2;
+  repeated RejectedEvent rejected = 3;
+}
+
+// TrafficRouteCell 是窗口内一个方法与路由组合的聚合。
+message TrafficRouteCell {
+  string method = 1;
+  string route_template = 2;
+  int64 request_count = 3;
+  int64 critical_count = 4;
+  int64 blocked_count = 5;
+  int64 incomplete_count = 6;
+}
+
+// TrafficWindow 是不含请求原文的五分钟流量聚合。
+message TrafficWindow {
+  string window_id = 1;
+  string unit_id = 2;
+  string asset_id = 3;
+  google.protobuf.Timestamp window_start = 4;
+  google.protobuf.Timestamp window_end = 5;
+  string generation_id = 6;
+  int64 generation_seq = 7;
+  string policy_digest = 8;
+  int64 request_count = 9;
+  int64 critical_count = 10;
+  int64 blocked_count = 11;
+  int64 observed_count = 12;
+  int64 incomplete_count = 13;
+  repeated TrafficRouteCell route_cells = 14;
+  TrafficRouteCell other = 15;
+  int64 evidence_dropped_count = 16;
+  yufeng.artifact.v1.TrafficReviewMode review_mode = 17;
+  // 丢弃原因及其计数；正文和文件路径不得进入键或值。
+  map<string, int64> evidence_drop_reasons = 18;
+}
+
+// ReviewCandidate 是边缘选择的脱敏代表，不含原始证据。
+message ReviewCandidate {
+  string candidate_id = 1;
+  string window_id = 2;
+  string unit_id = 3;
+  string asset_id = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+  string request_id = 6;
+  string method = 7;
+  string route_template = 8;
+  double risk_score = 9;
+  repeated string risk_reasons = 10;
+  yufeng.event.v1.EvidenceProjection evidence = 11;
+  string evidence_handle = 12;
+  string evidence_digest = 13;
+  google.protobuf.Timestamp evidence_expires_at = 14;
+  string generation_id = 15;
+  int64 generation_seq = 16;
+  bool baseline = 17;
+  yufeng.artifact.v1.TrafficReviewMode review_mode = 18;
+}
+
+message UploadTrafficWindowsRequest {
+  repeated TrafficWindow windows = 1;
+}
+
+message UploadTrafficWindowsResponse {
+  int32 accepted = 1;
+  int32 deduped = 2;
+  repeated RejectedEvent rejected = 3;
+}
+
+message UploadReviewCandidatesRequest {
+  repeated ReviewCandidate candidates = 1;
+}
+
+message UploadReviewCandidatesResponse {
+  int32 accepted = 1;
+  int32 deduped = 2;
+  repeated RejectedEvent rejected = 3;
+}

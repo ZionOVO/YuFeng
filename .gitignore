@@ -1,0 +1,47 @@
+# build
+/bin/
+/dist/
+.tmp/
+
+# go
+*.test
+*.out
+*.exe
+*.prof
+*.coverprofile
+coverage.out
+coverage.html
+__debug_bin*
+
+# local demo / env / secrets
+.env
+.env.*
+!.env.example
+.demo/
+tmp/
+*.pem
+*.key
+deploy/secrets/*
+!deploy/secrets/README.md
+
+# node / frontend
+node_modules/
+console/dist/
+console/.vite/
+console/coverage/
+*.tsbuildinfo
+
+# Python evidence tooling cache
+__pycache__/
+*.pyc
+
+# 公开流量数据集本地缓存（见 docs/test/model-scoring-and-agent-rule-datasets.md）
+testdata/traffic-datasets/
+
+# os / editor
+.grok/
+.DS_Store
+._*
+.idea/
+*.swp
+*~

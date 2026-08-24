@@ -1,0 +1,5 @@
+{"id":"mgmt-01","method":"GET","path":"/admin","query":"","note":"business /admin must not be implicitly skipped"}
+{"id":"mgmt-02","method":"GET","path":"/health","query":"","note":"business /health must not be implicitly skipped"}
+{"id":"mgmt-03","method":"GET","path":"/admin/users","query":"id=1","note":"business admin route stays on data plane"}
+{"id":"mgmt-04","method":"GET","path":"/ready","query":"","note":"application readiness is not yufeng admin port"}
+{"id":"mgmt-05","method":"GET","path":"/metrics","query":"","note":"application metrics stay on data plane"}

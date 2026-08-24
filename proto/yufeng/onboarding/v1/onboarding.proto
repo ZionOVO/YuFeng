@@ -1,0 +1,184 @@
+syntax = "proto3";
+
+// 初次配置引导：部署一行状态机、模型凭据与人工 Edge 部署规格。
+package yufeng.onboarding.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/common/v1/v1.proto";
+import "yufeng/model/v1/model.proto";
+
+option go_package = "yufeng/proto/gen/onboardingv1";
+
+// OnboardingService 是人机交付引导的操作域服务。
+service OnboardingService {
+  // GetOnboarding 返回引导投影，不含密钥明文。
+  rpc GetOnboarding(GetOnboardingRequest) returns (GetOnboardingResponse);
+  // PutModelConfig 把模型端点与密钥写入凭据槽。
+  rpc PutModelConfig(PutModelConfigRequest) returns (PutModelConfigResponse);
+  // TestModelConnectivity 由 brain 出网发一次最小聊天补全。
+  rpc TestModelConnectivity(TestModelConnectivityRequest) returns (TestModelConnectivityResponse);
+  // 兼容保留；服务端不再执行自动数据面部署。
+  rpc DeployDataplane(DeployDataplaneRequest) returns (DeployDataplaneResponse) {
+    option deprecated = true;
+  }
+  // PutDeploymentSpecification 确定性签发监听计划、基线世代与模型档案。
+  rpc PutDeploymentSpecification(PutDeploymentSpecificationRequest) returns (PutDeploymentSpecificationResponse);
+  // CompleteOnboarding 只检查四条谓词后写入系统授予。
+  rpc CompleteOnboarding(CompleteOnboardingRequest) returns (CompleteOnboardingResponse);
+}
+
+// OnboardingState 是引导状态机封闭枚举；线上只许全名。
+enum OnboardingState {
+  ONBOARDING_STATE_UNSPECIFIED = 0;
+  // 刚装完，未配模型。
+  ONBOARDING_STATE_PENDING = 1;
+  // 密钥已存，探测尚未成功。
+  ONBOARDING_STATE_MODEL_CONFIGURED = 2;
+  // 探测成功。
+  ONBOARDING_STATE_MODEL_LIVE = 3;
+  ONBOARDING_STATE_DATAPLANE_LIVE = 4 [deprecated = true];
+  // 引导结束，主控制台开放。
+  ONBOARDING_STATE_COMPLETED = 5;
+  // 最近一步失败，保留原因与已配密钥。
+  ONBOARDING_STATE_FAILED = 6;
+  // 人工部署的 Edge 已主动注册并确认装载期望制品。
+  ONBOARDING_STATE_EDGE_LIVE = 7;
+}
+
+// OnboardingGate 是 CompleteOnboarding 失败时 Connect details 的唯一条目。
+message OnboardingGate {
+  // missing_predicates 是未满足的 §19.1 谓词编号，取值 1–4，升序去重。
+  repeated int32 missing_predicates = 1;
+}
+
+// GetOnboardingRequest 无字段。
+message GetOnboardingRequest {}
+
+// GetOnboardingResponse 是引导只读投影，无密钥明文。
+message GetOnboardingResponse {
+  OnboardingState state = 1;
+  string base_url = 2;
+  string model = 3;
+  bool has_secret = 4;
+  string secret_hint = 5;
+  bool jarvis_online = 6;
+  bool dataplane_ready = 7 [deprecated = true];
+  string local_asset_id = 8;
+  string last_error = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  yufeng.model.v1.ModelDialect dialect = 11;
+  bool edge_ready = 12;
+  string local_unit_id = 13;
+  string deployment_spec_digest = 14;
+  string expected_generation_id = 15;
+  int64 expected_generation_seq = 16;
+  uint64 expected_listen_plan_version = 17;
+}
+
+// PutModelConfigRequest 写入模型端点与密钥。
+// dialect 省略或 UNSPECIFIED 则写入 MODEL_DIALECT_OPENAI_CHAT。
+message PutModelConfigRequest {
+  string base_url = 1;
+  string secret = 2;
+  string model = 3;
+  yufeng.model.v1.ModelDialect dialect = 4;
+}
+
+// PutModelConfigResponse 无字段。
+message PutModelConfigResponse {}
+
+// TestModelConnectivityRequest 无字段。
+message TestModelConnectivityRequest {}
+
+// TestModelConnectivityResponse 无字段。
+message TestModelConnectivityResponse {}
+
+// DeployDataplaneRequest 仅保留旧线缆编码。
+message DeployDataplaneRequest {
+  option deprecated = true;
+  // posture 决定反向代理或外部授权入口；首个企业试点不接受观察姿态。
+  yufeng.common.v1.IngressPosture posture = 1;
+  // traffic_key 标识同一条客户流量；同一键至多一个拦截单元。
+  string traffic_key = 2;
+  // target 必须与 posture 一致。
+  oneof target {
+    ReverseProxyTarget reverse_proxy = 3;
+    ExtAuthzTarget ext_authz = 4;
+  }
+  // trusted_proxy_cidrs 限定哪些直接对端可以提供 X-Forwarded-For。
+  repeated string trusted_proxy_cidrs = 5;
+}
+
+// ReverseProxyTarget 是反向代理入口的业务监听与回源目标。
+message ReverseProxyTarget {
+  // listen_address 是签名单元监听计划中的业务监听地址。
+  string listen_address = 1;
+  // upstream_url 是绝对 http/https URL；不得为 builtin。
+  string upstream_url = 2;
+}
+
+// ExtAuthzTarget 是外部授权入口的业务监听目标；不携带业务上游。
+message ExtAuthzTarget {
+  // listen_address 是签名单元监听计划中的授权服务监听地址。
+  string listen_address = 1;
+}
+
+// DeployDataplaneResponse 仅保留旧线缆编码。
+message DeployDataplaneResponse {
+  option deprecated = true;
+}
+
+// ModelDedupeRule 是签名模型档案允许的复核去重规则。
+enum ModelDedupeRule {
+  MODEL_DEDUPE_RULE_UNSPECIFIED = 0;
+  // 同方法与路由只保留风险最高代表。
+  MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE = 1;
+}
+
+// ModelProfileSpecification 是管理员提交、由 Brain 编进签名制品的模型策略。
+message ModelProfileSpecification {
+  string profile_id = 1;
+  string model_group = 2;
+  string model_type = 3;
+  string model_version = 4;
+  double alert_threshold = 5;
+  double review_floor = 6;
+  int32 review_window_seconds = 7;
+  int32 max_review_per_unit = 8;
+  int32 max_review_per_route = 9;
+  ModelDedupeRule dedupe_rule = 10;
+  repeated string allowed_headers = 11;
+  int32 max_body_bytes = 12;
+  bool review_new_routes = 13;
+  bool review_insufficient_coverage = 14;
+}
+
+// PutDeploymentSpecificationRequest 提交人工部署所需的确定性规格。
+message PutDeploymentSpecificationRequest {
+  string unit_id = 1;
+  string asset_id = 2;
+  yufeng.common.v1.IngressPosture posture = 3;
+  string traffic_key = 4;
+  oneof target {
+    ReverseProxyTarget reverse_proxy = 5;
+    ExtAuthzTarget ext_authz = 6;
+  }
+  repeated string trusted_proxy_cidrs = 7;
+  ModelProfileSpecification model_profile = 8;
+}
+
+// PutDeploymentSpecificationResponse 返回人工安装后 Edge 应装载的版本坐标。
+message PutDeploymentSpecificationResponse {
+  string unit_id = 1;
+  string asset_id = 2;
+  string deployment_spec_digest = 3;
+  uint64 listen_plan_version = 4;
+  string generation_id = 5;
+  int64 generation_seq = 6;
+}
+
+// CompleteOnboardingRequest 无字段。
+message CompleteOnboardingRequest {}
+
+// CompleteOnboardingResponse 无字段。
+message CompleteOnboardingResponse {}

@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+// 指令契约：执行单元长轮询确定性程序并逐步回执。
+package yufeng.command.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "yufeng/proto/gen/commandv1";
+
+service CommandService {
+  rpc PollCommands(PollCommandsRequest) returns (PollCommandsResponse);
+  rpc ReportStep(ReportStepRequest) returns (ReportStepResponse);
+}
+
+message CommandStep {
+  string primitive = 1;
+  string args_json = 2;
+  string guard = 3;
+  bool confirm = 4;
+}
+
+message Command {
+  string command_id = 1;
+  string run_id = 2;
+  string procedure_ref = 3;
+  string artifact_ref = 4;
+  string target_asset_id = 5;
+  repeated CommandStep steps = 6;
+  google.protobuf.Timestamp deadline = 7;
+  string rollback_ref = 8;
+  string idempotency_key = 9;
+  string lease_id = 10;
+  int64 lease_epoch = 11;
+  google.protobuf.Timestamp lease_deadline = 12;
+}
+
+enum StepPhase {
+  STEP_PHASE_UNSPECIFIED = 0;
+  STEP_PHASE_INTENT_RECORDED = 1;
+  STEP_PHASE_EFFECT_STARTED = 2;
+  STEP_PHASE_SUCCEEDED = 3;
+  STEP_PHASE_FAILED = 4;
+  STEP_PHASE_COMPENSATION_STARTED = 5;
+  STEP_PHASE_COMPENSATED = 6;
+  STEP_PHASE_OUTCOME_UNKNOWN = 7;
+}
+
+message PollCommandsRequest {
+  string unit_id = 1;
+  int32 long_poll_seconds = 2;
+}
+message PollCommandsResponse {
+  repeated Command commands = 1;
+}
+
+message StepReceipt {
+  int32 step_index = 1;
+  string status = 2;
+  string output_json = 3;
+  string error = 4;
+  google.protobuf.Timestamp completed_at = 5;
+  StepPhase phase = 6;
+  string guard_digest = 7;
+  string receipt_ref = 8;
+  string compensation_receipt_ref = 9;
+}
+
+message ReportStepRequest {
+  string command_id = 1;
+  repeated StepReceipt receipts = 2;
+  string unit_id = 3;
+  string lease_id = 4;
+  int64 lease_epoch = 5;
+}
+message ReportStepResponse {}

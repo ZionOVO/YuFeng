@@ -1,0 +1,21 @@
+services:
+  testapp-a:
+    build:
+      context: ..
+      dockerfile: deploy/testdata/Dockerfile
+    command: ["-name", "app-a", "-addr", ":8080"]
+    restart: unless-stopped
+
+  testapp-b:
+    build:
+      context: ..
+      dockerfile: deploy/testdata/Dockerfile
+    command: ["-name", "app-b", "-addr", ":8080"]
+    restart: unless-stopped
+
+  performance-load:
+    image: yufeng-performance-load:local
+    profiles: ["performance"]
+    build:
+      context: ..
+      dockerfile: deploy/testdata/performance-load.Dockerfile

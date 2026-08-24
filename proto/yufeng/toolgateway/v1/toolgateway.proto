@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+// 工具网关：Agent 统一调用中台预封装工具的唯一入口。
+package yufeng.toolgateway.v1;
+
+import "yufeng/tool/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/toolgatewayv1";
+
+service ToolGatewayService {
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+  rpc DescribeTool(DescribeToolRequest) returns (DescribeToolResponse);
+  rpc InvokeTool(InvokeToolRequest) returns (InvokeToolResponse);
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse);
+  rpc LoadSkill(LoadSkillRequest) returns (LoadSkillResponse);
+}
+
+message ListToolsRequest {}
+
+message ToolDescriptorItem {
+  string name = 1;
+  string description = 2;
+  repeated string permissions = 3;
+  string version = 4;
+  string schema_digest = 5;
+  yufeng.tool.v1.ToolEffect effect = 6;
+  yufeng.tool.v1.ToolReplay replay = 7;
+}
+
+message ListToolsResponse {
+  repeated ToolDescriptorItem tools = 1;
+}
+
+message DescribeToolRequest {
+  string turn_id = 1;
+  string tool_name = 2;
+  string tool_version = 3;
+  string schema_digest = 4;
+}
+
+message DescribeToolResponse {
+  yufeng.tool.v1.ToolDescriptor tool = 1;
+  string artifact_id = 2;
+}
+
+message InvokeToolRequest {
+  string tool_name = 1;
+  string args_json = 2;
+  string idempotency_key = 3;
+}
+
+message InvokeToolResponse {
+  string result_json = 1;
+  string result_ref = 2;
+  int64 calls_remaining = 3;
+}
+
+message ListSkillsRequest {}
+
+message SkillSummary {
+  string skill_id = 1;
+  string version = 2;
+  string name = 3;
+  string description = 4;
+  string content_digest = 5;
+}
+
+message ListSkillsResponse {
+  repeated SkillSummary skills = 1;
+}
+
+message LoadSkillRequest {
+  string turn_id = 1;
+  string skill_id = 2;
+  string version = 3;
+  string content_digest = 4;
+}
+
+message LoadSkillResponse {
+  yufeng.tool.v1.SkillManifest manifest = 1;
+  string artifact_id = 2;
+  repeated string effective_tools = 3;
+}

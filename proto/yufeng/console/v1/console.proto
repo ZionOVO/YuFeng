@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+// 控制台查询面：总览、事件流与事件详情。
+package yufeng.console.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/event/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/consolev1";
+
+service ConsoleService {
+  rpc Dashboard(DashboardRequest) returns (DashboardResponse);
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse);
+  rpc GetEvent(GetEventRequest) returns (GetEventResponse);
+}
+
+message DashboardRequest {}
+
+message DashboardResponse {
+  int64 assets_total = 1;
+  int64 degraded_units = 2;
+  map<string, int64> releases_by_state = 3;
+  int64 events_24h_total = 4;
+  int64 events_24h_blocked = 5;
+  int64 pending_retire_soon = 6;
+}
+
+message ListEventsRequest {
+  string asset_id = 1;
+  string release_id = 2;
+  yufeng.event.v1.Verdict verdict = 3;
+  yufeng.event.v1.Kind kind = 4;
+  google.protobuf.Timestamp since = 5;
+  google.protobuf.Timestamp until = 6;
+  string query = 7;
+  int32 page_size = 8;
+  string page_token = 9;
+}
+
+message ListEventsResponse {
+  repeated yufeng.event.v1.Event events = 1;
+  string next_page_token = 2;
+}
+
+message GetEventRequest {
+  string event_id = 1;
+}
+message GetEventResponse {
+  yufeng.event.v1.Event event = 1;
+}

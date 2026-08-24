@@ -1,0 +1,63 @@
+name: develop-integration-confirmation
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: develop-integration-confirmation
+  cancel-in-progress: true
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Confirm the exact merge tree and successful pull request gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r commit base_parent source_parent extra <<< "$(git rev-list --parents -n 1 "$GITHUB_SHA")"
+          test "$commit" = "$GITHUB_SHA"
+          test -n "$base_parent"
+          test -n "$source_parent"
+          test -z "${extra:-}"
+
+          pushed_base=$(jq -r .before "$GITHUB_EVENT_PATH")
+          test "$base_parent" = "$pushed_base"
+          git diff --quiet "$source_parent" "$GITHUB_SHA"
+          test "$(git rev-parse "${source_parent}^{tree}")" = "$(git rev-parse "${GITHUB_SHA}^{tree}")"
+
+          run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/pull-request.yml/runs?event=pull_request&head_sha=${source_parent}&status=completed&per_page=20")
+          conclusion=$(jq -r --arg repository "$GITHUB_REPOSITORY" --arg source "$source_parent" '
+            [.workflow_runs[] | select(
+              .head_sha == $source and
+              .head_repository.full_name == $repository and
+              .conclusion == "success"
+            )][0].conclusion // ""
+          ' <<< "$run_json")
+          run_url=$(jq -r --arg repository "$GITHUB_REPOSITORY" --arg source "$source_parent" '
+            [.workflow_runs[] | select(
+              .head_sha == $source and
+              .head_repository.full_name == $repository and
+              .conclusion == "success"
+            )][0].html_url // ""
+          ' <<< "$run_json")
+          if [[ "$conclusion" != "success" || -z "$run_url" ]]; then
+            echo "source pull request gate is not successful" >&2
+            exit 1
+          fi
+
+          {
+            echo "develop commit: $GITHUB_SHA"
+            echo "develop tree: $(git rev-parse "${GITHUB_SHA}^{tree}")"
+            echo "base parent: $base_parent"
+            echo "source parent: $source_parent"
+            echo "source pull request gate: $run_url"
+          } >> "$GITHUB_STEP_SUMMARY"

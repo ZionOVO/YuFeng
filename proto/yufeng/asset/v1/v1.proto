@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+// 资产契约（Asset）：资产账的主结构。
+// max_auto_tier 是"自动执行天花板"：该资产允许自动执行到修复连续谱的哪一层，
+// 默认 L0（只出报告），逐资产放开（见 docs/architecture.md 决策记录 014）。
+package yufeng.asset.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/assetv1";
+
+// Asset 是一台被保护对象的账本记录：服务器、容器集群、网络设备、家用设备等。
+message Asset {
+  // 资产标识（账本主键）。
+  string id = 1;
+  // 显示名。
+  string display_name = 2;
+  // 接入模式：决定可用修复面与执行通道。
+  yufeng.common.v1.AccessMode access_mode = 3;
+  // 可用执行通道（嵌入式本机 / SSH / 厂商接口）。
+  repeated Transport transports = 4;
+  // 能力矩阵：宿主程序探针上报的客观能力。
+  CapabilityMatrix capabilities = 5;
+  // 关键性等级。
+  Criticality criticality = 6;
+  // 自动执行天花板（consent）：自动修复动作的层级不得超越此值；默认 L0 只报告。
+  // 注意：冷补丁（L3）无论此值如何都须人工授权，此字段只约束"自动"边界。
+  yufeng.common.v1.Tier max_auto_tier = 7;
+  // 标签（环境、业务线、设备类等）。
+  map<string, string> labels = 8;
+  // 最近一次能力探针时间。
+  google.protobuf.Timestamp last_probe_at = 9;
+  // 操作方字段乐观锁时间。
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+// 执行通道：中台对资产施加动作的具体途径。
+message Transport {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    // 本机通道：资产上装有 yufeng-host。
+    KIND_LOCAL = 1;
+    // SSH 通道。
+    KIND_SSH = 2;
+    // 厂商接口通道（凭据保管在中台凭据保险库）。
+    KIND_VENDOR_API = 3;
+  }
+  Kind kind = 1;
+  // 通道端点（地址 / 接口名，不含凭据）。
+  string endpoint = 2;
+}
+
+// 能力矩阵：由宿主程序的系统探针产出，修复计划的可行性判断依据。
+message CapabilityMatrix {
+  // 内核版本（如 6.1.0）。
+  string kernel_version = 1;
+  // eBPF LSM 是否可用。
+  bool bpf_lsm = 2;
+  // seccomp 是否可用（仅可重启场景生效）。
+  bool seccomp = 3;
+  // nftables 是否可用。
+  bool nftables = 4;
+  // Landlock 是否可用（用于沙箱自有进程）。
+  bool landlock = 5;
+  // 可用的包管理器（apt / yum / apk / opkg …）。
+  repeated string package_managers = 6;
+}
+
+// 关键性等级。
+enum Criticality {
+  CRITICALITY_UNSPECIFIED = 0;
+  // 核心资产：误伤代价最高。
+  CRITICALITY_P0 = 1;
+  CRITICALITY_P1 = 2;
+  CRITICALITY_P2 = 3;
+}

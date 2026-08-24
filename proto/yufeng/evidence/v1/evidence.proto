@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+// 证据契约：单元主动领取批准后的精确证据请求。
+package yufeng.evidence.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "yufeng/proto/gen/evidencev1";
+
+service EvidenceService {
+  rpc PollEvidenceRequests(PollEvidenceRequestsRequest) returns (PollEvidenceRequestsResponse);
+  rpc SubmitEvidenceBundle(SubmitEvidenceBundleRequest) returns (SubmitEvidenceBundleResponse);
+}
+
+message EvidenceRequest {
+  string request_id = 1;
+  string approval_id = 2;
+  string case_id = 3;
+  string asset_id = 4;
+  string unit_id = 5;
+  repeated string evidence_handles = 6;
+  repeated string allowed_fields = 7;
+  int64 max_bytes = 8;
+  string model_config_digest = 9;
+  google.protobuf.Timestamp expires_at = 10;
+  string lease_id = 11;
+  int64 lease_epoch = 12;
+  google.protobuf.Timestamp lease_deadline = 13;
+  string bundle_group_id = 14;
+}
+
+message PollEvidenceRequestsRequest {
+  string unit_id = 1;
+  int32 long_poll_seconds = 2;
+}
+
+message PollEvidenceRequestsResponse {
+  repeated EvidenceRequest requests = 1;
+}
+
+message EvidenceFragment {
+  string evidence_handle = 1;
+  string field = 2;
+  bytes content = 3;
+  string content_digest = 4;
+}
+
+message SubmitEvidenceBundleRequest {
+  string request_id = 1;
+  string approval_id = 2;
+  string case_id = 3;
+  repeated EvidenceFragment fragments = 4;
+  string lease_id = 5;
+  int64 lease_epoch = 6;
+  string bundle_digest = 7;
+}
+
+message SubmitEvidenceBundleResponse {
+  string sensitive_content_ref = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string content_digest = 3;
+}

@@ -1,0 +1,239 @@
+syntax = "proto3";
+
+// 模型网关：brain 进程内唯一聊天补全出口。
+package yufeng.model.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/modelv1";
+
+// ModelGatewayService 是贾维斯生产补全与管理员改槽的 RPC。
+service ModelGatewayService {
+  // CompleteChat 用引导凭据槽出网，返回非空文本。
+  rpc CompleteChat(CompleteChatRequest) returns (CompleteChatResponse);
+  // Generate 在不可变 Turn 内完成可恢复的逻辑生成。
+  rpc Generate(GenerateRequest) returns (GenerateResponse);
+  // GetModelGateway 返回当前槽与统计窗（仅管理员；须引导完成）。
+  rpc GetModelGateway(GetModelGatewayRequest) returns (GetModelGatewayResponse);
+  // UpdateModelGateway 覆盖槽且不改引导状态（仅管理员；须引导完成）。
+  rpc UpdateModelGateway(UpdateModelGatewayRequest) returns (UpdateModelGatewayResponse);
+  // ProbeModelGateway 探测当前槽，不改引导状态（仅管理员；须引导完成）。
+  rpc ProbeModelGateway(ProbeModelGatewayRequest) returns (ProbeModelGatewayResponse);
+}
+
+// ModelGatewayStatus 是槽与近窗调用合成的服务状态。
+enum ModelGatewayStatus {
+  MODEL_GATEWAY_STATUS_UNSPECIFIED = 0;
+  MODEL_GATEWAY_STATUS_UNCONFIGURED = 1;
+  MODEL_GATEWAY_STATUS_READY = 2;
+  MODEL_GATEWAY_STATUS_LIVE = 3;
+  MODEL_GATEWAY_STATUS_DEGRADED = 4;
+  MODEL_GATEWAY_STATUS_DOWN = 5;
+}
+
+// ModelDialect 是 brain 出网时使用的供应商 HTTP 协议。
+//
+// [模型方言]: ../../../../docs/glossary.md#model-dialect
+enum ModelDialect {
+  MODEL_DIALECT_UNSPECIFIED = 0;
+  MODEL_DIALECT_OPENAI_CHAT = 1;
+  MODEL_DIALECT_OPENAI_RESPONSES = 2;
+  MODEL_DIALECT_CLAUDE_MESSAGES = 3;
+}
+
+// ChatMessage 是一条对话消息。
+message ChatMessage {
+  string role = 1;
+  string content = 2;
+}
+
+// CompleteChatRequest 是补全请求。
+message CompleteChatRequest {
+  repeated ChatMessage messages = 1;
+}
+
+// CompleteChatResponse 的 text 非空才算成功。
+message CompleteChatResponse {
+  string text = 1;
+}
+
+message GenerateInputItem {
+  string item_id = 1;
+  string role = 2;
+  string content = 3;
+  string content_digest = 4;
+  string trust_level = 5;
+  // 敏感内容引用；与 content 互斥，原文字节不进入账本。
+  SensitiveContentReference sensitive_content_ref = 6;
+}
+
+message SensitiveContentReference {
+  string ref_id = 1;
+  string content_digest = 2;
+  string approval_id = 3;
+  string case_id = 4;
+  int64 max_bytes = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+enum TrafficFindingDisposition {
+  TRAFFIC_FINDING_DISPOSITION_UNSPECIFIED = 0;
+  TRAFFIC_FINDING_DISPOSITION_SUSPECTED_MALICIOUS = 1;
+  TRAFFIC_FINDING_DISPOSITION_SUSPECTED_FALSE_POSITIVE = 2;
+  TRAFFIC_FINDING_DISPOSITION_SUSPECTED_MISS = 3;
+  TRAFFIC_FINDING_DISPOSITION_BENIGN = 4;
+  TRAFFIC_FINDING_DISPOSITION_INSUFFICIENT_EVIDENCE = 5;
+}
+
+message TrafficFinding {
+  TrafficFindingDisposition disposition = 1;
+  double confidence = 2;
+  repeated string evidence_refs = 3;
+  string attack_class = 4;
+  string route_template = 5;
+  repeated string selectors = 6;
+  string rationale = 7;
+  yufeng.artifact.v1.ShapeSource optional_shape_draft = 8;
+}
+
+message ContextManifest {
+  repeated string item_ids = 1;
+  repeated string item_digests = 2;
+  string system_prompt_version = 3;
+  string role_profile_version = 4;
+  repeated string skill_refs = 5;
+  string tool_catalog_version = 6;
+  repeated string loaded_schema_digests = 7;
+  repeated string compaction_entry_ids = 8;
+  string model_slot_id = 9;
+  string dialect = 10;
+  string adapter_version = 11;
+  string capability_projection_digest = 12;
+}
+
+message GenerationLimits {
+  int32 max_output_tokens = 1;
+  bool json_mode = 2;
+}
+
+message GenerateToolDefinition {
+  string name = 1;
+  string description = 2;
+  string version = 3;
+  string schema_digest = 4;
+}
+
+message GenerateRequest {
+  string thread_id = 1;
+  string turn_id = 2;
+  string step_id = 3;
+  string generation_id = 4;
+  int64 expected_item_sequence = 5;
+  ContextManifest context_manifest = 6;
+  repeated GenerateInputItem input_items = 7;
+  GenerationLimits generation_limits = 8;
+  string lease_id = 9;
+  int64 lease_epoch = 10;
+  repeated GenerateToolDefinition tool_definitions = 11;
+}
+
+enum GenerateOutputKind {
+  GENERATE_OUTPUT_KIND_UNSPECIFIED = 0;
+  GENERATE_OUTPUT_KIND_TEXT = 1;
+  GENERATE_OUTPUT_KIND_TOOL_CALL = 2;
+}
+
+message GenerateOutputItem {
+  GenerateOutputKind kind = 1;
+  string content = 2;
+  string call_id = 3;
+  string provider_call_id = 4;
+  string tool_name = 5;
+  string arguments_json = 6;
+  string arguments_digest = 7;
+  string schema_digest = 8;
+  int32 output_index = 9;
+}
+
+message GenerationUsage {
+  int64 input_tokens = 1;
+  int64 output_tokens = 2;
+  int64 cost_microunits = 3;
+}
+
+message GenerateResponse {
+  string generation_id = 1;
+  string accepted_attempt_id = 2;
+  repeated GenerateOutputItem output_items = 3;
+  string finish_reason = 4;
+  GenerationUsage usage = 5;
+  string actual_model = 6;
+  string provider_request_id = 7;
+  string retry_class = 8;
+  string optional_reasoning_summary = 9;
+  int64 next_item_sequence = 10;
+}
+
+// GetModelGatewayRequest 无字段。
+message GetModelGatewayRequest {}
+
+// UpdateModelGatewayRequest 覆盖端点；secret 空则保留旧钥。
+// dialect 为 UNSPECIFIED 则保留旧方言。
+message UpdateModelGatewayRequest {
+  string base_url = 1;
+  string secret = 2;
+  string model = 3;
+  ModelDialect dialect = 4;
+}
+
+// ProbeModelGatewayRequest 无字段。
+message ProbeModelGatewayRequest {}
+
+// ProbeModelGatewayResponse 是一次探测结果。
+message ProbeModelGatewayResponse {
+  bool ok = 1;
+  string last_error = 2;
+}
+
+// ModelProviderStat 是统计窗内一个主机的调用汇总。
+message ModelProviderStat {
+  string host = 1;
+  int64 calls_total = 2;
+  int64 calls_ok = 3;
+  google.protobuf.Timestamp last_at = 4;
+}
+
+// GetModelGatewayResponse 是槽投影加窗内统计。
+message GetModelGatewayResponse {
+  string base_url = 1;
+  string model = 2;
+  bool has_secret = 3;
+  string secret_hint = 4;
+  ModelGatewayStatus status = 5;
+  int32 provider_count = 6;
+  int64 window_seconds = 7;
+  int64 calls_total = 8;
+  int64 calls_ok = 9;
+  google.protobuf.Timestamp last_call_at = 10;
+  string last_error = 11;
+  repeated ModelProviderStat providers = 12;
+  ModelDialect dialect = 13;
+}
+
+// UpdateModelGatewayResponse 与 GetModelGatewayResponse 字段同形，类型分列以满足 RPC 响应命名。
+message UpdateModelGatewayResponse {
+  string base_url = 1;
+  string model = 2;
+  bool has_secret = 3;
+  string secret_hint = 4;
+  ModelGatewayStatus status = 5;
+  int32 provider_count = 6;
+  int64 window_seconds = 7;
+  int64 calls_total = 8;
+  int64 calls_ok = 9;
+  google.protobuf.Timestamp last_call_at = 10;
+  string last_error = 11;
+  repeated ModelProviderStat providers = 12;
+  ModelDialect dialect = 13;
+}

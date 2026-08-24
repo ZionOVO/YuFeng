@@ -1,0 +1,602 @@
+/* fusion（御锋安全运营中心）：御锋正式视觉语言 × HeroUI 组件基座。
+   面板、侧栏、徽章等结构件使用产品语义色板（发丝线 #1d252a / 边框 #263038）；
+   按钮、表格、弹窗等交互件由 .fusion 的 HeroUI 主题类着色。全部规则收在 .fusion 作用域。 */
+
+/* ---------- 布局骨架 ---------- */
+:where(.fusion, .fusionr) .fs-shell {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  min-height: 100vh;
+  background: #0a0d10;
+  color: #e9edf0;
+}
+:where(.fusion, .fusionr) .fs-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---------- 侧栏 ---------- */
+:where(.fusion, .fusionr) .fs-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0c1013;
+  border-right: 1px solid #263038;
+  min-width: 0;
+}
+:where(.fusion, .fusionr) .fs-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px;
+  border-bottom: 1px solid #1d252a;
+}
+:where(.fusion, .fusionr) .fs-seal,
+:where(.fusion, .fusionr) .yf-brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+}
+:where(.fusion, .fusionr) .yf-brand-mark {
+  object-fit: contain;
+  background: transparent;
+}
+:where(.fusion, .fusionr) .fs-wordmark {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+:where(.fusion, .fusionr) .fs-wordmark-sub {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: #8b98a1;
+  margin-top: 2px;
+}
+:where(.fusion, .fusionr) .fs-nav {
+  flex: 1;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+:where(.fusion, .fusionr) .fs-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: #8b98a1;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+:where(.fusion, .fusionr) .fs-nav-item:hover {
+  color: #e9edf0;
+  background: #11161a;
+}
+:where(.fusion, .fusionr) .fs-nav-item.is-active {
+  background: #18231e;
+  color: #dffbed;
+}
+:where(.fusion, .fusionr) .fs-nav-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+:where(.fusion, .fusionr) .fs-nav-group-trigger.is-active-parent {
+  color: #cfe9db;
+}
+:where(.fusion, .fusionr) .fs-nav-chevron {
+  margin-left: auto;
+  transition: transform 0.18s ease;
+}
+:where(.fusion, .fusionr) .fs-nav-group-trigger[aria-expanded='true'] .fs-nav-chevron {
+  transform: rotate(180deg);
+}
+:where(.fusion, .fusionr) .fs-nav-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 4px 20px;
+}
+:where(.fusion, .fusionr) .fs-nav-child {
+  position: relative;
+  font-size: 12px;
+}
+:where(.fusion, .fusionr) .fs-nav-child::before {
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 7px;
+  height: 1px;
+  background: #263038;
+  content: '';
+}
+:where(.fusion, .fusionr) .fs-nav-tag {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid #65512a;
+  background: #251f12;
+  color: #f1be5b;
+}
+:where(.fusion, .fusionr) .fs-sidebar-foot {
+  padding: 14px 18px;
+  border-top: 1px solid #1d252a;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+:where(.fusion, .fusionr) .fs-health {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: #8b98a1;
+}
+:where(.fusion, .fusionr) .fs-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #62e6a7;
+  box-shadow: 0 0 12px rgba(98, 230, 167, 0.5);
+  flex-shrink: 0;
+}
+:where(.fusion, .fusionr) .fs-dot--amber { background: #f1be5b; box-shadow: none; }
+:where(.fusion, .fusionr) .fs-dot--red { background: #ff746c; box-shadow: none; }
+:where(.fusion, .fusionr) .fs-dot--mute { background: #8b98a1; box-shadow: none; }
+
+/* ---------- 移动导航 ---------- */
+:where(.fusion, .fusionr) .fs-mobile-nav,
+:where(.fusion, .fusionr) .fs-mobile-backdrop,
+:where(.fusion, .fusionr) .fs-mobile-sheet {
+  display: none;
+}
+
+/* ---------- 顶栏 ---------- */
+:where(.fusion, .fusionr) .fs-topbar {
+  min-height: 112px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 38px 20px;
+  border-bottom: 1px solid #1d252a;
+}
+:where(.fusion, .fusionr) .fs-eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #62e6a7;
+}
+:where(.fusion, .fusionr) .fs-title {
+  margin-top: 6px;
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+:where(.fusion, .fusionr) .fs-clock {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: #8b98a1;
+  text-align: right;
+  line-height: 1.6;
+}
+:where(.fusion, .fusionr) .fs-clock strong {
+  display: block;
+  font-size: 17px;
+  color: #e9edf0;
+  font-weight: 500;
+}
+
+/* ---------- 主区 ---------- */
+:where(.fusion, .fusionr) .fs-main {
+  padding: 28px 38px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- 指标卡 ---------- */
+:where(.fusion, .fusionr) .fs-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+:where(.fusion, .fusionr) .fs-metric {
+  height: 132px;
+  background: #11161a;
+  border: 1px solid #263038;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+:where(.fusion, .fusionr) .fs-metric-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #8b98a1;
+}
+:where(.fusion, .fusionr) .fs-metric-value {
+  margin-top: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 34px;
+  line-height: 1;
+  color: #e9edf0;
+}
+:where(.fusion, .fusionr) .fs-metric-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #8b98a1;
+}
+:where(.fusion, .fusionr) .fs-metric--amber {
+  background: linear-gradient(140deg, #171811, #11161a);
+  border-color: #6f5930;
+}
+:where(.fusion, .fusionr) .fs-metric--amber .fs-metric-value { color: #f1be5b; }
+
+/* ---------- 面板 ---------- */
+:where(.fusion, .fusionr) .fs-grid2 {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 14px;
+}
+:where(.fusion, .fusionr) .fs-panel {
+  background: #11161a;
+  border: 1px solid #263038;
+}
+:where(.fusion, .fusionr) .fs-panel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #1d252a;
+}
+:where(.fusion, .fusionr) .fs-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+:where(.fusion, .fusionr) .fs-panel-sub {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: #8b98a1;
+  text-transform: uppercase;
+}
+:where(.fusion, .fusionr) .fs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-bottom: 1px solid #1d252a;
+  font-size: 12px;
+}
+:where(.fusion, .fusionr) .fs-row:last-child { border-bottom: none; }
+:where(.fusion, .fusionr) .fs-row-label { width: 64px; flex-shrink: 0; }
+:where(.fusion, .fusionr) .fs-row-note {
+  color: #8b98a1;
+  font-size: 11px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:where(.fusion, .fusionr) .fs-row-count {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px;
+  color: #e9edf0;
+}
+:where(.fusion, .fusionr) .fs-row-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #8b98a1;
+  flex-shrink: 0;
+}
+
+/* ---------- 语义徽章 ---------- */
+:where(.fusion, .fusionr) .fs-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  border: 1px solid;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+:where(.fusion, .fusionr) .fs-badge--green { color: #62e6a7; border-color: #28583f; background: #10251b; }
+:where(.fusion, .fusionr) .fs-badge--amber { color: #f1be5b; border-color: #65512a; background: #251f12; }
+:where(.fusion, .fusionr) .fs-badge--red { color: #ff746c; border-color: #653531; background: #261513; }
+:where(.fusion, .fusionr) .fs-badge--mute { color: #8b98a1; border-color: #263038; background: #12181c; }
+
+/* ---------- 焦点 ---------- */
+:where(.fusion, .fusionr) :focus-visible {
+  outline: 2px solid #62e6a7;
+  outline-offset: 2px;
+}
+/* HeroUI Input 的焦点落在内部 input 上，全局 outline 会变成贴在文字区的小直角框。 */
+:where(.fusion, .fusionr) input:focus,
+:where(.fusion, .fusionr) input:focus-visible,
+:where(.fusion, .fusionr) textarea:focus,
+:where(.fusion, .fusionr) textarea:focus-visible,
+:where(.fusion, .fusionr) [data-slot='input']:focus,
+:where(.fusion, .fusionr) [data-slot='input']:focus-visible {
+  outline: none;
+}
+:where(.fusion, .fusionr) [data-slot='input-wrapper'][data-focus='true'],
+:where(.fusion, .fusionr) [data-slot='input-wrapper'][data-focus-visible='true'] {
+  outline: none;
+  box-shadow: 0 0 0 1px #62e6a7;
+}
+
+/* ---------- HeroUI 组件在两个融合主题内的微调（发丝线、紧凑行距） ---------- */
+:where(.fusion, .fusionr) [data-focus-visible]:not([data-focus-visible-added]) {
+  outline: none;
+}
+:where(.fusion, .fusionr) .fs-table-tight thead th {
+  background: #161c21;
+  border-bottom: 1px solid #263038;
+}
+/* 直角仅属 fusion；fusionr 的表头圆角由面板 overflow 裁切 */
+.fusion .fs-table-tight thead th,
+.fusion .fs-table-tight thead th:first-child,
+.fusion .fs-table-tight thead th:last-child {
+  border-radius: 0;
+}
+:where(.fusion, .fusionr) .fs-table-tight tbody td {
+  border-bottom: 1px solid #1d252a;
+  font-size: 12px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+/* ---------- fusionr：HeroUI 原生圆角变体 ----------
+   布局与色板全部沿用共享规则，只把容器与控件的圆角交还给 HeroUI 风格。 */
+.fusionr .fs-panel {
+  border-radius: 12px;
+  overflow: hidden;
+}
+.fusionr .fs-metric {
+  border-radius: 12px;
+}
+.fusionr .fs-nav-item {
+  border-radius: 8px;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 1050px) {
+  :where(.fusion, .fusionr) .fs-metrics { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  :where(.fusion, .fusionr) .fs-grid2 { grid-template-columns: 1fr; }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+  :where(.fusion, .fusionr) .fs-shell { grid-template-columns: 192px minmax(0, 1fr); }
+  :where(.fusion, .fusionr) .fs-brand { gap: 9px; padding: 16px 12px; }
+  :where(.fusion, .fusionr) .fs-nav { padding: 12px 8px; }
+  :where(.fusion, .fusionr) .fs-nav-item { gap: 8px; padding: 8px; font-size: 12px; }
+  :where(.fusion, .fusionr) .fs-nav-children { padding-left: 14px; }
+  :where(.fusion, .fusionr) .fs-sidebar-foot { padding: 12px; }
+}
+@media (max-width: 640px) {
+  :where(.fusion, .fusionr) .fs-shell { grid-template-columns: 1fr; }
+  :where(.fusion, .fusionr) .fs-sidebar {
+    display: none;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-nav {
+    position: fixed;
+    z-index: 48;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: var(--yf-mobile-nav-height);
+    min-width: 0;
+    padding: max(8px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left));
+    border-bottom: 1px solid #263038;
+    background: rgba(12, 16, 19, 0.96);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(20px);
+  }
+  :where(.fusion, .fusionr) .fs-mobile-nav-brand {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-nav-title {
+    overflow: hidden;
+    color: #e9edf0;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-menu {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border: 1px solid #263038;
+    border-radius: 12px;
+    background: #11171a;
+    color: #b8c7cc;
+    touch-action: manipulation;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-menu.is-active { color: #62e6a7; border-color: #315f4a; }
+  :where(.fusion, .fusionr) .fs-mobile-nav-item {
+    min-width: 0;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid #263038;
+    border-radius: 12px;
+    background: #0c1013;
+    color: #b5c1c5;
+    font-size: 13px;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-nav-item.is-active {
+    color: #62e6a7;
+    background: #14231c;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-backdrop {
+    position: fixed;
+    z-index: 49;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.58);
+    backdrop-filter: blur(2px);
+  }
+  :where(.fusion, .fusionr) .fs-mobile-sheet {
+    position: fixed;
+    z-index: 50;
+    inset: 0;
+    display: block;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: 0;
+    background: #10171a;
+    box-shadow: 0 24px 72px rgba(0, 0, 0, 0.62);
+  }
+  :where(.fusion, .fusionr) .fs-mobile-sheet-head {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+    border-bottom: 1px solid #263038;
+    background: rgba(16, 23, 26, 0.96);
+    backdrop-filter: blur(16px);
+  }
+  :where(.fusion, .fusionr) .fs-mobile-sheet-head h2 {
+    margin-top: 4px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-close {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border: 1px solid #263038;
+    border-radius: 12px;
+    background: #0c1013;
+    color: #b8c7cc;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-sheet-links {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 12px max(16px, env(safe-area-inset-right)) 20px max(16px, env(safe-area-inset-left));
+  }
+  :where(.fusion, .fusionr) .fs-mobile-group-label {
+    margin: 12px 2px 0;
+    color: #718087;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-sheet-links .fs-mobile-nav-item {
+    min-height: 52px;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid #263038;
+    background: #0c1013;
+    color: #b5c1c5;
+    font-size: 13px;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-sheet-links .fs-mobile-nav-item.is-active {
+    border-color: #315f4a;
+    background: #14231c;
+    color: #62e6a7;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-account {
+    display: grid;
+    gap: 8px;
+    padding: 12px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    border-top: 1px solid #263038;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-account-user {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px 12px;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-account-user p:first-child { font-size: 13px; color: #e9edf0; }
+  :where(.fusion, .fusionr) .fs-mobile-account-user p:last-child {
+    overflow: hidden;
+    margin-top: 2px;
+    color: #718087;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-account > button {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid #263038;
+    border-radius: 12px;
+    background: #0c1013;
+    color: #b5c1c5;
+    text-align: left;
+  }
+  :where(.fusion, .fusionr) .fs-mobile-account > button.is-danger { color: #ff938c; }
+  :where(.fusion, .fusionr) body.yf-mobile-menu-open {
+    overflow: hidden;
+  }
+  :where(.fusion, .fusionr) .fs-topbar {
+    min-height: 0;
+    padding: 18px max(20px, env(safe-area-inset-right)) 18px max(20px, env(safe-area-inset-left));
+  }
+  :where(.fusion, .fusionr) .fs-main { padding: 20px; }
+}
+@media (max-width: 560px) {
+  :where(.fusion, .fusionr) .fs-metrics { grid-template-columns: minmax(0, 1fr); }
+  :where(.fusion, .fusionr) .fs-panel-head { align-items: flex-start; }
+}
+@media (pointer: coarse) {
+  :where(.fusion, .fusionr) .fs-nav-item,
+  :where(.fusion, .fusionr) .fs-mobile-nav-item { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.fusion, .fusionr) .fs-nav-chevron { transition: none; }
+}

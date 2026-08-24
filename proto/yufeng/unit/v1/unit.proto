@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+// 单元只读投影：生产能力、运行健康与资产侧展示。
+package yufeng.unit.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/unitv1";
+
+// ProducerOutput 是单元能生产的上行信息类别。
+enum ProducerOutput {
+  PRODUCER_OUTPUT_UNSPECIFIED = 0;
+  // 必须完整入账的检测、拦截与故障事件。
+  PRODUCER_OUTPUT_CRITICAL_EVENT = 1;
+  // 按签名采样策略产生的无发现普通样本。
+  PRODUCER_OUTPUT_ORDINARY_SAMPLE = 2;
+  // brain 冻结检查票据所需的脱敏特征。
+  PRODUCER_OUTPUT_TICKET_FEATURES = 3;
+}
+
+// SensorType 是单元内可用的传感实现。
+enum SensorType {
+  SENSOR_TYPE_UNSPECIFIED = 0;
+  // 规范 HTTP 请求视图与覆盖度。
+  SENSOR_TYPE_HTTP = 1;
+  // Coraza 核心规则集检测。
+  SENSOR_TYPE_CORAZA = 2;
+}
+
+// ProducerCapabilities 声明单元客观具备的生产能力，不授予任何权限。
+message ProducerCapabilities {
+  repeated ProducerOutput outputs = 1;
+  repeated string projection_versions = 2;
+  repeated yufeng.common.v1.IngressPosture postures = 3;
+  repeated SensorType sensors = 4;
+  bool local_evidence_ring = 5;
+  bool local_async_bypass = 6;
+  uint32 max_event_batch = 7;
+  uint32 max_in_flight_requests = 8;
+  uint64 max_spool_bytes = 9;
+  uint32 max_evidence_entries = 10;
+  // 当前二进制实现的模块协议能力；只用于兼容性判断，不产生授权。
+  repeated string module_capabilities = 11;
+}
+
+// ProducerHealth 是能力对应的单调或瞬时健康投影，不携带请求原文。
+message ProducerHealth {
+  uint64 buffered_critical_events = 1;
+  uint64 buffered_ordinary_samples = 2;
+  uint64 dropped_critical_events = 3;
+  uint64 dropped_ordinary_samples = 4;
+  uint64 dropped_local_bypass_items = 5;
+  uint64 projection_failures = 6;
+  repeated string healthy_projection_versions = 7;
+}
+
+// UnitProjection 是资产查询面返回的单元只读状态。
+message UnitProjection {
+  string unit_id = 1;
+  string kind = 2;
+  string version = 3;
+  yufeng.common.v1.UnitHealth health = 4;
+  ProducerCapabilities capabilities = 5;
+  ProducerHealth producer_health = 6;
+  yufeng.common.v1.IngressPosture posture = 7;
+  string traffic_key = 8;
+  google.protobuf.Timestamp last_heartbeat_at = 9;
+  // 最近合法心跳确认已装载的资产世代标识。
+  string current_generation_id = 10;
+  // 与 current_generation_id 对应的资产世代序号。
+  int64 current_generation_seq = 11;
+}

@@ -1,0 +1,105 @@
+name: develop-pull-request-gate
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: develop-pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: yufeng_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d yufeng_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      YUFENG_TEST_DSN: postgres://postgres@localhost:5432/yufeng_test?sslmode=disable
+      YUFENG_TRAFFIC_TEST_DSN: postgres://yufeng_traffic:integration-only@localhost:5432/yufeng_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+      - name: Create restricted traffic writer role
+        run: psql "$YUFENG_TEST_DSN" -v ON_ERROR_STOP=1 -c "CREATE ROLE yufeng_traffic LOGIN PASSWORD 'integration-only'"
+      - run: make build test
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l $(git ls-files '*.go'))"
+      - name: Run consolidated static analysis
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1 run ./...
+
+  proto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+      - run: go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+      - run: go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.20.0
+      - run: buf lint
+        working-directory: proto
+      - run: buf format --diff --exit-code
+        working-directory: proto
+      - run: git branch --force buf-breaking-baseline "${{ github.event.pull_request.base.sha }}"
+      - run: buf breaking proto --against '.git#branch=buf-breaking-baseline,subdir=proto'
+      - run: buf generate
+        working-directory: proto
+      - run: git diff --exit-code -- proto/gen
+
+  cross-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+      - run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./cmd/yufeng-edge ./cmd/yufeng-host
+      - run: CGO_ENABLED=0 GOOS=linux GOARCH=mips go build ./cmd/yufeng-edge ./cmd/yufeng-host
+      - name: Build distributed investigation workers
+        run: |
+          for target in linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64; do
+            target_os="${target%/*}"
+            target_arch="${target#*/}"
+            CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" go build ./cmd/yufeng-jarvis ./cmd/yufeng-agentd ./cmd/yufeng-run
+          done
+
+  console:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+      - run: npm ci
+        working-directory: console
+      - run: npm test
+        working-directory: console
+      - run: npm run lint
+        working-directory: console
+      - run: npm run typecheck
+        working-directory: console
+      - run: npm run build
+        working-directory: console

@@ -1,0 +1,5 @@
+# 构建与本地缓存不入库（根 .gitignore 的 /dist/ 只锚定仓库根）
+dist/
+.vite/
+coverage/
+*.tsbuildinfo

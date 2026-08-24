@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+// 防御模块目录契约：只返回编译期注册的语义能力。
+package yufeng.module.v1;
+
+option go_package = "yufeng/proto/gen/modulev1";
+
+service ModuleCatalogService {
+  rpc ListModules(ListModulesRequest) returns (ListModulesResponse);
+}
+
+enum ModuleSurface {
+  MODULE_SURFACE_UNSPECIFIED = 0;
+  MODULE_SURFACE_ASSET_BADGE = 1;
+  MODULE_SURFACE_CASE_CARD = 2;
+  MODULE_SURFACE_CASE_WORKSPACE = 3;
+  MODULE_SURFACE_STATISTICS = 4;
+}
+
+message DefenseModule {
+  string module_id = 1;
+  string display_name = 2;
+  string version = 3;
+  repeated string required_producer_capabilities = 4;
+  repeated string case_activity_schemas = 5;
+  repeated ModuleSurface surfaces = 6;
+  bool active = 7;
+}
+
+message ListModulesRequest {}
+message ListModulesResponse {
+  repeated DefenseModule modules = 1;
+}

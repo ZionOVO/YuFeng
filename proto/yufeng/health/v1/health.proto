@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+// 健康检查：Connect 版探针。
+package yufeng.health.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "yufeng/proto/gen/healthv1";
+
+service HealthService {
+  rpc Livez(LivezRequest) returns (LivezResponse);
+  rpc Readyz(ReadyzRequest) returns (ReadyzResponse);
+  rpc Version(VersionRequest) returns (VersionResponse);
+}
+
+message LivezRequest {}
+message LivezResponse {
+  string status = 1;
+  google.protobuf.Timestamp server_time = 2;
+}
+
+message ReadyzRequest {}
+message ReadyzResponse {
+  string status = 1;
+  google.protobuf.Timestamp server_time = 2;
+}
+
+message VersionRequest {}
+message VersionResponse {
+  string version = 1;
+  string contract_version = 2;
+  string build_sha = 3;
+  string build_time = 4;
+}

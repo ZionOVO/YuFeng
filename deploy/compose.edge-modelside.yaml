@@ -1,0 +1,119 @@
+services:
+  modelside:
+    image: ${YUFENG_MODELSIDE_IMAGE:-yufeng-modelside:local}
+    build:
+      context: ..
+      dockerfile: components/modelside/Dockerfile
+    restart: unless-stopped
+    command:
+      - "--listen"
+      - "unix:///run/yufeng/modelside.sock"
+      - "--modelside-id"
+      - "${YUFENG_MODELSIDE_ID:?set YUFENG_MODELSIDE_ID}"
+      - "--brain"
+      - "${YUFENG_BRAIN_URL:-https://brain:9050}"
+      - "--brain-token-file"
+      - "/run/secrets/modelside_result_token"
+      - "--brain-ca"
+      - "/tls/ca.crt"
+      - "--brain-cert"
+      - "/tls/client.crt"
+      - "--brain-key"
+      - "/tls/client.key"
+      - "--weights"
+      - "/models"
+      - "--workers"
+      - "${YUFENG_MODELSIDE_WORKERS:-2}"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - yufeng_modelside_socket:/run/yufeng
+      - yufeng_tls_modelside:/tls:ro
+      - ${YUFENG_MODELSIDE_WEIGHTS_DIR:?set YUFENG_MODELSIDE_WEIGHTS_DIR}:/models:ro
+    secrets:
+      - modelside_result_token
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /run/yufeng/modelside.sock"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  edge:
+    image: ${YUFENG_EDGE_IMAGE:-yufeng-edge:local}
+    build:
+      context: ..
+      dockerfile: deploy/edge.Dockerfile
+    restart: unless-stopped
+    command:
+      - "-brain"
+      - "${YUFENG_BRAIN_URL:-https://brain:9050}"
+      - "-unit"
+      - "${YUFENG_EDGE_UNIT:?set YUFENG_EDGE_UNIT}"
+      - "-unit-version"
+      - "${YUFENG_EDGE_VERSION:-0.2.0}"
+      - "-bootstrap-token-file"
+      - "/run/secrets/unit_bootstrap_token"
+      - "-pubkey"
+      - "/pubkey/pubkey.hex"
+      - "-tls-ca"
+      - "/tls/ca.crt"
+      - "-tls-cert"
+      - "/tls/client.crt"
+      - "-tls-key"
+      - "/tls/client.key"
+      - "-source-hmac-key"
+      - "/source/source-hmac.key"
+      - "-modelside"
+      - "unix:///run/yufeng/modelside.sock"
+      - "-data-dir"
+      - "/var/lib/yufeng/edge"
+      - "-spool-dir"
+      - "/var/lib/yufeng/telemetry"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - yufeng_modelside_socket:/run/yufeng
+      - yufeng_edge_cache:/var/lib/yufeng/edge
+      - yufeng_edge_telemetry:/var/lib/yufeng/telemetry
+      - yufeng_pubkey:/pubkey:ro
+      - yufeng_source:/source:ro
+      - yufeng_tls_edge:/tls:ro
+    secrets:
+      - unit_bootstrap_token
+    ports:
+      - "${YUFENG_EDGE_LISTEN_PORT:-18080}:18080"
+      - "127.0.0.1:${YUFENG_EDGE_ADMIN_PORT:-19092}:19092"
+    depends_on:
+      modelside:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:19092/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  yufeng_modelside_socket:
+  yufeng_edge_cache:
+  yufeng_edge_telemetry:
+  yufeng_pubkey:
+    name: ${YUFENG_PUBKEY_VOLUME:-yufeng_yufeng_pubkey}
+  yufeng_source:
+    name: ${YUFENG_SOURCE_VOLUME:-yufeng_yufeng_source}
+  yufeng_tls_edge:
+    name: ${YUFENG_EDGE_TLS_VOLUME:-yufeng_yufeng_tls_edge}
+  yufeng_tls_modelside:
+    name: ${YUFENG_MODELSIDE_TLS_VOLUME:-yufeng_yufeng_tls_modelside}
+
+secrets:
+  unit_bootstrap_token:
+    file: ${YUFENG_UNIT_BOOTSTRAP_TOKEN_FILE:-./secrets/unit_bootstrap_token}
+  modelside_result_token:
+    file: ${YUFENG_MODELSIDE_RESULT_TOKEN_FILE:-./secrets/modelside_result_token}

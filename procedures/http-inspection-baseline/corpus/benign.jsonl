@@ -1,0 +1,15 @@
+{"id":"b-01","method":"GET","path":"/api/items","query":"page=2","expect_hit":false}
+{"id":"b-02","method":"GET","path":"/api/items","query":"id=42","expect_hit":false}
+{"id":"b-03","method":"GET","path":"/health","query":"","expect_hit":false}
+{"id":"b-04","method":"GET","path":"/admin","query":"view=dashboard","expect_hit":false}
+{"id":"b-05","method":"POST","path":"/api/items","query":"","body":"name=widget&qty=3","content_type":"application/x-www-form-urlencoded","expect_hit":false}
+{"id":"b-06","method":"GET","path":"/search","query":"q=hello+world","expect_hit":false}
+{"id":"b-07","method":"GET","path":"/users/alice","query":"","expect_hit":false}
+{"id":"b-08","method":"GET","path":"/static/app.css","query":"v=1","expect_hit":false}
+{"id":"b-09","method":"POST","path":"/api/login","query":"","body":"{\"user\":\"alice\",\"pass\":\"correct-horse\"}","content_type":"application/json","expect_hit":false}
+{"id":"b-10","method":"GET","path":"/api/orders","query":"status=open&limit=20","expect_hit":false}
+{"id":"b-11","method":"PUT","path":"/api/items/42","query":"","body":"{\"name\":\"gadget\"}","content_type":"application/json","expect_hit":false}
+{"id":"b-12","method":"GET","path":"/","query":"","expect_hit":false}
+{"id":"b-13","method":"GET","path":"/about","query":"lang=zh-CN","expect_hit":false}
+{"id":"b-14","method":"POST","path":"/api/feedback","query":"","body":"note=thanks+for+the+help","content_type":"application/x-www-form-urlencoded","expect_hit":false}
+{"id":"b-15","method":"GET","path":"/api/items","query":"sort=created_at&order=desc","expect_hit":false}

@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+// 制品下发契约：单元按快照/游标拉取本单元可见的发布条目。
+package yufeng.artifact.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/artifactv1";
+
+service ArtifactService {
+  // ListReleases 按条查询发布；生产装载必须以世代信封为准。
+  rpc ListReleases(ListReleasesRequest) returns (ListReleasesResponse);
+  // ListGenerations 按序号追赶已签名资产世代信封；单次响应受字节预算约束。
+  rpc ListGenerations(ListGenerationsRequest) returns (ListGenerationsResponse);
+  // ListUnitListenPlans 按版本追赶当前身份单元的已签名监听计划。
+  rpc ListUnitListenPlans(ListUnitListenPlansRequest) returns (ListUnitListenPlansResponse);
+}
+
+message ListReleasesRequest {
+  string unit_id = 1;
+  string cursor = 2;
+  bool full_snapshot = 3;
+  int32 max_bytes = 4;
+}
+
+message ReleaseItem {
+  string release_id = 1;
+  Artifact artifact = 2;
+  string asset_id = 3;
+  yufeng.common.v1.ReleaseMode mode = 4;
+  int32 canary_percent = 5;
+  bool retired = 6;
+  yufeng.common.v1.RetireReason retire_reason = 7;
+  google.protobuf.Timestamp changed_at = 8;
+  // 所属资产世代序号；0 表示尚未编入世代（仅演示规则）。
+  int64 generation_seq = 9;
+}
+
+message ListReleasesResponse {
+  repeated ReleaseItem items = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
+  bool snapshot = 4;
+  // 快照模式下的当前资产世代信封；增量页可为空。
+  AssetGeneration generation = 5;
+}
+
+// AssetGeneration 是制品契约上的原子装载信封，不是第七个数据契约。
+message AssetGeneration {
+  // 信封内容地址（排除 envelope_signature）。
+  string generation_id = 1;
+  // 资产标识。
+  string asset_id = 2;
+  // 单调序号。
+  int64 generation_seq = 3;
+  // 上一份世代标识。
+  string parent_generation_id = 4;
+  // 成员仍是带 release_id 的 ReleaseItem。
+  repeated ReleaseItem members = 5;
+  // 最低边缘版本。
+  string min_edge_version = 6;
+  // 生效时间；与能力令牌共用 60 秒偏差。
+  google.protobuf.Timestamp not_before = 7;
+  // 只证明「这组成员一起装」。
+  Signature envelope_signature = 8;
+  // 被替换的 generation_seq；无签名回滚授权时拒绝更旧序号。
+  int64 rollback_of = 9;
+}
+
+message ListGenerationsRequest {
+  // 单元标识。
+  string unit_id = 1;
+  // 资产标识。
+  string asset_id = 2;
+  // 仅返回严格大于该序号的世代。
+  int64 since_seq = 3;
+  // 响应字节预算；0 表示服务端默认。
+  int32 max_bytes = 4;
+}
+
+message ListGenerationsResponse {
+  // 世代信封列表，按 generation_seq 升序。
+  repeated AssetGeneration generations = 1;
+  // 还有后续序号；为 true 时用本页最后一条 generation_seq 续拉。
+  bool has_more = 2;
+}
+
+message ListUnitListenPlansRequest {
+  // 目标单元；必须与访问令牌主体一致。
+  string unit_id = 1;
+  // 只返回严格大于该版本的计划。
+  uint64 since_version = 2;
+}
+
+message ListUnitListenPlansResponse {
+  // 计划按 version 升序。
+  repeated UnitListenPlan plans = 1;
+  // 还有后续版本；续拉时使用本页最后一条的 version。
+  bool has_more = 2;
+}

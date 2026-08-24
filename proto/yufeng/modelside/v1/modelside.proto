@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+// Edge 邻近模型旁路：规范流量输入与无原文批量结果上报。
+package yufeng.modelside.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/artifact/v1/v1.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/modelsidev1";
+
+// ModelSideIngressService 接收 Edge 后台发送的有界规范流量。
+service ModelSideIngressService {
+  rpc SubmitTraffic(SubmitTrafficRequest) returns (SubmitTrafficResponse);
+}
+
+// ModelResultService 接收 ModelSide 无原文的批量推理结果。
+service ModelResultService {
+  rpc UploadResults(UploadResultsRequest) returns (UploadResultsResponse);
+}
+
+// StringValues 保留一个规范字段的重复值与顺序。
+message StringValues {
+  string name = 1;
+  repeated string values = 2;
+}
+
+// NormalizedTraffic 是 normalized-http/v1 模型输入。
+message NormalizedTraffic {
+  string schema_version = 1;
+  string request_id = 2;
+  string unit_id = 3;
+  string asset_id = 4;
+  string generation_id = 5;
+  int64 generation_seq = 6;
+  string model_profile_id = 7;
+  string model_profile_digest = 8;
+  string method = 9;
+  string route = 10;
+  repeated StringValues headers = 11;
+  repeated StringValues query_parameters = 12;
+  bytes body = 13;
+  string content_type = 14;
+  int64 body_length = 15;
+  bool body_truncated = 16;
+  repeated yufeng.common.v1.InspectionCoverage coverage = 17;
+  google.protobuf.Timestamp occurred_at = 18;
+}
+
+// SubmitTrafficRequest 按同一签名模型档案批量提交规范流量。
+message SubmitTrafficRequest {
+  yufeng.artifact.v1.ModelProfile model_profile = 1;
+  string model_profile_digest = 2;
+  repeated NormalizedTraffic traffic = 3;
+}
+
+// RejectedTraffic 是 ModelSide 对单项输入的有界拒绝原因。
+message RejectedTraffic {
+  string request_id = 1;
+  string code = 2;
+}
+
+// SubmitTrafficResponse 保证 accepted + dropped == 请求条目数。
+message SubmitTrafficResponse {
+  int32 accepted = 1;
+  repeated RejectedTraffic dropped = 2;
+}
+
+// ModelResultKind 是模型结果进入 Brain 后的处理车道。
+enum ModelResultKind {
+  MODEL_RESULT_KIND_UNSPECIFIED = 0;
+  MODEL_RESULT_KIND_MODEL_ALERT = 1;
+  MODEL_RESULT_KIND_REVIEW_SAMPLE = 2;
+}
+
+// ReviewReason 是签名策略允许的复核原因。
+enum ReviewReason {
+  REVIEW_REASON_UNSPECIFIED = 0;
+  REVIEW_REASON_SCORE_FLOOR = 1;
+  REVIEW_REASON_NEW_ROUTE = 2;
+  REVIEW_REASON_INSUFFICIENT_COVERAGE = 3;
+}
+
+// ModelResult 是不包含原始头、查询参数或正文的推理结果。
+message ModelResult {
+  string result_id = 1;
+  string request_id = 2;
+  string unit_id = 3;
+  string asset_id = 4;
+  string generation_id = 5;
+  int64 generation_seq = 6;
+  ModelResultKind kind = 7;
+  double score = 8;
+  string model_profile_id = 9;
+  string model_profile_digest = 10;
+  string model_group = 11;
+  string model_type = 12;
+  string model_version = 13;
+  string method = 14;
+  string route = 15;
+  repeated yufeng.common.v1.InspectionCoverage coverage = 16;
+  repeated ReviewReason review_reasons = 17;
+  google.protobuf.Timestamp occurred_at = 18;
+}
+
+// UploadResultsRequest 由一个已绑定身份的 ModelSide 批量提交结果。
+message UploadResultsRequest {
+  string modelside_id = 1;
+  repeated ModelResult results = 2;
+}
+
+// RejectedResult 是 Brain 对单项结果的稳定拒绝原因。
+message RejectedResult {
+  string result_id = 1;
+  string code = 2;
+}
+
+// UploadResultsResponse 满足 accepted + deduped + rejected == 请求条目数。
+message UploadResultsResponse {
+  int32 accepted = 1;
+  int32 deduped = 2;
+  repeated RejectedResult rejected = 3;
+}

@@ -1,0 +1,295 @@
+name: yufeng
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: yufeng
+      POSTGRES_USER: yufeng
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yufeng -d yufeng"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - yufeng_pg:/var/lib/postgresql/data
+
+  traffic-role:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGDATABASE: yufeng
+      PGUSER: yufeng
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      TRAFFIC_PASSWORD_FILE: /run/secrets/traffic_db_password
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        export PGPASSWORD="$$(cat "$$DB_PASSWORD_FILE")"
+        traffic_password="$$(cat "$$TRAFFIC_PASSWORD_FILE")"
+        psql --set=traffic_password="$$traffic_password" <<'SQL'
+        SELECT format('CREATE ROLE yufeng_traffic LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L', :'traffic_password')
+        WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='yufeng_traffic') \gexec
+        SELECT format('ALTER ROLE yufeng_traffic WITH LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L', :'traffic_password') \gexec
+        SQL
+    secrets:
+      - db_password
+      - traffic_db_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  keys:
+    image: yufeng:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    user: "0"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        umask 077
+        yfctl keys -out /keys
+        for identity in brain jarvis agentd edge modelside operator; do
+          yfctl tls -out "/authority/$$identity"
+        done
+        cp /keys/pubkey.hex /pubkey/pubkey.hex
+        cp /authority/brain/server.crt /brain-tls/server.crt
+        cp /authority/brain/server.key /brain-tls/server.key
+        for identity in jarvis agentd edge modelside; do
+          eval target="/$$identity-tls"
+          cp /authority/brain/ca.crt "$$target/ca.crt"
+          cp "/authority/$$identity/client.crt" "$$target/client.crt"
+          cp "/authority/$$identity/client.key" "$$target/client.key"
+        done
+        cp /authority/agentd/client-public.pem /agentd-public/worker-public.pem
+        cp /authority/agentd/client.crt /agentd-public/worker-client.crt
+        cat /authority/jarvis/ca.crt /authority/agentd/ca.crt /authority/edge/ca.crt /authority/modelside/ca.crt /authority/operator/ca.crt > /tls-trust/client-ca.crt
+        cp /authority/brain/ca.crt /operator/ca.crt
+        cp /authority/operator/client.crt /operator/client.crt
+        cp /authority/operator/client.key /operator/client.key
+        if [ ! -s /source/source-hmac.key ]; then head -c 32 /dev/urandom > /source/source-hmac.key; fi
+        chown -R yufeng:yufeng /brain-tls /jarvis-tls /agentd-tls /agentd-public /operator
+        chown -R 65532:65532 /edge-tls /modelside-tls
+        chown -R yufeng:yufeng /keys /sign /audit-checkpoints
+        chmod 0600 /keys/signing.key.hex /brain-tls/server.key /jarvis-tls/client.key /agentd-tls/client.key /edge-tls/client.key /modelside-tls/client.key /operator/client.key
+        chmod 0644 /pubkey/pubkey.hex /brain-tls/server.crt /jarvis-tls/ca.crt /jarvis-tls/client.crt /agentd-tls/ca.crt /agentd-tls/client.crt /edge-tls/ca.crt /edge-tls/client.crt /modelside-tls/ca.crt /modelside-tls/client.crt /agentd-public/worker-public.pem /agentd-public/worker-client.crt /tls-trust/client-ca.crt /operator/ca.crt /operator/client.crt
+        chmod 0444 /source/source-hmac.key
+    volumes:
+      - yufeng_keys:/keys
+      - yufeng_pubkey:/pubkey
+      - yufeng_source:/source
+      - yufeng_sign:/sign
+      - yufeng_audit_checkpoints:/audit-checkpoints
+      - yufeng_tls_authority:/authority
+      - yufeng_tls_brain:/brain-tls
+      - yufeng_tls_jarvis:/jarvis-tls
+      - yufeng_tls_agentd:/agentd-tls
+      - yufeng_tls_edge:/edge-tls
+      - yufeng_tls_modelside:/modelside-tls
+      - yufeng_tls_trust:/tls-trust
+      - yufeng_agentd_public:/agentd-public
+      - ../.tmp/compose-tls:/operator
+
+  signer:
+    image: yufeng:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    entrypoint: ["/usr/local/bin/yfctl"]
+    command: ["signer", "-socket", "/sign/sign.sock", "-key", "/keys/signing.key.hex", "-workload-socket", "/sign/workload-sign.sock", "-workload-ca-key", "/sign/workload-ca.key", "-workload-ca-cert", "/sign/workload-ca.crt", "-trusted-client-ca", "/tls-trust/client-ca.crt", "-client-ca-bundle", "/sign/client-ca-bundle.crt"]
+    volumes:
+      - yufeng_keys:/keys:ro
+      - yufeng_sign:/sign
+      - yufeng_tls_trust:/tls-trust:ro
+    depends_on:
+      keys:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /sign/sign.sock && test -S /sign/workload-sign.sock && test -s /sign/client-ca-bundle.crt"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  brain:
+    image: yufeng:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    command:
+      - "-dsn"
+      - "postgres://yufeng@postgres:5432/yufeng?sslmode=disable"
+      - "-dsn-password-file"
+      - "/run/secrets/db_password"
+      - "-traffic-dsn"
+      - "postgres://yufeng_traffic@postgres:5432/yufeng?sslmode=disable"
+      - "-traffic-dsn-password-file"
+      - "/run/secrets/traffic_db_password"
+      - "-addr"
+      - ":9050"
+      - "-bootstrap-admin-user"
+      - "${YUFENG_ADMIN_USER:-admin}"
+      - "-bootstrap-admin-pass-file"
+      - "/run/secrets/admin_password"
+      - "-jarvis-agent-id=jarvis-1"
+      - "-tls-cert"
+      - "/brain-tls/server.crt"
+      - "-tls-key"
+      - "/brain-tls/server.key"
+      - "-tls-client-ca"
+      - "/sign/client-ca-bundle.crt"
+      - "-signing-socket"
+      - "/sign/sign.sock"
+      - "-signing-pubkey"
+      - "/pubkey/pubkey.hex"
+      - "-workload-signing-socket"
+      - "/sign/workload-sign.sock"
+      - "-audit-checkpoint"
+      - "/audit-checkpoints/audit-ledger.jsonl"
+      - "-agent-bootstrap-token-file"
+      - "/run/secrets/agent_bootstrap_token"
+      - "-unit-bootstrap-token-file"
+      - "/run/secrets/unit_bootstrap_token"
+      - "-modelside-token-file"
+      - "/run/secrets/modelside_result_token"
+      - "-central-worker-id=agentd-central"
+      - "-central-worker-bootstrap-token-file"
+      - "/run/secrets/central_worker_bootstrap_token"
+      - "-central-worker-public-key-file=/agentd-public/worker-public.pem"
+      - "-central-worker-client-cert=/agentd-public/worker-client.crt"
+      - "-nats-port"
+      - "4222"
+      - "-console-dir"
+      - "/usr/share/yufeng/console"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traffic-role:
+        condition: service_completed_successfully
+      keys:
+        condition: service_completed_successfully
+      signer:
+        condition: service_healthy
+    volumes:
+      - yufeng_pubkey:/pubkey:ro
+      - yufeng_sign:/sign
+      - yufeng_audit_checkpoints:/audit-checkpoints
+      - yufeng_tls_brain:/brain-tls:ro
+      - yufeng_agentd_public:/agentd-public:ro
+    secrets:
+      - db_password
+      - traffic_db_password
+      - admin_password
+      - agent_bootstrap_token
+      - unit_bootstrap_token
+      - modelside_result_token
+      - central_worker_bootstrap_token
+    ports:
+      - "9050:9050"
+      - "19090:19090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:19090/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  jarvis:
+    image: yufeng:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    entrypoint: ["/usr/local/bin/yufeng-jarvis"]
+    command:
+      - "-brain"
+      - "https://brain:9050"
+      - "-jarvis-agent-id=jarvis-1"
+      - "-bootstrap-token-file"
+      - "/run/secrets/agent_bootstrap_token"
+      - "-tls-ca"
+      - "/tls/ca.crt"
+      - "-tls-cert"
+      - "/tls/client.crt"
+      - "-tls-key"
+      - "/tls/client.key"
+      - "-state-dir"
+      - "/var/lib/yufeng/jarvis"
+    volumes:
+      - yufeng_tls_jarvis:/tls:ro
+      - yufeng_jarvis:/var/lib/yufeng/jarvis
+    secrets:
+      - agent_bootstrap_token
+    depends_on:
+      brain:
+        condition: service_healthy
+
+  agentd:
+    image: yufeng:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    entrypoint: ["/usr/local/bin/yufeng-agentd"]
+    command:
+      - "-brain"
+      - "https://brain:9050"
+      - "-worker=agentd-central"
+      - "-worker-bootstrap-token-file"
+      - "/run/secrets/central_worker_bootstrap_token"
+      - "-tls-ca=/tls/ca.crt"
+      - "-tls-seed-cert=/tls/client.crt"
+      - "-tls-seed-key=/tls/client.key"
+      - "-state-dir=/var/lib/yufeng/agentd"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - yufeng_tls_agentd:/tls:ro
+      - yufeng_agentd:/var/lib/yufeng/agentd
+    secrets:
+      - central_worker_bootstrap_token
+    depends_on:
+      brain:
+        condition: service_healthy
+
+volumes:
+  yufeng_keys:
+  yufeng_pubkey:
+  yufeng_source:
+  yufeng_pg:
+  yufeng_sign:
+  yufeng_audit_checkpoints:
+  yufeng_jarvis:
+  yufeng_agentd:
+  yufeng_tls_authority:
+  yufeng_tls_brain:
+  yufeng_tls_jarvis:
+  yufeng_tls_agentd:
+  yufeng_tls_edge:
+  yufeng_tls_modelside:
+  yufeng_tls_trust:
+  yufeng_agentd_public:
+
+secrets:
+  db_password:
+    file: ${YUFENG_DB_PASSWORD_FILE:-./secrets/db_password}
+  traffic_db_password:
+    file: ${YUFENG_TRAFFIC_DB_PASSWORD_FILE:-./secrets/traffic_db_password}
+  admin_password:
+    file: ${YUFENG_ADMIN_PASSWORD_FILE:-./secrets/admin_password}
+  agent_bootstrap_token:
+    file: ${YUFENG_AGENT_BOOTSTRAP_TOKEN_FILE:-./secrets/agent_bootstrap_token}
+  unit_bootstrap_token:
+    file: ${YUFENG_UNIT_BOOTSTRAP_TOKEN_FILE:-./secrets/unit_bootstrap_token}
+  modelside_result_token:
+    file: ${YUFENG_MODELSIDE_RESULT_TOKEN_FILE:-./secrets/modelside_result_token}
+  central_worker_bootstrap_token:
+    file: ${YUFENG_CENTRAL_WORKER_BOOTSTRAP_TOKEN_FILE:-./secrets/central_worker_bootstrap_token}

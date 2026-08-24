@@ -1,0 +1,5 @@
+{"id":"prof-01","param":"user_id","values":["1","2","3","4","5"],"expect":"digit","note":"参数画像检测器尚未装载；当前文件只冻结样本清单"}
+{"id":"prof-02","param":"token","values":["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"],"expect":"uuid","note":"参数画像检测器尚未装载；当前文件只冻结样本清单"}
+{"id":"prof-03","param":"q","values":["hello","world","search"],"expect":"alpha","note":"参数画像检测器尚未装载；当前文件只冻结样本清单"}
+{"id":"prof-04","param":"hex","values":["00ff","aabb"],"expect":"hex","note":"参数画像检测器尚未装载；当前文件只冻结样本清单"}
+{"id":"prof-05","param":"note","values":["ok"],"expect":"ascii_print","note":"参数画像检测器尚未装载；当前文件只冻结样本清单"}

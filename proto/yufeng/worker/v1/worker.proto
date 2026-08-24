@@ -1,0 +1,508 @@
+syntax = "proto3";
+
+// Worker 契约：agentd 工作负载身份领取 run 并回执。
+package yufeng.worker.v1;
+
+import "google/protobuf/timestamp.proto";
+import "yufeng/event/v1/v1.proto";
+import "yufeng/run/v1/run.proto";
+
+option go_package = "yufeng/proto/gen/workerv1";
+
+service WorkerService {
+  rpc CreateWorkerBootstrap(CreateWorkerBootstrapRequest) returns (CreateWorkerBootstrapResponse);
+  rpc RegisterWorkerIdentity(RegisterWorkerIdentityRequest) returns (RegisterWorkerIdentityResponse);
+  rpc RefreshWorkerAccessToken(RefreshWorkerAccessTokenRequest) returns (RefreshWorkerAccessTokenResponse);
+  rpc RevokeWorkerIdentity(RevokeWorkerIdentityRequest) returns (RevokeWorkerIdentityResponse);
+  rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+  rpc PollWork(PollWorkRequest) returns (PollWorkResponse);
+  rpc ExtendLease(ExtendLeaseRequest) returns (ExtendLeaseResponse);
+  rpc ReportProgress(ReportProgressRequest) returns (ReportProgressResponse);
+  rpc CompleteWork(CompleteWorkRequest) returns (CompleteWorkResponse);
+  rpc FailWork(FailWorkRequest) returns (FailWorkResponse);
+  rpc PollAnalysisWork(PollAnalysisWorkRequest) returns (PollAnalysisWorkResponse) {
+    option deprecated = true;
+  }
+  rpc ExtendAnalysisLease(ExtendAnalysisLeaseRequest) returns (ExtendAnalysisLeaseResponse) {
+    option deprecated = true;
+  }
+  rpc CompleteAnalysisWork(CompleteAnalysisWorkRequest) returns (CompleteAnalysisWorkResponse) {
+    option deprecated = true;
+  }
+  rpc FailAnalysisWork(FailAnalysisWorkRequest) returns (FailAnalysisWorkResponse) {
+    option deprecated = true;
+  }
+  rpc RequestWorkerEnrollment(RequestWorkerEnrollmentRequest) returns (RequestWorkerEnrollmentResponse);
+  rpc DecideWorkerEnrollment(DecideWorkerEnrollmentRequest) returns (DecideWorkerEnrollmentResponse);
+  rpc ListWorkerEnrollments(ListWorkerEnrollmentsRequest) returns (ListWorkerEnrollmentsResponse);
+  rpc RenewWorkerCertificate(RenewWorkerCertificateRequest) returns (RenewWorkerCertificateResponse);
+  rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
+  rpc GetWorkerEnrollmentResult(GetWorkerEnrollmentResultRequest) returns (GetWorkerEnrollmentResultResponse);
+  rpc AcknowledgeWorkerActivation(AcknowledgeWorkerActivationRequest) returns (AcknowledgeWorkerActivationResponse);
+}
+
+enum WorkerKind {
+  WORKER_KIND_UNSPECIFIED = 0;
+  WORKER_KIND_RUN_SUPERVISOR = 1;
+  WORKER_KIND_ANALYSIS_SCORER = 2 [deprecated = true];
+}
+
+enum RunStepReplayPolicy {
+  RUN_STEP_REPLAY_POLICY_UNSPECIFIED = 0;
+  RUN_STEP_REPLAY_POLICY_SAFE = 1;
+  RUN_STEP_REPLAY_POLICY_IDEMPOTENT = 2;
+  RUN_STEP_REPLAY_POLICY_NEVER_REPLAY = 3;
+}
+
+enum RunStepPhase {
+  RUN_STEP_PHASE_UNSPECIFIED = 0;
+  RUN_STEP_PHASE_ACTION_INTENT_RECORDED = 1;
+  RUN_STEP_PHASE_ACTION_EFFECT_STARTED = 2;
+  RUN_STEP_PHASE_ACTION_SUCCEEDED = 3;
+  RUN_STEP_PHASE_ACTION_FAILED = 4;
+  RUN_STEP_PHASE_COMPENSATION_INTENT_RECORDED = 5;
+  RUN_STEP_PHASE_COMPENSATION_EFFECT_STARTED = 6;
+  RUN_STEP_PHASE_COMPENSATED = 7;
+  RUN_STEP_PHASE_COMPENSATION_FAILED = 8;
+  RUN_STEP_PHASE_OUTCOME_UNKNOWN = 9;
+}
+
+message RunSagaStepPlan {
+  int32 sequence = 1;
+  string step_key = 2;
+  RunStepReplayPolicy action_replay = 3;
+  bool has_compensation = 4;
+  RunStepReplayPolicy compensation_replay = 5;
+}
+
+message RunSagaPlan {
+  string schema_version = 1;
+  repeated RunSagaStepPlan steps = 2;
+  string plan_digest = 3;
+}
+
+message RunSagaReceipt {
+  int32 sequence = 1;
+  string step_key = 2;
+  RunStepPhase phase = 3;
+  string guard_digest = 4;
+  string receipt_ref = 5;
+  string error = 6;
+}
+
+message RunSagaStepSnapshot {
+  RunSagaStepPlan plan = 1;
+  RunStepPhase action_phase = 2;
+  RunStepPhase compensation_phase = 3;
+  string guard_digest = 4;
+  string action_receipt_ref = 5;
+  string compensation_receipt_ref = 6;
+  string error = 7;
+  bool action_effect_started = 8;
+}
+
+message RunSagaSnapshot {
+  string state = 1;
+  string plan_digest = 2;
+  bool cancel_requested = 3;
+  repeated RunSagaStepSnapshot steps = 4;
+  string cause = 5;
+}
+
+message CreateWorkerBootstrapRequest {
+  string worker_id = 1;
+  WorkerKind worker_kind = 2;
+  string worker_public_key = 3;
+  string client_cert_sha256 = 4;
+  repeated string bindings = 5;
+  int64 expires_in_seconds = 6;
+}
+
+message CreateWorkerBootstrapResponse {
+  string bootstrap_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message RegisterWorkerIdentityRequest {
+  string worker_id = 1;
+  WorkerKind worker_kind = 2;
+  string bootstrap_token = 3;
+  string worker_public_key = 4;
+}
+
+message RegisterWorkerIdentityResponse {
+  string worker_id = 1;
+  WorkerKind worker_kind = 2;
+  string refresh_token = 3;
+  string access_token = 4;
+  int64 expires_in = 5;
+}
+
+message RefreshWorkerAccessTokenRequest {
+  string worker_id = 1;
+  string refresh_token = 2;
+}
+
+message RefreshWorkerAccessTokenResponse {
+  string refresh_token = 1;
+  string access_token = 2;
+  int64 expires_in = 3;
+}
+
+message RevokeWorkerIdentityRequest {
+  string worker_id = 1;
+}
+
+message RevokeWorkerIdentityResponse {}
+
+message AnalyzerProfile {
+  string profile_ref = 1;
+  string model_group = 2;
+  string model_type = 3;
+  string model_version = 4;
+  repeated string ticket_schemas = 5;
+  // profile_digest 由服务端计算，只在响应和工作项中返回。
+  string profile_digest = 6;
+}
+
+message RegisterWorkerRequest {
+  string worker_id = 1;
+  repeated string capability_labels = 2;
+  string version = 3;
+  // 请求自报的领取档案 Bindings：服务端忽略。档案只取对应身份域的服务端授予；空则不能领。
+  repeated string bindings = 4;
+  WorkerKind worker_kind = 5;
+  repeated AnalyzerProfile analyzer_profiles = 6;
+  int32 max_concurrency = 7;
+  string operating_system = 8;
+  string architecture = 9;
+  repeated string sandbox_capabilities = 10;
+  int64 memory_capacity_bytes = 11;
+  int32 logical_cpu_capacity = 12;
+  string approved_manifest_digest = 13;
+  SandboxAttestation sandbox_attestation = 14;
+}
+message RegisterWorkerResponse {
+  string worker_id = 1;
+  WorkerKind worker_kind = 2;
+  repeated AnalyzerProfile analyzer_profiles = 3;
+  int32 max_concurrency = 4;
+}
+
+message PollWorkRequest {
+  string worker_id = 1;
+  int32 long_poll_seconds = 2;
+}
+
+message WorkItem {
+  string work_id = 1;
+  string run_id = 2;
+  string agent_role = 3;
+  string plan_ref = 4;
+  repeated string toolset = 5;
+  string budget = 6;
+  string ttl = 7;
+  repeated string bindings = 8;
+  string capability_token = 9;
+  google.protobuf.Timestamp lease_deadline = 10;
+  string lease_id = 11;
+  // 跨令牌轮换与重新领取保持不变的预算账户。
+  string budget_id = 12;
+  // 所有权隔离栅栏；仅重新领取时递增。
+  int64 lease_epoch = 13;
+  string turn_id = 14;
+  string thread_id = 15;
+  int64 expected_item_sequence = 16;
+  string resume_generation_id = 17;
+  string step_id = 18;
+  string checkpoint_json = 19;
+  yufeng.run.v1.RunBudgetSnapshot budget_snapshot = 20;
+  google.protobuf.Timestamp execution_deadline = 21;
+  RunSagaSnapshot saga_snapshot = 22;
+  InvestigationInput investigation_input = 23;
+  string agent_id = 24;
+  string agent_config_digest = 25;
+}
+
+// InvestigationInput 是调查 run 唯一允许消费的不可变输入。
+message InvestigationInput {
+  yufeng.event.v1.CheckTicket ticket = 1;
+  string ticket_digest = 2;
+  string cluster_id = 3;
+  string case_id = 4;
+  string review_candidate_id = 5;
+  string sensitive_content_ref = 6;
+  string evidence_approval_id = 7;
+  string sensitive_content_digest = 8;
+  int64 sensitive_max_bytes = 9;
+  google.protobuf.Timestamp sensitive_expires_at = 10;
+  string agent_id = 11;
+  string agent_config_digest = 12;
+}
+
+message RequestWorkerEnrollmentRequest {
+  string worker_id = 1;
+  WorkerKind worker_kind = 2;
+  string worker_public_key = 3;
+  string hostname = 4;
+  string operating_system = 5;
+  string architecture = 6;
+  repeated string sandbox_capabilities = 7;
+  string certificate_request = 8;
+  string activation_public_key = 9;
+  string version = 10;
+  int32 max_concurrency = 11;
+  int64 memory_capacity_bytes = 12;
+  int32 logical_cpu_capacity = 13;
+}
+
+message RequestWorkerEnrollmentResponse {
+  string enrollment_id = 1;
+  string public_key_fingerprint = 2;
+  string state = 3;
+}
+
+message DecideWorkerEnrollmentRequest {
+  string enrollment_id = 1;
+  bool approved = 2;
+  repeated string bindings = 3;
+  int32 max_concurrency = 4;
+}
+
+message DecideWorkerEnrollmentResponse {
+  string enrollment_id = 1;
+  string state = 2;
+  // 明文引导令牌禁止经批准响应返回；保留字段只用于旧客户端兼容。
+  string bootstrap_token = 3 [deprecated = true];
+  // 明文客户端证书禁止经批准响应返回；证书只存在于加密激活包。
+  string client_certificate = 4 [deprecated = true];
+  // 明文证书链禁止经批准响应返回；证书链只存在于加密激活包。
+  string certificate_chain = 5 [deprecated = true];
+  google.protobuf.Timestamp certificate_expires_at = 6;
+  string activation_bundle_ref = 7;
+  string approved_manifest_digest = 8;
+}
+
+message ListWorkerEnrollmentsRequest {
+  string state = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message WorkerEnrollmentRecord {
+  string enrollment_id = 1;
+  string worker_id = 2;
+  WorkerKind worker_kind = 3;
+  string public_key_fingerprint = 4;
+  string hostname = 5;
+  string operating_system = 6;
+  string architecture = 7;
+  repeated string sandbox_capabilities = 8;
+  string state = 9;
+  repeated string bindings = 10;
+  int32 max_concurrency = 11;
+  google.protobuf.Timestamp requested_at = 12;
+  google.protobuf.Timestamp decided_at = 13;
+  string activation_public_key_fingerprint = 14;
+  string approved_manifest_digest = 15;
+  string version = 16;
+  int64 memory_capacity_bytes = 17;
+  int32 logical_cpu_capacity = 18;
+  string sandbox_challenge_id = 19;
+}
+
+message ListWorkerEnrollmentsResponse {
+  repeated WorkerEnrollmentRecord enrollments = 1;
+  string next_page_token = 2;
+}
+
+message GetWorkerEnrollmentResultRequest {
+  string enrollment_id = 1;
+}
+
+message GetWorkerEnrollmentResultResponse {
+  string enrollment_id = 1;
+  string state = 2;
+  string activation_bundle_ref = 3;
+  bytes encrypted_activation_bundle = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  string approved_manifest_digest = 6;
+  string sandbox_challenge_id = 7;
+}
+
+message AcknowledgeWorkerActivationRequest {
+  string enrollment_id = 1;
+  string activation_bundle_ref = 2;
+}
+message AcknowledgeWorkerActivationResponse {}
+
+message SandboxAttestation {
+  string challenge_id = 1;
+  string manifest_digest = 2;
+  repeated string passed_probes = 3;
+  string signature = 4;
+}
+
+message RenewWorkerCertificateRequest {
+  string worker_id = 1;
+  string certificate_request = 2;
+}
+
+message RenewWorkerCertificateResponse {
+  string client_certificate = 1;
+  string certificate_chain = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message ListWorkersRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message WorkerRecord {
+  string worker_id = 1;
+  WorkerKind worker_kind = 2;
+  string version = 3;
+  string operating_system = 4;
+  string architecture = 5;
+  repeated string sandbox_capabilities = 6;
+  int32 max_concurrency = 7;
+  google.protobuf.Timestamp last_seen_at = 8;
+  bool investigation_eligible = 9;
+  repeated string missing_sandbox_capabilities = 10;
+}
+
+message ListWorkersResponse {
+  repeated WorkerRecord workers = 1;
+  string next_page_token = 2;
+}
+
+// InvestigationToolRead 记录一次字段级只读投影的结果摘要。
+message InvestigationToolRead {
+  string tool_name = 1;
+  string result_digest = 2;
+}
+
+// InvestigationReceipt 是调查 run 与冻结票据绑定的终态回执。
+message InvestigationReceipt {
+  string event_id = 1;
+  string ticket_digest = 2;
+  string status = 3;
+  repeated InvestigationToolRead reads = 4;
+  string output_digest = 5;
+  string error_code = 6;
+  string message_digest = 7;
+}
+
+message PollWorkResponse {
+  WorkItem work = 1;
+}
+
+message ExtendLeaseRequest {
+  string work_id = 1;
+  string lease_id = 2;
+  int64 lease_epoch = 3;
+}
+message ExtendLeaseResponse {
+  google.protobuf.Timestamp lease_deadline = 1;
+  string capability_token = 2;
+  string lease_id = 3;
+  string budget_id = 4;
+  int64 lease_epoch = 5;
+  bool cancel_requested = 6;
+}
+
+message ReportProgressRequest {
+  string work_id = 1;
+  string lease_id = 2;
+  string stage = 3;
+  string payload_ref = 4;
+  int64 lease_epoch = 5;
+  RunSagaPlan saga_plan = 6;
+  RunSagaReceipt saga_receipt = 7;
+}
+message ReportProgressResponse {
+  RunSagaSnapshot saga_snapshot = 1;
+}
+
+message CompleteWorkRequest {
+  string work_id = 1;
+  string lease_id = 2;
+  string result_ref = 3;
+  string receipt = 4;
+  int64 lease_epoch = 5;
+}
+message CompleteWorkResponse {}
+
+message FailWorkRequest {
+  string work_id = 1;
+  string lease_id = 2;
+  string error_code = 3;
+  string message = 4;
+  string compensation_hint = 5;
+  int64 lease_epoch = 6;
+}
+message FailWorkResponse {}
+
+message PollAnalysisWorkRequest {
+  string worker_id = 1;
+  int32 long_poll_seconds = 2;
+}
+
+message AnalysisWorkItem {
+  string analysis_work_id = 1;
+  yufeng.event.v1.CheckTicket ticket = 2;
+  string ticket_digest = 3;
+  string analyzer_profile_ref = 4;
+  string analyzer_profile_digest = 5;
+  repeated string bindings = 6;
+  google.protobuf.Timestamp deadline = 7;
+  string lease_id = 8;
+  int64 lease_epoch = 9;
+  google.protobuf.Timestamp lease_deadline = 10;
+}
+
+message PollAnalysisWorkResponse {
+  AnalysisWorkItem work = 1;
+}
+
+message ExtendAnalysisLeaseRequest {
+  string analysis_work_id = 1;
+  string lease_id = 2;
+  int64 lease_epoch = 3;
+}
+
+message ExtendAnalysisLeaseResponse {
+  string lease_id = 1;
+  int64 lease_epoch = 2;
+  google.protobuf.Timestamp lease_deadline = 3;
+}
+
+message CompleteAnalysisWorkRequest {
+  string analysis_work_id = 1;
+  string lease_id = 2;
+  int64 lease_epoch = 3;
+  yufeng.event.v1.ModelInference inference = 4;
+}
+
+message CompleteAnalysisWorkResponse {
+  string inference_id = 1;
+  bool deduped = 2;
+}
+
+enum AnalysisFailureDisposition {
+  ANALYSIS_FAILURE_DISPOSITION_UNSPECIFIED = 0;
+  ANALYSIS_FAILURE_DISPOSITION_RETRYABLE = 1;
+  ANALYSIS_FAILURE_DISPOSITION_TERMINAL = 2;
+}
+
+message FailAnalysisWorkRequest {
+  string analysis_work_id = 1;
+  string lease_id = 2;
+  int64 lease_epoch = 3;
+  string error_code = 4;
+  string message = 5;
+  AnalysisFailureDisposition disposition = 6;
+}
+
+message FailAnalysisWorkResponse {}

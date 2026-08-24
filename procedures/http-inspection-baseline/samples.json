@@ -1,0 +1,15 @@
+{
+  "version": "r5-v1",
+  "malicious": 15,
+  "benign": 15,
+  "management": 5,
+  "parse_diff": 12,
+  "profile_samples": 5,
+  "files": {
+    "malicious": "corpus/malicious.jsonl",
+    "benign": "corpus/benign.jsonl",
+    "management": "corpus/management.jsonl",
+    "parse_diff": "corpus/parse-diff.jsonl",
+    "profile_samples": "corpus/profile-samples.jsonl"
+  }
+}

@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+// 用户管理：管理员创建、查询、更新、删除与重置密码。
+package yufeng.user.v1;
+
+import "google/protobuf/field_mask.proto";
+import "yufeng/auth/v1/auth.proto";
+import "yufeng/common/v1/v1.proto";
+
+option go_package = "yufeng/proto/gen/userv1";
+
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc AdminResetPassword(AdminResetPasswordRequest) returns (AdminResetPasswordResponse);
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string password = 2;
+  string display_name = 3;
+  yufeng.common.v1.UserRole role = 4;
+}
+message CreateUserResponse {
+  yufeng.auth.v1.User user = 1;
+}
+
+message ListUsersRequest {
+  string query = 1;
+  yufeng.common.v1.UserRole role = 2;
+  yufeng.common.v1.UserState state = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+message ListUsersResponse {
+  repeated yufeng.auth.v1.User users = 1;
+  string next_page_token = 2;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+message GetUserResponse {
+  yufeng.auth.v1.User user = 1;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  yufeng.auth.v1.User user = 2;
+  google.protobuf.FieldMask update_mask = 3;
+}
+message UpdateUserResponse {
+  yufeng.auth.v1.User user = 1;
+}
+
+message DeleteUserRequest {
+  string user_id = 1;
+}
+message DeleteUserResponse {
+  yufeng.auth.v1.User user = 1;
+}
+
+message AdminResetPasswordRequest {
+  string user_id = 1;
+  string new_password = 2;
+  bool revoke_sessions = 3;
+}
+message AdminResetPasswordResponse {
+  yufeng.auth.v1.User user = 1;
+}
