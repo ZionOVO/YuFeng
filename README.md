@@ -8,7 +8,7 @@
 
 | 项目 | 结论 |
 |---|---|
-| 当前公开版本 | 以 [Latest Release](https://github.com/ZionOVO/YuFeng/releases/latest) 为准；[`v0.1.0`](https://github.com/ZionOVO/YuFeng/releases/tag/v0.1.0) 已于 2026-08-24 公开 |
+| 当前公开版本 | 以 [Latest Release](https://github.com/ZionOVO/YuFeng/releases/latest) 为准；[`v0.1.1`](https://github.com/ZionOVO/YuFeng/releases/tag/v0.1.1) 已于 2026-08-24 公开 |
 | 首个交付场景 | 单个企业站点、一个中台、一个数据面单元；客户入口终止业务传输层安全协议（Transport Layer Security，TLS），御锋处理已解密 HTTP 流量 |
 | 接入方式 | 反向代理首发；已有 Envoy 或兼容网关时可使用外部授权 |
 | 治理方式 | 智能代理可以提出影子策略；全量生效必须满足确定性门槛，或由提案人之外且拥有资产授权的操作员批准 |

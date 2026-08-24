@@ -52,7 +52,7 @@ services:
       - "-unit"
       - "${YUFENG_EDGE_UNIT:?set YUFENG_EDGE_UNIT}"
       - "-unit-version"
-      - "${YUFENG_EDGE_VERSION:-0.1.1}"
+      - "${YUFENG_EDGE_VERSION:-0.1.2}"
       - "-bootstrap-token-file"
       - "/run/secrets/unit_bootstrap_token"
       - "-pubkey"

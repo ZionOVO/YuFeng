@@ -22,13 +22,13 @@ docker compose -f deploy/compose.yaml up -d --build
 
 ## 0.1.1 交付物
 
-发布工作流分别交付原生 Edge 二进制与 systemd 物料、`yufeng-modelside` Python wheel 与 systemd 物料、Compose 部署包，以及 Linux amd64 的 Edge 和 ModelSide 容器镜像归档。容器目标主机可以先校验 `yufeng-v0.1.1-checksums.txt`，再显式载入镜像：
+发布工作流分别交付原生 Edge 二进制与 systemd 物料、`yufeng-modelside` Python wheel 与 systemd 物料、Compose 部署包，以及 Linux amd64 的 Edge 和 ModelSide 容器镜像归档。容器目标主机可以先校验 `yufeng-v0.1.2-checksums.txt`，再显式载入镜像：
 
 ```sh
-gzip -dc yufeng-v0.1.1-edge-image-linux-amd64.tar.gz | docker load
-gzip -dc yufeng-v0.1.1-modelside-image-linux-amd64.tar.gz | docker load
-export YUFENG_EDGE_IMAGE=yufeng-edge:v0.1.1
-export YUFENG_MODELSIDE_IMAGE=yufeng-modelside:v0.1.1
+gzip -dc yufeng-v0.1.2-edge-image-linux-amd64.tar.gz | docker load
+gzip -dc yufeng-v0.1.2-modelside-image-linux-amd64.tar.gz | docker load
+export YUFENG_EDGE_IMAGE=yufeng-edge:v0.1.2
+export YUFENG_MODELSIDE_IMAGE=yufeng-modelside:v0.1.2
 ```
 
 加载镜像不会启动服务；后续生命周期仍由技术人员执行下面的 Compose 命令。非 amd64 主机使用原生 Edge 交付物，并按目标 Python 与 TensorFlow 平台安装 ModelSide wheel，除非对应平台另有经过校验的容器镜像。
@@ -54,4 +54,4 @@ Edge 与 ModelSide 分机时不使用这份同机 Unix 套接字编排：分别�
 
 ## 交付验证
 
-软件 Release 下载后先按 `yufeng-v0.1.1-release-manifest.json` 与 `yufeng-v0.1.1-checksums.txt` 复核实际文件，再在目标环境运行 `scripts/delivery-evidence.sh static` 和所需的活栈、恢复、容量诊断。部署验收必须覆盖旁路关闭、ModelSide 空闲、ModelSide 满载、Brain 断连和磁盘变慢下每秒 2000 个请求及第 99 百分位延迟预算，并记录客户现场的代理网段、上游、证书、网络核对和变更责任人。部署结果不覆盖 Release 资产，也不改变软件已经发布的事实。
+软件 Release 下载后先按 `yufeng-v0.1.2-release-manifest.json` 与 `yufeng-v0.1.2-checksums.txt` 复核实际文件，再在目标环境运行 `scripts/delivery-evidence.sh static` 和所需的活栈、恢复、容量诊断。部署验收必须覆盖旁路关闭、ModelSide 空闲、ModelSide 稳定消费、ModelSide 满载和 ModelSide 不可达下的小正文与接近检查上限正文、默认窗口与本地硬上限窗口组合，验证每秒 2000 个请求、模型旁路第 99 百分位延迟增量不超过 1 毫秒、中央处理器占用增量不超过 5 个百分点、Edge 常驻内存不超过 512 MiB，并记录客户现场的代理网段、上游、证书、网络核对和变更责任人。部署结果不覆盖 Release 资产，也不改变软件已经发布的事实。
