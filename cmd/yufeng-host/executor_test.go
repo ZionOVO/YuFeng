@@ -124,32 +124,42 @@ func TestHostExecutorCommandDeadlineCancelsServiceAndCompensatesWithParentContex
 
 func TestHostExecutorCommandDeadlineCancelsServiceActiveVerification(t *testing.T) {
 	executor, artifact := testHostExecutor(t, []byte("payload"))
-	serviceStarted := make(chan struct{}, 1)
+	serviceStarted := make(chan struct{})
 	executor.run = func(ctx context.Context, operation, service string) error {
 		if operation != "active" || service != "nginx" {
-			t.Fatalf("operation=%q service=%q", operation, service)
+			return errors.New("unexpected service active verification")
 		}
-		serviceStarted <- struct{}{}
+		close(serviceStarted)
 		<-ctx.Done()
 		return ctx.Err()
 	}
 	command := &commandv1.Command{
 		CommandId: "cmd-service-active-deadline", ArtifactRef: artifact.GetId(), LeaseId: "lease-active-deadline", LeaseEpoch: 1,
-		Deadline: timestamppb.New(time.Now().Add(100 * time.Millisecond)),
+		Deadline: timestamppb.New(time.Now().Add(time.Second)),
 		Steps:    []*commandv1.CommandStep{{Primitive: "verify.service_active", ArgsJson: `{"service":"nginx"}`}},
 	}
-	parent, cancel := context.WithTimeout(context.Background(), time.Second)
+	parent, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	err := executor.Execute(parent, command, func(ctx context.Context, _ *commandv1.StepReceipt) error {
-		return ctx.Err()
-	})
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("Execute error=%v want command deadline exceeded", err)
-	}
+	executionResult := make(chan error, 1)
+	go func() {
+		executionResult <- executor.Execute(parent, command, func(ctx context.Context, _ *commandv1.StepReceipt) error {
+			return ctx.Err()
+		})
+	}()
 	select {
 	case <-serviceStarted:
-	default:
-		t.Fatal("service active verification was not started")
+	case err := <-executionResult:
+		t.Fatalf("Execute returned before service active verification started: %v", err)
+	case <-parent.Done():
+		t.Fatalf("service active verification did not start: %v", parent.Err())
+	}
+	select {
+	case err := <-executionResult:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Execute error=%v want command deadline exceeded", err)
+		}
+	case <-parent.Done():
+		t.Fatalf("Execute did not stop at the command deadline: %v", parent.Err())
 	}
 }
 
