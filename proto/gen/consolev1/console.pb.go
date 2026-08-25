@@ -69,6 +69,7 @@ type DashboardResponse struct {
 	Events_24HTotal   int64                  `protobuf:"varint,4,opt,name=events_24h_total,json=events24hTotal,proto3" json:"events_24h_total,omitempty"`
 	Events_24HBlocked int64                  `protobuf:"varint,5,opt,name=events_24h_blocked,json=events24hBlocked,proto3" json:"events_24h_blocked,omitempty"`
 	PendingRetireSoon int64                  `protobuf:"varint,6,opt,name=pending_retire_soon,json=pendingRetireSoon,proto3" json:"pending_retire_soon,omitempty"`
+	ModelAlerts_24H   int64                  `protobuf:"varint,7,opt,name=model_alerts_24h,json=modelAlerts24h,proto3" json:"model_alerts_24h,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -141,6 +142,13 @@ func (x *DashboardResponse) GetEvents_24HBlocked() int64 {
 func (x *DashboardResponse) GetPendingRetireSoon() int64 {
 	if x != nil {
 		return x.PendingRetireSoon
+	}
+	return 0
+}
+
+func (x *DashboardResponse) GetModelAlerts_24H() int64 {
+	if x != nil {
+		return x.ModelAlerts_24H
 	}
 	return 0
 }
@@ -350,10 +358,12 @@ func (x *GetEventRequest) GetEventId() string {
 }
 
 type GetEventResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Event         *eventv1.Event         `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState    `protogen:"open.v1"`
+	Event            *eventv1.Event            `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+	ModelInferences  []*eventv1.ModelInference `protobuf:"bytes,2,rep,name=model_inferences,json=modelInferences,proto3" json:"model_inferences,omitempty"`
+	TriageDeliveries []*TriageDelivery         `protobuf:"bytes,3,rep,name=triage_deliveries,json=triageDeliveries,proto3" json:"triage_deliveries,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetEventResponse) Reset() {
@@ -393,19 +403,127 @@ func (x *GetEventResponse) GetEvent() *eventv1.Event {
 	return nil
 }
 
+func (x *GetEventResponse) GetModelInferences() []*eventv1.ModelInference {
+	if x != nil {
+		return x.ModelInferences
+	}
+	return nil
+}
+
+func (x *GetEventResponse) GetTriageDeliveries() []*TriageDelivery {
+	if x != nil {
+		return x.TriageDeliveries
+	}
+	return nil
+}
+
+// TriageDelivery 是事件关联案件向贾维斯交付的非敏感投影。
+type TriageDelivery struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CaseId         string                 `protobuf:"bytes,1,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
+	InstructionId  string                 `protobuf:"bytes,2,opt,name=instruction_id,json=instructionId,proto3" json:"instruction_id,omitempty"`
+	HandlerId      string                 `protobuf:"bytes,3,opt,name=handler_id,json=handlerId,proto3" json:"handler_id,omitempty"`
+	Kind           string                 `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	Status         string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	AcknowledgedAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=acknowledged_at,json=acknowledgedAt,proto3" json:"acknowledged_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TriageDelivery) Reset() {
+	*x = TriageDelivery{}
+	mi := &file_yufeng_console_v1_console_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TriageDelivery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TriageDelivery) ProtoMessage() {}
+
+func (x *TriageDelivery) ProtoReflect() protoreflect.Message {
+	mi := &file_yufeng_console_v1_console_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TriageDelivery.ProtoReflect.Descriptor instead.
+func (*TriageDelivery) Descriptor() ([]byte, []int) {
+	return file_yufeng_console_v1_console_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TriageDelivery) GetCaseId() string {
+	if x != nil {
+		return x.CaseId
+	}
+	return ""
+}
+
+func (x *TriageDelivery) GetInstructionId() string {
+	if x != nil {
+		return x.InstructionId
+	}
+	return ""
+}
+
+func (x *TriageDelivery) GetHandlerId() string {
+	if x != nil {
+		return x.HandlerId
+	}
+	return ""
+}
+
+func (x *TriageDelivery) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *TriageDelivery) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *TriageDelivery) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *TriageDelivery) GetAcknowledgedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AcknowledgedAt
+	}
+	return nil
+}
+
 var File_yufeng_console_v1_console_proto protoreflect.FileDescriptor
 
 const file_yufeng_console_v1_console_proto_rawDesc = "" +
 	"\n" +
 	"\x1fyufeng/console/v1/console.proto\x12\x11yufeng.console.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18yufeng/event/v1/v1.proto\"\x12\n" +
-	"\x10DashboardRequest\"\x90\x03\n" +
+	"\x10DashboardRequest\"\xba\x03\n" +
 	"\x11DashboardResponse\x12!\n" +
 	"\fassets_total\x18\x01 \x01(\x03R\vassetsTotal\x12%\n" +
 	"\x0edegraded_units\x18\x02 \x01(\x03R\rdegradedUnits\x12e\n" +
 	"\x11releases_by_state\x18\x03 \x03(\v29.yufeng.console.v1.DashboardResponse.ReleasesByStateEntryR\x0freleasesByState\x12(\n" +
 	"\x10events_24h_total\x18\x04 \x01(\x03R\x0eevents24hTotal\x12,\n" +
 	"\x12events_24h_blocked\x18\x05 \x01(\x03R\x10events24hBlocked\x12.\n" +
-	"\x13pending_retire_soon\x18\x06 \x01(\x03R\x11pendingRetireSoon\x1aB\n" +
+	"\x13pending_retire_soon\x18\x06 \x01(\x03R\x11pendingRetireSoon\x12(\n" +
+	"\x10model_alerts_24h\x18\a \x01(\x03R\x0emodelAlerts24h\x1aB\n" +
 	"\x14ReleasesByStateEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\xe2\x02\n" +
@@ -425,9 +543,21 @@ const file_yufeng_console_v1_console_proto_rawDesc = "" +
 	"\x06events\x18\x01 \x03(\v2\x16.yufeng.event.v1.EventR\x06events\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\",\n" +
 	"\x0fGetEventRequest\x12\x19\n" +
-	"\bevent_id\x18\x01 \x01(\tR\aeventId\"@\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\"\xdc\x01\n" +
 	"\x10GetEventResponse\x12,\n" +
-	"\x05event\x18\x01 \x01(\v2\x16.yufeng.event.v1.EventR\x05event2\x98\x02\n" +
+	"\x05event\x18\x01 \x01(\v2\x16.yufeng.event.v1.EventR\x05event\x12J\n" +
+	"\x10model_inferences\x18\x02 \x03(\v2\x1f.yufeng.event.v1.ModelInferenceR\x0fmodelInferences\x12N\n" +
+	"\x11triage_deliveries\x18\x03 \x03(\v2!.yufeng.console.v1.TriageDeliveryR\x10triageDeliveries\"\x9b\x02\n" +
+	"\x0eTriageDelivery\x12\x17\n" +
+	"\acase_id\x18\x01 \x01(\tR\x06caseId\x12%\n" +
+	"\x0einstruction_id\x18\x02 \x01(\tR\rinstructionId\x12\x1d\n" +
+	"\n" +
+	"handler_id\x18\x03 \x01(\tR\thandlerId\x12\x12\n" +
+	"\x04kind\x18\x04 \x01(\tR\x04kind\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12C\n" +
+	"\x0facknowledged_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt2\x98\x02\n" +
 	"\x0eConsoleService\x12V\n" +
 	"\tDashboard\x12#.yufeng.console.v1.DashboardRequest\x1a$.yufeng.console.v1.DashboardResponse\x12Y\n" +
 	"\n" +
@@ -446,39 +576,45 @@ func file_yufeng_console_v1_console_proto_rawDescGZIP() []byte {
 	return file_yufeng_console_v1_console_proto_rawDescData
 }
 
-var file_yufeng_console_v1_console_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_yufeng_console_v1_console_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_yufeng_console_v1_console_proto_goTypes = []any{
-	(*DashboardRequest)(nil),      // 0: yufeng.console.v1.DashboardRequest
-	(*DashboardResponse)(nil),     // 1: yufeng.console.v1.DashboardResponse
-	(*ListEventsRequest)(nil),     // 2: yufeng.console.v1.ListEventsRequest
-	(*ListEventsResponse)(nil),    // 3: yufeng.console.v1.ListEventsResponse
-	(*GetEventRequest)(nil),       // 4: yufeng.console.v1.GetEventRequest
-	(*GetEventResponse)(nil),      // 5: yufeng.console.v1.GetEventResponse
-	nil,                           // 6: yufeng.console.v1.DashboardResponse.ReleasesByStateEntry
-	(eventv1.Verdict)(0),          // 7: yufeng.event.v1.Verdict
-	(eventv1.Kind)(0),             // 8: yufeng.event.v1.Kind
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
-	(*eventv1.Event)(nil),         // 10: yufeng.event.v1.Event
+	(*DashboardRequest)(nil),       // 0: yufeng.console.v1.DashboardRequest
+	(*DashboardResponse)(nil),      // 1: yufeng.console.v1.DashboardResponse
+	(*ListEventsRequest)(nil),      // 2: yufeng.console.v1.ListEventsRequest
+	(*ListEventsResponse)(nil),     // 3: yufeng.console.v1.ListEventsResponse
+	(*GetEventRequest)(nil),        // 4: yufeng.console.v1.GetEventRequest
+	(*GetEventResponse)(nil),       // 5: yufeng.console.v1.GetEventResponse
+	(*TriageDelivery)(nil),         // 6: yufeng.console.v1.TriageDelivery
+	nil,                            // 7: yufeng.console.v1.DashboardResponse.ReleasesByStateEntry
+	(eventv1.Verdict)(0),           // 8: yufeng.event.v1.Verdict
+	(eventv1.Kind)(0),              // 9: yufeng.event.v1.Kind
+	(*timestamppb.Timestamp)(nil),  // 10: google.protobuf.Timestamp
+	(*eventv1.Event)(nil),          // 11: yufeng.event.v1.Event
+	(*eventv1.ModelInference)(nil), // 12: yufeng.event.v1.ModelInference
 }
 var file_yufeng_console_v1_console_proto_depIdxs = []int32{
-	6,  // 0: yufeng.console.v1.DashboardResponse.releases_by_state:type_name -> yufeng.console.v1.DashboardResponse.ReleasesByStateEntry
-	7,  // 1: yufeng.console.v1.ListEventsRequest.verdict:type_name -> yufeng.event.v1.Verdict
-	8,  // 2: yufeng.console.v1.ListEventsRequest.kind:type_name -> yufeng.event.v1.Kind
-	9,  // 3: yufeng.console.v1.ListEventsRequest.since:type_name -> google.protobuf.Timestamp
-	9,  // 4: yufeng.console.v1.ListEventsRequest.until:type_name -> google.protobuf.Timestamp
-	10, // 5: yufeng.console.v1.ListEventsResponse.events:type_name -> yufeng.event.v1.Event
-	10, // 6: yufeng.console.v1.GetEventResponse.event:type_name -> yufeng.event.v1.Event
-	0,  // 7: yufeng.console.v1.ConsoleService.Dashboard:input_type -> yufeng.console.v1.DashboardRequest
-	2,  // 8: yufeng.console.v1.ConsoleService.ListEvents:input_type -> yufeng.console.v1.ListEventsRequest
-	4,  // 9: yufeng.console.v1.ConsoleService.GetEvent:input_type -> yufeng.console.v1.GetEventRequest
-	1,  // 10: yufeng.console.v1.ConsoleService.Dashboard:output_type -> yufeng.console.v1.DashboardResponse
-	3,  // 11: yufeng.console.v1.ConsoleService.ListEvents:output_type -> yufeng.console.v1.ListEventsResponse
-	5,  // 12: yufeng.console.v1.ConsoleService.GetEvent:output_type -> yufeng.console.v1.GetEventResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	7,  // 0: yufeng.console.v1.DashboardResponse.releases_by_state:type_name -> yufeng.console.v1.DashboardResponse.ReleasesByStateEntry
+	8,  // 1: yufeng.console.v1.ListEventsRequest.verdict:type_name -> yufeng.event.v1.Verdict
+	9,  // 2: yufeng.console.v1.ListEventsRequest.kind:type_name -> yufeng.event.v1.Kind
+	10, // 3: yufeng.console.v1.ListEventsRequest.since:type_name -> google.protobuf.Timestamp
+	10, // 4: yufeng.console.v1.ListEventsRequest.until:type_name -> google.protobuf.Timestamp
+	11, // 5: yufeng.console.v1.ListEventsResponse.events:type_name -> yufeng.event.v1.Event
+	11, // 6: yufeng.console.v1.GetEventResponse.event:type_name -> yufeng.event.v1.Event
+	12, // 7: yufeng.console.v1.GetEventResponse.model_inferences:type_name -> yufeng.event.v1.ModelInference
+	6,  // 8: yufeng.console.v1.GetEventResponse.triage_deliveries:type_name -> yufeng.console.v1.TriageDelivery
+	10, // 9: yufeng.console.v1.TriageDelivery.created_at:type_name -> google.protobuf.Timestamp
+	10, // 10: yufeng.console.v1.TriageDelivery.acknowledged_at:type_name -> google.protobuf.Timestamp
+	0,  // 11: yufeng.console.v1.ConsoleService.Dashboard:input_type -> yufeng.console.v1.DashboardRequest
+	2,  // 12: yufeng.console.v1.ConsoleService.ListEvents:input_type -> yufeng.console.v1.ListEventsRequest
+	4,  // 13: yufeng.console.v1.ConsoleService.GetEvent:input_type -> yufeng.console.v1.GetEventRequest
+	1,  // 14: yufeng.console.v1.ConsoleService.Dashboard:output_type -> yufeng.console.v1.DashboardResponse
+	3,  // 15: yufeng.console.v1.ConsoleService.ListEvents:output_type -> yufeng.console.v1.ListEventsResponse
+	5,  // 16: yufeng.console.v1.ConsoleService.GetEvent:output_type -> yufeng.console.v1.GetEventResponse
+	14, // [14:17] is the sub-list for method output_type
+	11, // [11:14] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_yufeng_console_v1_console_proto_init() }
@@ -492,7 +628,7 @@ func file_yufeng_console_v1_console_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_yufeng_console_v1_console_proto_rawDesc), len(file_yufeng_console_v1_console_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

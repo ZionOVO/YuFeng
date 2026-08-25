@@ -244,7 +244,11 @@ func buildYufengRun(t *testing.T) string {
 			return
 		}
 		root := filepath.Join(filepath.Dir(file), "../..")
-		brainYufengRunBuild.path = filepath.Join(brainYufengRunBuild.dir, "yufeng-run")
+		name := "yufeng-run"
+		if goruntime.GOOS == "windows" {
+			name += ".exe"
+		}
+		brainYufengRunBuild.path = filepath.Join(brainYufengRunBuild.dir, name)
 		cmd := exec.Command("go", "build", "-o", brainYufengRunBuild.path, "./cmd/yufeng-run")
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), "CGO_ENABLED=0")

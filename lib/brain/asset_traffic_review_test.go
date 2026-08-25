@@ -31,6 +31,12 @@ func TestTrafficReviewPolicyPublishesSignedGenerationOneLevelAtATime(t *testing.
 	if _, err := st.Pool().Exec(ctx, `INSERT INTO assets(asset_id,display_name,max_auto_tier) VALUES($1,$1,'L1')`, assetID); err != nil {
 		t.Fatal(err)
 	}
+	if err := writeAdminSystemGrant(ctx, st.Pool(), login.Msg.GetUser().GetUserId(), assetID); err != nil {
+		t.Fatal(err)
+	}
+	if err := SeedOnboardingState(ctx, st.Pool(), OnboardingStateCompleted, assetID); err != nil {
+		t.Fatal(err)
+	}
 	_, privateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		t.Fatal(err)

@@ -7,6 +7,7 @@ import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "yufeng/artifact/v1/v1.proto";
 import "yufeng/asset/v1/v1.proto";
+import "yufeng/common/v1/v1.proto";
 import "yufeng/unit/v1/unit.proto";
 
 option go_package = "yufeng/proto/gen/assetv1";
@@ -19,6 +20,8 @@ service AssetService {
   rpc GetAsset(GetAssetRequest) returns (GetAssetResponse);
   rpc AttachUnit(AttachUnitRequest) returns (AttachUnitResponse);
   rpc DetachUnit(DetachUnitRequest) returns (DetachUnitResponse);
+  rpc PutEdgeEnrollment(PutEdgeEnrollmentRequest) returns (PutEdgeEnrollmentResponse);
+  rpc GetEdgeEnrollment(GetEdgeEnrollmentRequest) returns (GetEdgeEnrollmentResponse);
   rpc GetTrafficReviewPolicy(GetTrafficReviewPolicyRequest) returns (GetTrafficReviewPolicyResponse);
   rpc UpdateTrafficReviewPolicy(UpdateTrafficReviewPolicyRequest) returns (UpdateTrafficReviewPolicyResponse);
   rpc GetModelIngressWindow(GetModelIngressWindowRequest) returns (GetModelIngressWindowResponse);
@@ -55,6 +58,8 @@ message AssetDetail {
   int32 active_release_count = 4;
   // 绑定单元的只读能力与生产健康投影。
   repeated yufeng.unit.v1.UnitProjection units = 5;
+  // 资产下全部人工 Edge 接入状态；不含令牌、证书私钥或安装执行能力。
+  repeated EdgeEnrollment edge_enrollments = 6;
 }
 
 message ListAssetsRequest {
@@ -89,6 +94,69 @@ message DetachUnitRequest {
 }
 message DetachUnitResponse {
   AssetDetail asset = 1;
+}
+
+// EdgeEnrollmentStatus 是人工 Edge 接入的注册与制品收敛状态。
+enum EdgeEnrollmentStatus {
+  EDGE_ENROLLMENT_STATUS_UNSPECIFIED = 0;
+  EDGE_ENROLLMENT_STATUS_WAITING_FOR_REGISTRATION = 1;
+  EDGE_ENROLLMENT_STATUS_ONLINE = 2;
+  EDGE_ENROLLMENT_STATUS_OUT_OF_SYNC = 3;
+  EDGE_ENROLLMENT_STATUS_OFFLINE = 4;
+}
+
+// EdgeEnrollment 投影既有资产的规范配置、期望制品坐标和运行状态。
+message EdgeEnrollment {
+  string asset_id = 1;
+  string unit_id = 2;
+  yufeng.common.v1.IngressPosture posture = 3;
+  string listen_address = 4;
+  string upstream_url = 5;
+  string traffic_key = 6;
+  repeated string trusted_proxy_cidrs = 7;
+  yufeng.artifact.v1.ModelProfile model_profile = 8;
+  yufeng.artifact.v1.ModelIngressWindow model_ingress_window = 9;
+  string modelside_id = 10;
+  string specification_digest = 11;
+  uint64 expected_listen_plan_version = 12;
+  string expected_generation_id = 13;
+  int64 expected_generation_seq = 14;
+  EdgeEnrollmentStatus status = 15;
+  google.protobuf.Timestamp last_heartbeat_at = 16;
+  uint64 current_listen_plan_version = 17;
+  string current_generation_id = 18;
+  int64 current_generation_seq = 19;
+  EdgeEnrollmentStatus modelside_status = 20;
+  google.protobuf.Timestamp modelside_last_result_at = 21;
+  string model_profile_digest = 22;
+}
+
+// PutEdgeEnrollmentRequest 写入一个既有资产的人工 Edge 接入配置。
+message PutEdgeEnrollmentRequest {
+  string asset_id = 1;
+  string unit_id = 2;
+  yufeng.common.v1.IngressPosture posture = 3;
+  string listen_address = 4;
+  // 反向代理姿态必填绝对 http/https URL；外部授权姿态必须为空。
+  string upstream_url = 5;
+  string traffic_key = 6;
+  repeated string trusted_proxy_cidrs = 7;
+  yufeng.artifact.v1.ModelProfile model_profile = 8;
+  // 省略时由 Brain 写入平台默认值。
+  yufeng.artifact.v1.ModelIngressWindow model_ingress_window = 9;
+}
+
+message PutEdgeEnrollmentResponse {
+  EdgeEnrollment enrollment = 1;
+}
+
+message GetEdgeEnrollmentRequest {
+  string asset_id = 1;
+  string unit_id = 2;
+}
+
+message GetEdgeEnrollmentResponse {
+  EdgeEnrollment enrollment = 1;
 }
 
 message GetTrafficReviewPolicyRequest {

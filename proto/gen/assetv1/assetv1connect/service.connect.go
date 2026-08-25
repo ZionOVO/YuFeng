@@ -51,6 +51,12 @@ const (
 	AssetServiceAttachUnitProcedure = "/yufeng.asset.v1.AssetService/AttachUnit"
 	// AssetServiceDetachUnitProcedure is the fully-qualified name of the AssetService's DetachUnit RPC.
 	AssetServiceDetachUnitProcedure = "/yufeng.asset.v1.AssetService/DetachUnit"
+	// AssetServicePutEdgeEnrollmentProcedure is the fully-qualified name of the AssetService's
+	// PutEdgeEnrollment RPC.
+	AssetServicePutEdgeEnrollmentProcedure = "/yufeng.asset.v1.AssetService/PutEdgeEnrollment"
+	// AssetServiceGetEdgeEnrollmentProcedure is the fully-qualified name of the AssetService's
+	// GetEdgeEnrollment RPC.
+	AssetServiceGetEdgeEnrollmentProcedure = "/yufeng.asset.v1.AssetService/GetEdgeEnrollment"
 	// AssetServiceGetTrafficReviewPolicyProcedure is the fully-qualified name of the AssetService's
 	// GetTrafficReviewPolicy RPC.
 	AssetServiceGetTrafficReviewPolicyProcedure = "/yufeng.asset.v1.AssetService/GetTrafficReviewPolicy"
@@ -74,6 +80,8 @@ type AssetServiceClient interface {
 	GetAsset(context.Context, *connect.Request[assetv1.GetAssetRequest]) (*connect.Response[assetv1.GetAssetResponse], error)
 	AttachUnit(context.Context, *connect.Request[assetv1.AttachUnitRequest]) (*connect.Response[assetv1.AttachUnitResponse], error)
 	DetachUnit(context.Context, *connect.Request[assetv1.DetachUnitRequest]) (*connect.Response[assetv1.DetachUnitResponse], error)
+	PutEdgeEnrollment(context.Context, *connect.Request[assetv1.PutEdgeEnrollmentRequest]) (*connect.Response[assetv1.PutEdgeEnrollmentResponse], error)
+	GetEdgeEnrollment(context.Context, *connect.Request[assetv1.GetEdgeEnrollmentRequest]) (*connect.Response[assetv1.GetEdgeEnrollmentResponse], error)
 	GetTrafficReviewPolicy(context.Context, *connect.Request[assetv1.GetTrafficReviewPolicyRequest]) (*connect.Response[assetv1.GetTrafficReviewPolicyResponse], error)
 	UpdateTrafficReviewPolicy(context.Context, *connect.Request[assetv1.UpdateTrafficReviewPolicyRequest]) (*connect.Response[assetv1.UpdateTrafficReviewPolicyResponse], error)
 	GetModelIngressWindow(context.Context, *connect.Request[assetv1.GetModelIngressWindowRequest]) (*connect.Response[assetv1.GetModelIngressWindowResponse], error)
@@ -133,6 +141,18 @@ func NewAssetServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(assetServiceMethods.ByName("DetachUnit")),
 			connect.WithClientOptions(opts...),
 		),
+		putEdgeEnrollment: connect.NewClient[assetv1.PutEdgeEnrollmentRequest, assetv1.PutEdgeEnrollmentResponse](
+			httpClient,
+			baseURL+AssetServicePutEdgeEnrollmentProcedure,
+			connect.WithSchema(assetServiceMethods.ByName("PutEdgeEnrollment")),
+			connect.WithClientOptions(opts...),
+		),
+		getEdgeEnrollment: connect.NewClient[assetv1.GetEdgeEnrollmentRequest, assetv1.GetEdgeEnrollmentResponse](
+			httpClient,
+			baseURL+AssetServiceGetEdgeEnrollmentProcedure,
+			connect.WithSchema(assetServiceMethods.ByName("GetEdgeEnrollment")),
+			connect.WithClientOptions(opts...),
+		),
 		getTrafficReviewPolicy: connect.NewClient[assetv1.GetTrafficReviewPolicyRequest, assetv1.GetTrafficReviewPolicyResponse](
 			httpClient,
 			baseURL+AssetServiceGetTrafficReviewPolicyProcedure,
@@ -169,6 +189,8 @@ type assetServiceClient struct {
 	getAsset                  *connect.Client[assetv1.GetAssetRequest, assetv1.GetAssetResponse]
 	attachUnit                *connect.Client[assetv1.AttachUnitRequest, assetv1.AttachUnitResponse]
 	detachUnit                *connect.Client[assetv1.DetachUnitRequest, assetv1.DetachUnitResponse]
+	putEdgeEnrollment         *connect.Client[assetv1.PutEdgeEnrollmentRequest, assetv1.PutEdgeEnrollmentResponse]
+	getEdgeEnrollment         *connect.Client[assetv1.GetEdgeEnrollmentRequest, assetv1.GetEdgeEnrollmentResponse]
 	getTrafficReviewPolicy    *connect.Client[assetv1.GetTrafficReviewPolicyRequest, assetv1.GetTrafficReviewPolicyResponse]
 	updateTrafficReviewPolicy *connect.Client[assetv1.UpdateTrafficReviewPolicyRequest, assetv1.UpdateTrafficReviewPolicyResponse]
 	getModelIngressWindow     *connect.Client[assetv1.GetModelIngressWindowRequest, assetv1.GetModelIngressWindowResponse]
@@ -210,6 +232,16 @@ func (c *assetServiceClient) DetachUnit(ctx context.Context, req *connect.Reques
 	return c.detachUnit.CallUnary(ctx, req)
 }
 
+// PutEdgeEnrollment calls yufeng.asset.v1.AssetService.PutEdgeEnrollment.
+func (c *assetServiceClient) PutEdgeEnrollment(ctx context.Context, req *connect.Request[assetv1.PutEdgeEnrollmentRequest]) (*connect.Response[assetv1.PutEdgeEnrollmentResponse], error) {
+	return c.putEdgeEnrollment.CallUnary(ctx, req)
+}
+
+// GetEdgeEnrollment calls yufeng.asset.v1.AssetService.GetEdgeEnrollment.
+func (c *assetServiceClient) GetEdgeEnrollment(ctx context.Context, req *connect.Request[assetv1.GetEdgeEnrollmentRequest]) (*connect.Response[assetv1.GetEdgeEnrollmentResponse], error) {
+	return c.getEdgeEnrollment.CallUnary(ctx, req)
+}
+
 // GetTrafficReviewPolicy calls yufeng.asset.v1.AssetService.GetTrafficReviewPolicy.
 func (c *assetServiceClient) GetTrafficReviewPolicy(ctx context.Context, req *connect.Request[assetv1.GetTrafficReviewPolicyRequest]) (*connect.Response[assetv1.GetTrafficReviewPolicyResponse], error) {
 	return c.getTrafficReviewPolicy.CallUnary(ctx, req)
@@ -239,6 +271,8 @@ type AssetServiceHandler interface {
 	GetAsset(context.Context, *connect.Request[assetv1.GetAssetRequest]) (*connect.Response[assetv1.GetAssetResponse], error)
 	AttachUnit(context.Context, *connect.Request[assetv1.AttachUnitRequest]) (*connect.Response[assetv1.AttachUnitResponse], error)
 	DetachUnit(context.Context, *connect.Request[assetv1.DetachUnitRequest]) (*connect.Response[assetv1.DetachUnitResponse], error)
+	PutEdgeEnrollment(context.Context, *connect.Request[assetv1.PutEdgeEnrollmentRequest]) (*connect.Response[assetv1.PutEdgeEnrollmentResponse], error)
+	GetEdgeEnrollment(context.Context, *connect.Request[assetv1.GetEdgeEnrollmentRequest]) (*connect.Response[assetv1.GetEdgeEnrollmentResponse], error)
 	GetTrafficReviewPolicy(context.Context, *connect.Request[assetv1.GetTrafficReviewPolicyRequest]) (*connect.Response[assetv1.GetTrafficReviewPolicyResponse], error)
 	UpdateTrafficReviewPolicy(context.Context, *connect.Request[assetv1.UpdateTrafficReviewPolicyRequest]) (*connect.Response[assetv1.UpdateTrafficReviewPolicyResponse], error)
 	GetModelIngressWindow(context.Context, *connect.Request[assetv1.GetModelIngressWindowRequest]) (*connect.Response[assetv1.GetModelIngressWindowResponse], error)
@@ -294,6 +328,18 @@ func NewAssetServiceHandler(svc AssetServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(assetServiceMethods.ByName("DetachUnit")),
 		connect.WithHandlerOptions(opts...),
 	)
+	assetServicePutEdgeEnrollmentHandler := connect.NewUnaryHandler(
+		AssetServicePutEdgeEnrollmentProcedure,
+		svc.PutEdgeEnrollment,
+		connect.WithSchema(assetServiceMethods.ByName("PutEdgeEnrollment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	assetServiceGetEdgeEnrollmentHandler := connect.NewUnaryHandler(
+		AssetServiceGetEdgeEnrollmentProcedure,
+		svc.GetEdgeEnrollment,
+		connect.WithSchema(assetServiceMethods.ByName("GetEdgeEnrollment")),
+		connect.WithHandlerOptions(opts...),
+	)
 	assetServiceGetTrafficReviewPolicyHandler := connect.NewUnaryHandler(
 		AssetServiceGetTrafficReviewPolicyProcedure,
 		svc.GetTrafficReviewPolicy,
@@ -334,6 +380,10 @@ func NewAssetServiceHandler(svc AssetServiceHandler, opts ...connect.HandlerOpti
 			assetServiceAttachUnitHandler.ServeHTTP(w, r)
 		case AssetServiceDetachUnitProcedure:
 			assetServiceDetachUnitHandler.ServeHTTP(w, r)
+		case AssetServicePutEdgeEnrollmentProcedure:
+			assetServicePutEdgeEnrollmentHandler.ServeHTTP(w, r)
+		case AssetServiceGetEdgeEnrollmentProcedure:
+			assetServiceGetEdgeEnrollmentHandler.ServeHTTP(w, r)
 		case AssetServiceGetTrafficReviewPolicyProcedure:
 			assetServiceGetTrafficReviewPolicyHandler.ServeHTTP(w, r)
 		case AssetServiceUpdateTrafficReviewPolicyProcedure:
@@ -377,6 +427,14 @@ func (UnimplementedAssetServiceHandler) AttachUnit(context.Context, *connect.Req
 
 func (UnimplementedAssetServiceHandler) DetachUnit(context.Context, *connect.Request[assetv1.DetachUnitRequest]) (*connect.Response[assetv1.DetachUnitResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("yufeng.asset.v1.AssetService.DetachUnit is not implemented"))
+}
+
+func (UnimplementedAssetServiceHandler) PutEdgeEnrollment(context.Context, *connect.Request[assetv1.PutEdgeEnrollmentRequest]) (*connect.Response[assetv1.PutEdgeEnrollmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("yufeng.asset.v1.AssetService.PutEdgeEnrollment is not implemented"))
+}
+
+func (UnimplementedAssetServiceHandler) GetEdgeEnrollment(context.Context, *connect.Request[assetv1.GetEdgeEnrollmentRequest]) (*connect.Response[assetv1.GetEdgeEnrollmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("yufeng.asset.v1.AssetService.GetEdgeEnrollment is not implemented"))
 }
 
 func (UnimplementedAssetServiceHandler) GetTrafficReviewPolicy(context.Context, *connect.Request[assetv1.GetTrafficReviewPolicyRequest]) (*connect.Response[assetv1.GetTrafficReviewPolicyResponse], error) {

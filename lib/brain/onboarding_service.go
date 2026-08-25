@@ -59,23 +59,6 @@ func (s *OnboardingServer) Handler() (string, http.Handler) {
 	return onboardingv1connect.NewOnboardingServiceHandler(s, handlerOptions()...)
 }
 
-// edgeReady 只依据已认证单元心跳中回执的签名制品坐标判定人工部署是否就绪。
-func edgeReady(ctx context.Context, db dbTX, view onboardingView) bool {
-	if view.LocalUnitID == "" || view.LocalAssetID == "" || view.LocalAssetID == "bootstrap" ||
-		view.ExpectedGenerationID == "" || view.ExpectedGenerationSeq <= 0 || view.ExpectedListenPlanVersion == 0 {
-		return false
-	}
-	var ready bool
-	err := db.QueryRow(ctx, `SELECT EXISTS(
-		SELECT 1 FROM units u JOIN unit_assets ua ON ua.unit_id=u.unit_id
-		WHERE u.unit_id=$1 AND ua.asset_id=$2 AND u.last_heartbeat_at >= $3
-		  AND u.current_generation_id=$4 AND u.current_generation_seq=$5
-		  AND u.current_listen_plan_version=$6)`,
-		view.LocalUnitID, view.LocalAssetID, time.Now().Add(-kernel.EdgeOnlineWindow),
-		view.ExpectedGenerationID, view.ExpectedGenerationSeq, view.ExpectedListenPlanVersion).Scan(&ready)
-	return err == nil && ready
-}
-
 // ModelHandler 返回 ModelGatewayService 处理器。
 func (s *OnboardingServer) ModelHandler() (string, http.Handler) {
 	return modelv1connect.NewModelGatewayServiceHandler(s, handlerOptions()...)
@@ -94,28 +77,20 @@ func (s *OnboardingServer) GetOnboarding(ctx context.Context, req *connect.Reque
 	if !view.UpdatedAt.IsZero() {
 		updated = timestamppb.New(view.UpdatedAt)
 	}
-	ready := edgeReady(ctx, s.pool, view)
 	state := view.State
-	if ready && state != OnboardingStateCompleted {
-		state = OnboardingStateEdgeLive
+	if state == OnboardingStateEdgeLive {
+		state = OnboardingStateModelLive
 	}
 	return connect.NewResponse(&onboardingv1.GetOnboardingResponse{
-		State:                     protoOnboardingState(state),
-		BaseUrl:                   view.BaseURL,
-		Model:                     view.Model,
-		HasSecret:                 view.HasSecret,
-		SecretHint:                view.SecretHint,
-		JarvisOnline:              jarvisOnline(ctx, s.pool, s.jarvisID),
-		LocalAssetId:              view.publicAssetID(),
-		LastError:                 view.LastError,
-		UpdatedAt:                 updated,
-		Dialect:                   protoModelDialect(view.Dialect),
-		EdgeReady:                 ready,
-		LocalUnitId:               view.LocalUnitID,
-		DeploymentSpecDigest:      view.DeploymentSpecDigest,
-		ExpectedGenerationId:      view.ExpectedGenerationID,
-		ExpectedGenerationSeq:     view.ExpectedGenerationSeq,
-		ExpectedListenPlanVersion: view.ExpectedListenPlanVersion,
+		State:        protoOnboardingState(state),
+		BaseUrl:      view.BaseURL,
+		Model:        view.Model,
+		HasSecret:    view.HasSecret,
+		SecretHint:   view.SecretHint,
+		JarvisOnline: jarvisOnline(ctx, s.pool, s.jarvisID),
+		LastError:    view.LastError,
+		UpdatedAt:    updated,
+		Dialect:      protoModelDialect(view.Dialect),
 	}), nil
 }
 
@@ -239,57 +214,12 @@ func (s *OnboardingServer) TestModelConnectivity(ctx context.Context, req *conne
 	return connect.NewResponse(resp), nil
 }
 
-// PutDeploymentSpecification 由 Brain 确定性签发人工安装 Edge 所需的监听计划、基线世代和模型档案。
+// PutDeploymentSpecification 只保留旧线缆；人工接入必须走 AssetService.PutEdgeEnrollment。
 func (s *OnboardingServer) PutDeploymentSpecification(ctx context.Context, req *connect.Request[onboardingv1.PutDeploymentSpecificationRequest]) (*connect.Response[onboardingv1.PutDeploymentSpecificationResponse], error) {
-	user, err := s.requireAdmin(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	spec, err := normalizeDeploymentSpec(req.Msg)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	resp := &onboardingv1.PutDeploymentSpecificationResponse{}
-	err = idempotentProto(ctx, s.pool, "onboarding.put_deployment_specification", idempotencyKey(req.Header()), spec.Request, resp, func(tx pgx.Tx) error {
-		view, err := loadOnboardingViewTx(ctx, tx, true)
-		if err != nil {
-			return err
-		}
-		if err := onboardingEdgeError(view.State, actionPutDeploymentSpec, view.HasSecret, view.ModelLive); err != nil {
-			return err
-		}
-		if view.DeploymentSpecDigest == spec.Digest && view.ExpectedListenPlanVersion > 0 && view.ExpectedGenerationID != "" {
-			resp.UnitId = view.LocalUnitID
-			resp.AssetId = view.LocalAssetID
-			resp.DeploymentSpecDigest = view.DeploymentSpecDigest
-			resp.ListenPlanVersion = view.ExpectedListenPlanVersion
-			resp.GenerationId = view.ExpectedGenerationID
-			resp.GenerationSeq = view.ExpectedGenerationSeq
-			return nil
-		}
-		listenVersion, generationID, generationSeq, err := publishDeploymentSpecification(
-			ctx, tx, spec, s.signingKey, s.artifactSigner, user.GetUserId())
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE deployment_onboarding SET state=$1,last_error='',updated_at=now() WHERE id=1`, OnboardingStateModelLive); err != nil {
-			return err
-		}
-		resp.UnitId = spec.Request.GetUnitId()
-		resp.AssetId = spec.Request.GetAssetId()
-		resp.DeploymentSpecDigest = spec.Digest
-		resp.ListenPlanVersion = listenVersion
-		resp.GenerationId = generationID
-		resp.GenerationSeq = generationSeq
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(resp), nil
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("onboarding deployment specification is retired"))
 }
 
-// CompleteOnboarding 仅在模型、智能代理、数据面、本机资产和权限授予全部就绪时关闭初次配置。
+// CompleteOnboarding 仅在模型网关已探测且贾维斯在线时关闭初次配置。
 func (s *OnboardingServer) CompleteOnboarding(ctx context.Context, req *connect.Request[onboardingv1.CompleteOnboardingRequest]) (*connect.Response[onboardingv1.CompleteOnboardingResponse], error) {
 	user, err := s.requireAdmin(ctx, req)
 	if err != nil {
@@ -317,23 +247,19 @@ func (s *OnboardingServer) CompleteOnboarding(ctx context.Context, req *connect.
 	if err := onboardingEdgeError(view.State, actionCompleteOnboarding, view.HasSecret, view.ModelLive); err != nil {
 		return nil, err
 	}
-	ready := edgeReady(ctx, tx, view)
 	missing := missingCompletePredicates(ctx, tx, completeCheck{
 		AdminUserID:   user.UserId,
 		JarvisAgentID: s.jarvisID,
 		LocalAssetID:  view.LocalAssetID,
 		ModelLive:     view.ModelLive,
-		EdgeReady:     ready,
 	})
 	if len(missing) > 0 {
 		return nil, onboardingGateError(missing)
 	}
-	ids := []string{view.LocalAssetID}
-	extra, err := listAssetIDs(ctx, tx)
+	ids, err := listAssetIDs(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	ids = append(ids, extra...)
 	if err := writeAdminSystemGrantAssets(ctx, tx, user.UserId, ids); err != nil {
 		return nil, err
 	}

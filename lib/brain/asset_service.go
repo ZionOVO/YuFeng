@@ -51,7 +51,14 @@ func (s *AssetServer) Handler() (string, http.Handler) {
 }
 
 func (s *AssetServer) caller(ctx context.Context, req interface{ Header() http.Header }) (*authv1.User, error) {
-	return requireUser(ctx, s.pool, req)
+	user, err := requireUser(ctx, s.pool, req)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireCompletedOnboarding(ctx, s.pool); err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 // CreateAsset 校验管理权限与资产字段后登记一个新的防御资产。
@@ -194,15 +201,15 @@ func (s *AssetServer) DeleteAsset(ctx context.Context, req *connect.Request[asse
 	if id == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("asset_id is required"))
 	}
-	snap, err := loadOnboarding(ctx, s.pool)
-	if err != nil {
-		return nil, err
-	}
-	if snap.LocalAssetID != "" && id == snap.LocalAssetID {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("cannot delete local asset"))
-	}
 	if err := authorizeWrite(ctx, s.pool, user, "asset.delete", "asset", id, false); err != nil {
 		return nil, err
+	}
+	var enrolled bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM edge_enrollments WHERE asset_id=$1)`, id).Scan(&enrolled); err != nil {
+		return nil, err
+	}
+	if enrolled {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("asset has an edge enrollment"))
 	}
 	tag, err := s.pool.Exec(ctx, `DELETE FROM assets WHERE asset_id=$1`, id)
 	if err != nil {
@@ -227,25 +234,9 @@ func (s *AssetServer) ListAssets(ctx context.Context, req *connect.Request[asset
 	if err != nil {
 		return nil, err
 	}
-	snap, err := loadOnboarding(ctx, s.pool)
-	if err != nil {
-		return nil, err
-	}
 	scope := scopeFromAccess(access)
 	ids := scope.assetIDs()
-	if !snap.completed() {
-		if user.Role != commonv1.UserRole_USER_ROLE_ADMIN || !scope.hasTool("console.read") {
-			return connect.NewResponse(&assetv1.ListAssetsResponse{}), nil
-		}
-		if snap.LocalAssetID == "" {
-			return connect.NewResponse(&assetv1.ListAssetsResponse{}), nil
-		}
-		all, err := listAssetIDs(ctx, s.pool)
-		if err != nil {
-			return nil, err
-		}
-		ids = all
-	} else if !scope.hasTool("console.read") || len(ids) == 0 {
+	if !scope.hasTool("console.read") || len(ids) == 0 {
 		return connect.NewResponse(&assetv1.ListAssetsResponse{}), nil
 	}
 	limit := ClampPageSize(req.Msg.GetPageSize())
@@ -290,19 +281,11 @@ func (s *AssetServer) GetAsset(ctx context.Context, req *connect.Request[assetv1
 	if err != nil {
 		return nil, err
 	}
-	snap, err := loadOnboarding(ctx, s.pool)
-	if err != nil {
-		return nil, err
-	}
 	access, err := loadEffectiveAccess(ctx, s.pool, user)
 	if err != nil {
 		return nil, err
 	}
-	if !snap.completed() {
-		if user.Role != commonv1.UserRole_USER_ROLE_ADMIN || snap.LocalAssetID == "" {
-			return nil, onboardingIncompleteError()
-		}
-	} else if !scopeFromAccess(access).coversAsset(req.Msg.AssetId) {
+	if !scopeFromAccess(access).coversAsset(req.Msg.AssetId) {
 		return nil, objectDenied()
 	}
 	row := s.pool.QueryRow(ctx, `SELECT `+assetSelectCols+` FROM assets WHERE asset_id=$1`, req.Msg.AssetId)
@@ -331,6 +314,14 @@ func (s *AssetServer) AttachUnit(ctx context.Context, req *connect.Request[asset
 	}
 	if err := authorizeWrite(ctx, s.pool, user, "asset.attach", "asset", req.Msg.AssetId, false); err != nil {
 		return nil, err
+	}
+	var enrolledAssetID string
+	err = s.pool.QueryRow(ctx, `SELECT asset_id FROM edge_enrollments WHERE unit_id=$1`, req.Msg.UnitId).Scan(&enrolledAssetID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	if enrolledAssetID != "" && enrolledAssetID != req.Msg.AssetId {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("edge enrollment binds another asset"))
 	}
 	if _, err := s.pool.Exec(ctx, `INSERT INTO unit_assets(unit_id, asset_id, relation, is_primary) VALUES($1,$2,'protects',false)
 	ON CONFLICT(unit_id, asset_id) DO NOTHING`, req.Msg.UnitId, req.Msg.AssetId); err != nil {
@@ -364,6 +355,13 @@ func (s *AssetServer) DetachUnit(ctx context.Context, req *connect.Request[asset
 	}
 	if err := authorizeWrite(ctx, s.pool, user, "asset.detach", "asset", req.Msg.AssetId, false); err != nil {
 		return nil, err
+	}
+	var enrolled bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM edge_enrollments WHERE unit_id=$1 AND asset_id=$2)`, req.Msg.UnitId, req.Msg.AssetId).Scan(&enrolled); err != nil {
+		return nil, err
+	}
+	if enrolled {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("edge enrollment must be retired before detach"))
 	}
 	if _, err := s.pool.Exec(ctx, `DELETE FROM unit_assets WHERE unit_id=$1 AND asset_id=$2`, req.Msg.UnitId, req.Msg.AssetId); err != nil {
 		return nil, err
@@ -429,6 +427,10 @@ func (s *AssetServer) assetDetail(ctx context.Context, a *assetv1.Asset) (*asset
 		detail.Units = append(detail.Units, unit)
 	}
 	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	detail.EdgeEnrollments, err = listEdgeEnrollments(ctx, s.pool, a.Id)
+	if err != nil {
 		return nil, err
 	}
 	err = s.pool.QueryRow(ctx, `SELECT count(*) FROM releases r JOIN release_assets ra ON ra.release_id=r.release_id

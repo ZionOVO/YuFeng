@@ -87,7 +87,7 @@ func (s *RegistryServer) authorizeRegister(ctx context.Context, req *connect.Req
 	}
 	isBootstrap := s.bootstrapToken != "" && subtle.ConstantTimeCompare([]byte(raw), []byte(s.bootstrapToken)) == 1
 	if exists {
-		// 管理员提交部署规格时只预声明身份与签名计划，不签发进程凭据；
+		// 管理员写入人工 Edge 接入配置时只预声明身份与签名计划，不签发进程凭据；
 		// 首次人工启动仍须用部署级引导令牌完成唯一一次接管。
 		if existingTokenHash == "" {
 			if isBootstrap {
@@ -153,13 +153,15 @@ func (s *RegistryServer) Register(ctx context.Context, req *connect.Request[regi
 		assetID = msg.UnitId
 	}
 	var expectedAssetID string
-	expectErr := s.pool.QueryRow(ctx, `SELECT local_asset_id FROM deployment_onboarding
-		WHERE id=1 AND local_unit_id=$1 AND deployment_spec_digest<>''`, msg.UnitId).Scan(&expectedAssetID)
+	expectErr := s.pool.QueryRow(ctx, `SELECT asset_id FROM edge_enrollments WHERE unit_id=$1`, msg.UnitId).Scan(&expectedAssetID)
 	if expectErr != nil && !errors.Is(expectErr, pgx.ErrNoRows) && !isUndefinedTable(expectErr) {
 		return nil, expectErr
 	}
 	if expectedAssetID != "" && assetID != expectedAssetID {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("registered asset does not match deployment specification"))
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("registered asset does not match edge enrollment"))
+	}
+	if expectedAssetID != "" && msg.Kind == registryv1.UnitKind_UNIT_KIND_HOST {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("edge enrollment cannot register as host"))
 	}
 	raw, tokenHash, err := newSessionToken()
 	if err != nil {
@@ -211,11 +213,14 @@ func (s *RegistryServer) Register(ctx context.Context, req *connect.Request[regi
 		msg.UnitId, unitKind, msg.Version, msg.PubkeyHint, tokenHash, refreshHash, accessExp, refreshExp, producerCapabilities); err != nil {
 		return nil, err
 	}
+	displayName := strings.TrimSpace(asset.DisplayName)
+	if displayName == "" {
+		displayName = assetID
+	}
 	if _, err := tx.Exec(ctx, `INSERT INTO assets(asset_id, display_name, access_mode, transports, capabilities, criticality, max_auto_tier, labels, last_probe_at, updated_at)
 	VALUES($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8::jsonb,now(),now())
-	ON CONFLICT(asset_id) DO UPDATE SET display_name=EXCLUDED.display_name, access_mode=EXCLUDED.access_mode,
-	  capabilities=EXCLUDED.capabilities, last_probe_at=now(), updated_at=now()`,
-		assetID, asset.DisplayName, accessModeString(asset.AccessMode), transports, assetCapabilities,
+	ON CONFLICT(asset_id) DO UPDATE SET capabilities=EXCLUDED.capabilities, last_probe_at=now()`,
+		assetID, displayName, accessModeString(asset.AccessMode), transports, assetCapabilities,
 		criticalityString(asset.Criticality), tierString(asset.MaxAutoTier), string(labels)); err != nil {
 		return nil, err
 	}
@@ -340,15 +345,6 @@ func (s *RegistryServer) Heartbeat(ctx context.Context, req *connect.Request[reg
 		current_generation_id=$5,current_generation_seq=$6,current_listen_plan_version=$7,last_heartbeat_at=now(), updated_at=now() WHERE unit_id=$8`,
 		req.Msg.Generation, strings.TrimSpace(req.Msg.GetVersion()), heartbeatPosture(req.Msg.GetPosture()), strings.TrimSpace(req.Msg.GetTrafficKey()),
 		currentGenerationID, currentGenerationSeq, currentListenPlanVersion, unitID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.Exec(ctx, `UPDATE deployment_onboarding SET
-		state=CASE WHEN state=$1 THEN state ELSE $2 END,last_error='',updated_at=now()
-		WHERE id=1 AND model_live AND local_unit_id=$3 AND expected_generation_id=$4
-		  AND expected_generation_seq=$5 AND expected_listen_plan_version=$6
-		  AND EXISTS(SELECT 1 FROM unit_assets WHERE unit_id=$3 AND asset_id=deployment_onboarding.local_asset_id)`,
-		OnboardingStateCompleted, OnboardingStateEdgeLive, unitID, currentGenerationID,
-		currentGenerationSeq, currentListenPlanVersion); err != nil && !isUndefinedTable(err) {
 		return nil, err
 	}
 	if capabilities != nil {
