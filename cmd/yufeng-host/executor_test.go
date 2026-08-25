@@ -58,7 +58,7 @@ func TestHostExecutorRestoresFileWhenServiceReloadFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if enforcesPOSIXHostPermissions && info.Mode().Perm() != 0o600 {
 		t.Fatalf("restored target mode=%04o want=0600", info.Mode().Perm())
 	}
 	if !containsPhase(phases, commandv1.StepPhase_STEP_PHASE_COMPENSATION_STARTED) || !containsPhase(phases, commandv1.StepPhase_STEP_PHASE_COMPENSATED) {
@@ -503,7 +503,7 @@ func TestHostExecutorAtomicReplacePreservesExistingModeAndUsesPrivateDefault(t *
 			if err != nil {
 				t.Fatal(err)
 			}
-			if info.Mode().Perm() != test.want {
+			if enforcesPOSIXHostPermissions && info.Mode().Perm() != test.want {
 				t.Fatalf("target mode=%04o want=%04o", info.Mode().Perm(), test.want)
 			}
 		})
@@ -516,11 +516,14 @@ func TestHostExecutorRejectsPathTraversalAndSymlink(t *testing.T) {
 	if err := os.WriteFile(outside, []byte("outside"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	targets := []string{outside}
 	link := filepath.Join(executor.config.AllowedRoots[0], "linked")
-	if err := os.Symlink(outside, link); err != nil {
+	if err := os.Symlink(outside, link); err == nil {
+		targets = append(targets, link)
+	} else if enforcesPOSIXHostPermissions {
 		t.Fatal(err)
 	}
-	for _, target := range []string{outside, link} {
+	for _, target := range targets {
 		command := &commandv1.Command{
 			CommandId: "cmd-reject-" + hexDigest(target)[:8], ArtifactRef: artifact.GetId(), LeaseId: "lease-1", LeaseEpoch: 1,
 			Steps: []*commandv1.CommandStep{{Primitive: "file.atomic_replace", ArgsJson: mustJSON(t, map[string]string{"target": target})}},

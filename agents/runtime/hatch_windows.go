@@ -26,7 +26,15 @@ func configureChildProcess(cmd *exec.Cmd) (func(), error) {
 	}
 	defer source.Close() //nolint:errcheck // 受限令牌创建完成后释放源令牌。
 	var restricted windows.Token
-	result, _, callErr := createRestrictedToken.Call(uintptr(source), 1, 0, 0, 0, 0, 0, 0, uintptr(unsafe.Pointer(&restricted)))
+	const (
+		disableMaxPrivilege = 0x1
+		limitedUserToken    = 0x4
+	)
+	result, _, callErr := createRestrictedToken.Call(
+		uintptr(source), disableMaxPrivilege|limitedUserToken,
+		0, 0, 0, 0, 0, 0,
+		uintptr(unsafe.Pointer(&restricted)),
+	)
 	if result == 0 {
 		if callErr == nil {
 			callErr = syscall.EINVAL

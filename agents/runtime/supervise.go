@@ -122,14 +122,15 @@ func Supervise(ctx context.Context, cfg SuperviseConfig) HatchResult {
 	childEnvironment = append(childEnvironment, signals.environment...)
 	childFiles := append(transportFiles, signals.files...)
 	out = Hatch(runCtx, HatchConfig{
-		Bin:        cfg.Bin,
-		Args:       args,
-		Env:        childEnvironment,
-		TTL:        cfg.TTL,
-		WorkDir:    workDir,
-		Limits:     cfg.Limits,
-		Sandbox:    cfg.Input.IsInvestigation(),
-		ExtraFiles: childFiles,
+		Bin:           cfg.Bin,
+		Args:          args,
+		Env:           childEnvironment,
+		TTL:           cfg.TTL,
+		WorkDir:       workDir,
+		Limits:        cfg.Limits,
+		Sandbox:       cfg.Input.IsInvestigation(),
+		ExtraFiles:    childFiles,
+		RequestCancel: signals.RequestCancel,
 	})
 	_ = transport.Close()
 	// 未使用监督协议的普通子进程会在未连接时正常退出；关闭监听器会让

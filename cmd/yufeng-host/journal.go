@@ -83,7 +83,7 @@ func ensurePrivateDir(path string) error {
 	if err != nil {
 		return err
 	}
-	if !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
+	if !info.IsDir() || (enforcesPOSIXHostPermissions && info.Mode().Perm()&0o077 != 0) {
 		return errors.New("host state directories must not be accessible by group or others")
 	}
 	return nil
@@ -117,13 +117,5 @@ func atomicWriteFile(path string, raw []byte, mode os.FileMode) error {
 	if err := os.Rename(tempPath, path); err != nil {
 		return err
 	}
-	directory, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	if err := directory.Sync(); err != nil {
-		_ = directory.Close()
-		return err
-	}
-	return directory.Close()
+	return syncHostDirectory(filepath.Dir(path))
 }

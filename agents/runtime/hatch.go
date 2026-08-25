@@ -19,15 +19,16 @@ type ResourceLimit struct {
 
 // HatchConfig 是孵化 yufeng-run 执行实例的参数。
 type HatchConfig struct {
-	Bin        string
-	Args       []string
-	Env        []string
-	TTL        time.Duration
-	Budget     *CallBudget
-	Limits     ResourceLimit
-	Sandbox    bool
-	WorkDir    string
-	ExtraFiles []*os.File
+	Bin           string
+	Args          []string
+	Env           []string
+	TTL           time.Duration
+	Budget        *CallBudget
+	Limits        ResourceLimit
+	Sandbox       bool
+	WorkDir       string
+	ExtraFiles    []*os.File
+	RequestCancel func()
 }
 
 // HatchResult 是一次孵化的结果。
@@ -93,7 +94,13 @@ func Hatch(ctx context.Context, cfg HatchConfig) HatchResult {
 		out.Err = err
 		return out
 	}
-	cmd.Cancel = func() error { return terminateChildProcess(cmd.Process) }
+	cmd.Cancel = func() error {
+		if cfg.RequestCancel != nil {
+			cfg.RequestCancel()
+			return nil
+		}
+		return terminateChildProcess(cmd.Process)
+	}
 	cmd.WaitDelay = time.Second
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

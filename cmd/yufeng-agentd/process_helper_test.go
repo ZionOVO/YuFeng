@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -42,6 +44,9 @@ func newAgentdProcessTestHelper(t *testing.T, config agentdProcessHelperConfig) 
 	t.Helper()
 	dir := t.TempDir()
 	out := filepath.Join(dir, agentdProcessHelperPrefix)
+	if runtime.GOOS == "windows" {
+		out += ".exe"
+	}
 	testBinary, err := filepath.Abs(os.Args[0])
 	if err != nil {
 		t.Fatal(err)
@@ -107,8 +112,13 @@ func runSupervisorWatchHelper(config agentdProcessHelperConfig) error {
 }
 
 func runCancelableCompensationHelper(config agentdProcessHelperConfig) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	ctx, cancel := context.WithCancel(signalCtx)
+	defer cancel()
+	if err := agentruntime.WatchCancellation(agentdProcessHelperCancelFD(), cancel); err != nil {
+		return err
+	}
 	var record agentruntime.RunRecord
 	err := agentruntime.Execute(ctx, []agentruntime.Step{
 		{
@@ -126,4 +136,13 @@ func runCancelableCompensationHelper(config agentdProcessHelperConfig) error {
 		return errors.New("cancelable helper completed without cancellation")
 	}
 	return nil
+}
+
+func agentdProcessHelperCancelFD() int {
+	value := strings.TrimSpace(os.Getenv("YUFENG_CANCEL_FD"))
+	fd, err := strconv.Atoi(value)
+	if err != nil || fd < 3 {
+		return -1
+	}
+	return fd
 }

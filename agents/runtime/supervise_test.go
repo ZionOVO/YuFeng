@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -199,6 +200,9 @@ func TestSuperviseYufengRunOmitsCapability(t *testing.T) {
 }
 
 func TestSuperviseInvestigationPassesFrozenInputThroughBrokerOnly(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Windows traffic investigation remains disabled until AppContainer is available")
+	}
 	bin := buildYufengRun(t)
 	work := &fakeWork{}
 	tools := &captureTools{}

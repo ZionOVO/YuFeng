@@ -47,7 +47,7 @@ func TestDeploymentEvidenceRemainsDiagnostic(t *testing.T) {
 	}
 }
 
-func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
+func TestContinuousIntegrationUsesOneRequiredResult(t *testing.T) {
 	body, err := os.ReadFile("../.github/workflows/ci.yml")
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
 		"govulncheck@v1.7.0",
 		"protoc-gen-go@v1.36.12",
 		"protoc-gen-connect-go@v1.20.0",
-		`version: "1.72.0"`,
+		"github.com/bufbuild/buf/cmd/buf@v1.72.0",
 		"buf breaking",
 		"npm run build",
 		"GOARCH=mips",
@@ -76,7 +76,7 @@ func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
 			t.Errorf("continuous integration workflow missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"branches: [develop]", "release-gate.yml", "pull-request.yml"} {
+	for _, forbidden := range []string{"branches: [develop]", "release-gate.yml", "pull-request.yml", "bufbuild/buf-setup-action", "timeout-minutes:"} {
 		if strings.Contains(workflow, forbidden) {
 			t.Errorf("continuous integration retains retired topology %q", forbidden)
 		}
@@ -92,21 +92,45 @@ func TestDevelopmentPlatformCompatibilityRemainsAdvisory(t *testing.T) {
 	for _, want := range []string{
 		"name: development-platform-compatibility",
 		"workflow_dispatch:",
-		"schedule:",
-		"ubuntu-22.04-low-resource",
-		"windows-2022-low-resource",
-		"macos-15-intel-low-resource",
+		"os: ubuntu-22.04",
+		"os: windows-2022",
+		"os: macos-15-intel",
 		"GO_TEST_FLAGS='-p=1'",
 		"development-check.ps1 -Parallelism 1",
-		"npm test -- --maxWorkers=1",
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("development compatibility workflow missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"pull_request:", "push:", "needs:"} {
+	for _, forbidden := range []string{
+		"pull_request:",
+		"push:",
+		"schedule:",
+		"timeout-minutes:",
+		"needs:",
+		"actions/setup-node@",
+		"npm ci",
+		"npm test",
+		"npm run",
+	} {
 		if strings.Contains(workflow, forbidden) {
 			t.Errorf("advisory compatibility workflow must not become a merge gate through %q", forbidden)
+		}
+	}
+}
+
+func TestBuildWorkflowsDoNotGateOnElapsedTime(t *testing.T) {
+	for _, path := range []string{
+		"../.github/workflows/ci.yml",
+		"../.github/workflows/compatibility.yml",
+		"../.github/workflows/release.yml",
+	} {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(body), "timeout-minutes:") {
+			t.Errorf("%s gates build success on elapsed time", path)
 		}
 	}
 }

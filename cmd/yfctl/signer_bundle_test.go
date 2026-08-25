@@ -35,7 +35,7 @@ func TestWriteClientCABundleAtomicallyReplacesExistingPublicBundle(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o644 {
+	if enforcesPOSIXSignerModes && info.Mode().Perm() != 0o644 {
 		t.Fatalf("client certificate authority bundle mode=%#o", info.Mode().Perm())
 	}
 	temporary, err := filepath.Glob(filepath.Join(directory, ".client-ca-bundle-*"))
@@ -71,7 +71,7 @@ func TestReplaceClientCABundleRenameFailurePreservesExistingBundle(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o644 {
+	if enforcesPOSIXSignerModes && info.Mode().Perm() != 0o644 {
 		t.Fatalf("rename failure changed bundle mode=%#o", info.Mode().Perm())
 	}
 	temporary, err := filepath.Glob(filepath.Join(directory, ".client-ca-bundle-*"))

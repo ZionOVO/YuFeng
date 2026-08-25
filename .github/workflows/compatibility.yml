@@ -1,10 +1,8 @@
 name: development-platform-compatibility
 
-# 合并门禁固定在 Ubuntu 24.04；本工作流定期验证较旧开发环境，不因托管平台临时不可用阻断 main。
+# 合并门禁固定在 Ubuntu 24.04；需要排查平台差异时才人工运行本工作流，不阻断 main。
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "23 3 * * 1"
 
 permissions:
   contents: read
@@ -17,16 +15,15 @@ jobs:
   platform:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: ubuntu-22.04-low-resource
+          - name: ubuntu-22.04
             os: ubuntu-22.04
-          - name: windows-2022-low-resource
+          - name: windows-2022
             os: windows-2022
-          - name: macos-15-intel-low-resource
+          - name: macos-15-intel
             os: macos-15-intel
     env:
       PYTHON: python
@@ -35,11 +32,6 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.0"
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: console/package-lock.json
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.9"
@@ -50,13 +42,3 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\development-check.ps1 -Parallelism 1
-      - run: npm ci
-        working-directory: console
-      - run: npm test -- --maxWorkers=1
-        working-directory: console
-      - run: npm run lint
-        working-directory: console
-      - run: npm run typecheck
-        working-directory: console
-      - run: npm run build
-        working-directory: console

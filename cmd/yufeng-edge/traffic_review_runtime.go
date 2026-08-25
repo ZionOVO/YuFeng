@@ -49,7 +49,7 @@ func loadOrCreateEvidenceKey(path string) ([]byte, error) {
 		}
 		if info, statErr := os.Stat(path); statErr != nil {
 			return nil, statErr
-		} else if info.Mode().Perm()&0o077 != 0 {
+		} else if !privateEvidenceKeyPermissions(info) {
 			return nil, errors.New("evidence vault key permissions are too broad")
 		}
 		return raw, nil

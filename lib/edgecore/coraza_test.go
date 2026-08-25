@@ -3,6 +3,7 @@ package edgecore
 import (
 	"bufio"
 	"encoding/json"
+	"io/fs"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -11,6 +12,26 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestCorazaRootFSNormalizesWindowsSeparators(t *testing.T) {
+	raw, err := fs.ReadFile(newCorazaRootFS(), `@owasp_crs\REQUEST-930-APPLICATION-ATTACK-LFI.conf`)
+	if err != nil {
+		t.Fatalf("read embedded rule with Windows separators: %v", err)
+	}
+	if !strings.Contains(string(raw), "t:"+corazaPortableNormalizePathWin) {
+		t.Fatal("embedded rules must use the operating-system-neutral path transformation")
+	}
+}
+
+func TestCorazaRulePathNormalizationDoesNotDependOnOperatingSystem(t *testing.T) {
+	got, changed, err := normalizeCorazaRulePath(`....//....//etc/passwd`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed || got != `..../..../etc/passwd` {
+		t.Fatalf("normalized path=%q changed=%t", got, changed)
+	}
+}
 
 func TestCorazaDetectionOnlyNoBlock(t *testing.T) {
 	d, err := NewCorazaDetector()

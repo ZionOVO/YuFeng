@@ -113,18 +113,8 @@ func NewEvidenceVault(dir string, key []byte) (*EvidenceVault, error) {
 	if len(key) != 32 {
 		return nil, errors.New("evidence vault key must be 32 bytes")
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := secureEvidenceVaultDirectory(dir); err != nil {
 		return nil, err
-	}
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return nil, err
-	}
-	info, err := os.Stat(dir)
-	if err != nil {
-		return nil, err
-	}
-	if !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
-		return nil, errors.New("evidence vault directory permissions are too broad")
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -342,8 +332,8 @@ func (v *EvidenceVault) rebuildIndexLocked() error {
 		if err != nil {
 			return errors.Join(err, f.Close())
 		}
-		if info.Mode().Perm()&0o077 != 0 {
-			return errors.Join(errors.New("evidence vault segment permissions are too broad"), f.Close())
+		if err := validateEvidenceVaultSegment(info); err != nil {
+			return errors.Join(err, f.Close())
 		}
 		reader := bufio.NewReaderSize(f, 16*1024)
 		var offset int64
@@ -434,14 +424,6 @@ func truncateVaultTail(file *os.File, path string, offset int64) error {
 		return err
 	}
 	return syncDirectory(filepath.Dir(path))
-}
-
-func syncDirectory(path string) error {
-	directory, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	return errors.Join(directory.Sync(), directory.Close())
 }
 
 func (v *EvidenceVault) filesLocked() ([]string, error) {

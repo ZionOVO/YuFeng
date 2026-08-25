@@ -1,14 +1,18 @@
 package edgecore
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/fs"
 	"net/url"
+	"path"
 	"strings"
 	"sync"
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/experimental/plugins"
 	"github.com/corazawaf/coraza/v3/types"
 
 	"yufeng/lib/kernel"
@@ -30,6 +34,13 @@ func SharedCoraza() (*CorazaDetector, error) {
 }
 
 const corazaDetectorID = "crs"
+
+const corazaPortableNormalizePathWin = "yufengNormalizePathWin"
+
+func init() {
+	// Coraza 的扩展注册表是进程级的；使用唯一名称并在任何 WAF 装载前完成一次注册。
+	plugins.RegisterTransformation(corazaPortableNormalizePathWin, normalizeCorazaRulePath)
+}
 
 // CRSAutoGovernRule 判定规则标识是否允许进入自动治理通道。
 // 91x / 920 / 913 等协议与扫描器类不得进自动治理。
@@ -55,6 +66,49 @@ type CorazaDetector struct {
 	waf coraza.WAF
 }
 
+type corazaRootFS struct{ fs.FS }
+
+func (root corazaRootFS) Open(name string) (fs.File, error) {
+	return root.FS.Open(normalizeCorazaPath(name))
+}
+
+func (root corazaRootFS) ReadFile(name string) ([]byte, error) {
+	raw, err := fs.ReadFile(root.FS, normalizeCorazaPath(name))
+	if err != nil {
+		return nil, err
+	}
+	return bytes.ReplaceAll(raw, []byte("t:normalizePathWin"), []byte("t:"+corazaPortableNormalizePathWin)), nil
+}
+
+func (root corazaRootFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	return fs.ReadDir(root.FS, normalizeCorazaPath(name))
+}
+
+func (root corazaRootFS) Glob(pattern string) ([]string, error) {
+	return fs.Glob(root.FS, normalizeCorazaPath(pattern))
+}
+
+func normalizeCorazaPath(name string) string {
+	return strings.ReplaceAll(name, `\`, "/")
+}
+
+func normalizeCorazaRulePath(value string) (string, bool, error) {
+	if value == "" {
+		return value, false, nil
+	}
+	slashed := strings.ReplaceAll(value, `\`, "/")
+	cleaned := path.Clean(slashed)
+	if cleaned == "." {
+		return "", true, nil
+	}
+	if strings.HasSuffix(slashed, "/") {
+		cleaned += "/"
+	}
+	return cleaned, cleaned != value, nil
+}
+
+func newCorazaRootFS() fs.FS { return corazaRootFS{FS: coreruleset.FS} }
+
 // NewCorazaDetector 按架构冻结清单装载核心规则集。
 func NewCorazaDetector() (*CorazaDetector, error) {
 	directives := `
@@ -76,7 +130,7 @@ Include @owasp_crs/REQUEST-934-APPLICATION-ATTACK-GENERIC.conf
 Include @owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf
 Include @owasp_crs/REQUEST-942-APPLICATION-ATTACK-SQLI.conf
 `
-	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithRootFS(coreruleset.FS).WithDirectives(directives))
+	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithRootFS(newCorazaRootFS()).WithDirectives(directives))
 	if err != nil {
 		return nil, fmt.Errorf("create coraza waf: %w", err)
 	}

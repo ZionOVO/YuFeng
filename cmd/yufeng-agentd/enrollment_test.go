@@ -36,7 +36,7 @@ func TestLoadOrCreateEnrollmentMaterialPersistsMatchingIdentity(t *testing.T) {
 		if err != nil {
 			t.Fatalf("stat enrollment material: %v", err)
 		}
-		if info.Mode().Perm() != 0o600 {
+		if goruntime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 			t.Fatalf("enrollment material mode = %o", info.Mode().Perm())
 		}
 	}

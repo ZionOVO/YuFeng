@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime/debug"
 	"testing"
@@ -109,9 +108,11 @@ func TestLimitResourcesUsesGoMemoryLimit(t *testing.T) {
 		}
 		return
 	}
-	cmd := exec.Command(os.Args[0], "-test.run=^TestLimitResourcesUsesGoMemoryLimit$")
-	cmd.Env = append(os.Environ(), childEnv+"=1")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("resource-limited Go child failed: %v\n%s", err, output)
+	result := Hatch(context.Background(), HatchConfig{
+		Bin: os.Args[0], Args: []string{"-test.run=^TestLimitResourcesUsesGoMemoryLimit$"},
+		Env: append(os.Environ(), childEnv+"=1"), TTL: 10 * time.Second,
+	})
+	if result.Err != nil {
+		t.Fatalf("resource-limited Go child failed: %v", result.Err)
 	}
 }

@@ -10,8 +10,9 @@ func TestRefreshFileEmptyDir(t *testing.T) {
 	if refreshFile("") != "" || refreshFile("   ") != "" {
 		t.Fatal("empty state dir must not persist")
 	}
-	got := refreshFile("/var/lib/yufeng/jarvis")
-	if got != "/var/lib/yufeng/jarvis/refresh" {
+	stateDir := filepath.Join(string(filepath.Separator), "var", "lib", "yufeng", "jarvis")
+	got := refreshFile(stateDir)
+	if want := filepath.Join(stateDir, "refresh"); got != want {
 		t.Fatalf("path=%s", got)
 	}
 }
