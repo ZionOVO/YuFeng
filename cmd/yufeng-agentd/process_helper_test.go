@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -42,6 +43,9 @@ func newAgentdProcessTestHelper(t *testing.T, config agentdProcessHelperConfig) 
 	t.Helper()
 	dir := t.TempDir()
 	out := filepath.Join(dir, agentdProcessHelperPrefix)
+	if runtime.GOOS == "windows" {
+		out += ".exe"
+	}
 	testBinary, err := filepath.Abs(os.Args[0])
 	if err != nil {
 		t.Fatal(err)

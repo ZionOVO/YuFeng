@@ -169,9 +169,5 @@ func replaceClientCABundle(path string, bundle []byte, rename func(string, strin
 	if err := rename(temporaryPath, path); err != nil {
 		return err
 	}
-	directory, err := os.Open(directoryPath)
-	if err != nil {
-		return err
-	}
-	return errors.Join(directory.Sync(), directory.Close())
+	return syncSignerDirectory(directoryPath)
 }

@@ -602,19 +602,6 @@ func (e *hostExecutor) atomicReplace(target string, payload []byte, mode os.File
 	return e.syncDir(root, dir)
 }
 
-func syncRootDirectory(root *os.Root, dir string) error {
-	directory, err := root.Open(dir)
-	if err != nil {
-		return err
-	}
-	syncErr := directory.Sync()
-	closeErr := directory.Close()
-	if syncErr != nil {
-		return syncErr
-	}
-	return closeErr
-}
-
 func (e *hostExecutor) restoreFile(compensation *fileCompensation) error {
 	if compensation == nil {
 		return nil

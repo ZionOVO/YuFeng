@@ -74,13 +74,7 @@ func atomicWritePrivate(path, pattern string, payload []byte) error {
 		}
 		return errors.Join(err, removeErr)
 	}
-	dir, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	syncErr := dir.Sync()
-	closeErr := dir.Close()
-	if err := errors.Join(syncErr, closeErr); err != nil {
+	if err := syncPrivateParentDirectory(filepath.Dir(path)); err != nil {
 		return fmt.Errorf("sync parent directory: %w", err)
 	}
 	return nil

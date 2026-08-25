@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,6 +25,9 @@ import (
 )
 
 func TestKilledAgentdReapsRunProcessTree(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows job object allows only the supervised run process and prevents a grandchild")
+	}
 	if _, err := exec.LookPath("sleep"); err != nil {
 		t.Skip("sleep not available")
 	}
