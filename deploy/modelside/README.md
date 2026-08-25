@@ -65,6 +65,8 @@ sudo stat /run/yufeng/modelside.sock
 
 跨主机监听时，把 `YUFENG_MODELSIDE_LISTEN` 改为 HTTPS 地址，并在服务命令中追加 `--listen-ca`、`--listen-cert`、`--listen-key`。服务端证书必须覆盖 Edge 实际使用的名称，`--listen-ca` 只信任获准入口主机的客户端证书权威。
 
+`YUFENG_MODELSIDE_INGRESS_CAPACITY=0` 使用推理线程数两倍的默认批次交接槽。跨主机突发导致 `ingress_dropped` 增长时，可按容量测试结果设置 2–64；该参数只增加易失批次交接容量，不改变 Edge 的模型输入缓存窗口，也不能替代扩展推理能力。
+
 ## 4. 升级与回退
 
 升级 wheel 或 TensorFlow 运行时前记录虚拟环境、权重摘要、ModelSide 身份和控制台最近结果时间。把新 wheel 安装到新的虚拟环境，验证 `--help`、权重清单和依赖导入后再切换 systemd 的可执行路径。不要覆盖正在使用的权重文件。

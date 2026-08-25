@@ -32,6 +32,7 @@ RESULT_MAX = 1024
 UPLOAD_MAX = 100
 INFERENCE_BATCH = 32
 INGRESS_BATCH_SLOTS_PER_WORKER = 2
+INGRESS_BATCH_SLOTS_MAX = 64
 SEEN_ROUTE_MAX = 8192
 
 
@@ -277,10 +278,11 @@ class ModelSideRuntime:
         shutdown_timeout: float = 5.0,
     ):
         if ingress_capacity is None:
-            ingress_capacity = max(2, workers * INGRESS_BATCH_SLOTS_PER_WORKER)
+            ingress_capacity = min(INGRESS_BATCH_SLOTS_MAX, max(2, workers * INGRESS_BATCH_SLOTS_PER_WORKER))
         if (
             not modelside_id.strip()
-            or ingress_capacity <= 0
+            or ingress_capacity < 2
+            or ingress_capacity > INGRESS_BATCH_SLOTS_MAX
             or result_capacity <= 0
             or workers <= 0
             or shutdown_timeout < 0

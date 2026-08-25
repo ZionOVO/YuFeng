@@ -64,6 +64,7 @@ class TensorFlowBackend:
         self._root = pathlib.Path(weights_root).resolve()
         self._models: dict[tuple[str, str, str], object] = {}
         self._lock = threading.Lock()
+        self._inference_lock = threading.Lock()
         try:
             raw = (self._root / "manifest.json").read_text(encoding="utf-8")
             manifest = json.loads(raw)
@@ -132,7 +133,12 @@ class TensorFlowBackend:
             [encode_character_classes(item.model_text) for item in items],
             maxlen=SEQUENCE_LENGTH,
         )
-        predictions = self._model(profile)(data, training=False).numpy()
+        try:
+            # Keras 的共享图形处理器模型调用不是线程安全的；批次并发由入口槽吸收，模型调用串行化。
+            with self._inference_lock:
+                predictions = self._model(profile)(data, training=False).numpy()
+        except Exception as exc:
+            raise InferenceError("tensorflow inference failed") from exc
         scores = [float(row[0]) for row in predictions]
         if any(score < 0 or score > 1 for score in scores):
             raise InferenceError("model returned an invalid score")

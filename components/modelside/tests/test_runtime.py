@@ -127,6 +127,15 @@ class AlertBackend:
 
 
 class RuntimeIsolationTests(unittest.TestCase):
+    def test_ingress_capacity_rejects_a_persistent_business_window(self):
+        with self.assertRaises(ValueError):
+            ModelSideRuntime(
+                "modelside-1",
+                AlertBackend(),
+                OfflineBrain(),
+                ingress_capacity=65,
+            )
+
     def test_ingress_capacity_counts_submitted_batches_not_individual_traffic(self):
         runtime = ModelSideRuntime(
             "modelside-1",

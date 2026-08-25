@@ -8,8 +8,7 @@ import signal
 import threading
 
 from .inference import DeterministicBackend, TensorFlowBackend
-from .runtime import BrainClient, ModelSideRuntime
-from .server import make_server
+from .runtime import BrainClient, INGRESS_BATCH_SLOTS_MAX, ModelSideRuntime
 
 
 def _secret(value: str, path: str, name: str) -> str:
@@ -23,6 +22,18 @@ def _secret(value: str, path: str, name: str) -> str:
     if not value.strip():
         raise SystemExit(f"{name} is required")
     return value.strip()
+
+
+def _ingress_capacity(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("ingress capacity must be an integer") from exc
+    if parsed != 0 and not 2 <= parsed <= INGRESS_BATCH_SLOTS_MAX:
+        raise argparse.ArgumentTypeError(
+            f"ingress capacity must be 0 or between 2 and {INGRESS_BATCH_SLOTS_MAX}"
+        )
+    return parsed
 
 
 def parser() -> argparse.ArgumentParser:
@@ -40,6 +51,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--listen-key", default="")
     result.add_argument("--weights", default="")
     result.add_argument("--workers", type=int, default=1)
+    result.add_argument("--ingress-capacity", type=_ingress_capacity, default=0)
     result.add_argument("--dev-insecure", action="store_true")
     result.add_argument("--dev-deterministic", action="store_true")
     return result
@@ -47,6 +59,8 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = parser().parse_args()
+    from .server import make_server
+
     if args.dev_deterministic and not args.dev_insecure:
         raise SystemExit("deterministic inference is restricted to development mode")
     token = _secret(args.brain_token, args.brain_token_file, "brain-token")
@@ -59,7 +73,13 @@ def main() -> None:
         args.brain_key,
         args.dev_insecure,
     )
-    runtime = ModelSideRuntime(args.modelside_id, backend, brain, workers=args.workers)
+    runtime = ModelSideRuntime(
+        args.modelside_id,
+        backend,
+        brain,
+        ingress_capacity=args.ingress_capacity or None,
+        workers=args.workers,
+    )
     server = make_server(
         args.listen,
         runtime,

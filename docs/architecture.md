@@ -470,7 +470,8 @@ L1 生产数据面不变量见 §4，网络结果与失败语义见 [`api.md`](a
 | `ModelIngressDefaultItems` / `ModelIngressDefaultBytes` / `ModelIngressDefaultAge` | 4096 / 128 MiB / 2s | Brain 签发的 Edge → modelside 模型输入缓存窗口默认期望值 |
 | `ModelIngressLocalMaxItems` / `ModelIngressLocalMaxBytes` / `ModelIngressLocalMaxAge` | 16384 / 256 MiB / 5min | Edge 本机默认硬上限；启动参数可进一步收窄 |
 | `ModelIngressAbsoluteMaxItems` / `ModelIngressAbsoluteMinBytes` / `ModelIngressAbsoluteMaxBytes` / `ModelIngressAbsoluteMinAge` / `ModelIngressAbsoluteMaxAge` | 65536 / 1 MiB / 256 MiB / 10ms / 5min | Brain 与 Edge 接受模型输入缓存窗口配置的绝对范围 |
-| `ModelIngressBatchMaxItems` / `ModelIngressBatchWait` / `ModelSideIngressWorkers` | 32 / 10ms / 2 | Edge 后台同档案批量与并发发送上限 |
+| `ModelIngressBatchMaxItems` / `ModelIngressBatchWait` / `ModelSideIngressWorkers` | 32 / 10ms / 2 | Edge 后台同档案批量与 ModelSide 默认推理并发 |
+| `ModelSideIngressBatchSlotsMax` | 64 | ModelSide 本机可配置的浅层批次交接槽硬上限；0 使用推理线程数两倍且不超过该硬上限的默认值 |
 | `ModelSideResultQueueMax` / `ModelSideUploadBatchMax` | 1024 / 100 | modelside → brain 独立结果队列与单批上限 |
 | `ModelReviewWindow` / `ModelReviewPerUnit` / `ModelReviewPerRoute` | 5min / 4 / 1 | 初始签名模型档案的复核窗口与代表上限 |
 | `ModelAlertThresholdDefault` / `ModelReviewFloorDefault` | 0.9 / 0.5 | 初始签名模型档案阈值；运行时只认档案，不认进程默认值 |
