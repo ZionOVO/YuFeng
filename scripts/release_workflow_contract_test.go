@@ -17,9 +17,9 @@ func TestReleaseWorkflowPromotesOneImmutableBundle(t *testing.T) {
 		"actions/workflows/ci.yml/runs?branch=main&event=push",
 		"./scripts/build-release-assets.sh",
 		"./scripts/verify-release-assets.sh",
-		"actions/upload-artifact@v4",
+		"actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
 		"overwrite: false",
-		"actions/download-artifact@v4",
+		"actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
 		"gh run download \"$BUNDLE_RUN_ID\"",
 		"cmp \"$BUNDLE_DIR/$asset\"",
 		"git config user.name \"github-actions[bot]\"",
@@ -46,7 +46,7 @@ func TestReleaseWorkflowPromotesOneImmutableBundle(t *testing.T) {
 			t.Errorf("software release workflow retains non-convergent behavior %q", forbidden)
 		}
 	}
-	upload := strings.Index(release, "actions/upload-artifact@v4")
+	upload := strings.Index(release, "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a")
 	tag := strings.Index(release, "git tag -a")
 	if upload < 0 || tag < 0 || upload > tag {
 		t.Fatal("immutable workflow bundle must be stored before creating the release tag")

@@ -16,8 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/sys/unix"
-
 	"yufeng/lib/kernel"
 	artifactv1 "yufeng/proto/gen/artifactv1"
 	modelsidev1 "yufeng/proto/gen/modelsidev1"
@@ -456,22 +454,6 @@ func modelBypassPercentile(values []int64, percentile int) int64 {
 	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
 	index := (len(values)*percentile+99)/100 - 1
 	return values[index]
-}
-
-func modelBypassReadProcessUsage(t *testing.T) modelBypassProcessUsage {
-	t.Helper()
-	var usage unix.Rusage
-	if err := unix.Getrusage(unix.RUSAGE_SELF, &usage); err != nil {
-		t.Fatal(err)
-	}
-	resident := uint64(usage.Maxrss)
-	if runtime.GOOS != "darwin" {
-		resident *= 1024
-	}
-	return modelBypassProcessUsage{
-		cpuSeconds:    float64(usage.Utime.Sec) + float64(usage.Utime.Usec)/1e6 + float64(usage.Stime.Sec) + float64(usage.Stime.Usec)/1e6,
-		residentBytes: resident,
-	}
 }
 
 func modelBypassPerformanceDurationValue(t *testing.T, name string, fallback time.Duration) time.Duration {

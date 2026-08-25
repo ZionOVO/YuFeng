@@ -10,6 +10,20 @@
 make build test vet
 ```
 
+Linux 与 macOS 的低性能开发机可以限制 Go 测试并发，减少中央处理器和内存峰值：
+
+```sh
+make build test vet GO_TEST_FLAGS='-p=1'
+```
+
+Windows 不要求额外安装 Make；在 PowerShell 中运行同一组平台检查：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\development-check.ps1
+```
+
+脚本默认串行执行测试；性能较好的 Windows 设备可以通过 `-Parallelism` 提高并发。平台检查只扫描仓库自身的 Go 包，不会把控制台 `node_modules` 中偶然携带的 Go 源码纳入门禁。Python 3 未安装时，本地跳过 ModelSide 与发布制品的 Python 契约；持续集成仍在固定 Python 版本下强制执行这些契约。
+
 控制台使用 Node.js 22：
 
 ```sh

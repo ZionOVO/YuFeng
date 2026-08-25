@@ -194,7 +194,19 @@ func writeReleaseArchive(t *testing.T, path, memberName string) {
 
 func runReleaseArtifactCommand(t *testing.T, wantSuccess bool, arguments ...string) {
 	t.Helper()
-	command := exec.Command("python3", append([]string{"release-artifacts.py"}, arguments...)...)
+	python := os.Getenv("PYTHON")
+	if python == "" {
+		for _, candidate := range []string{"python3", "python"} {
+			if resolved, err := exec.LookPath(candidate); err == nil {
+				python = resolved
+				break
+			}
+		}
+	}
+	if python == "" {
+		t.Skip("Python 3 is not installed; release artifact contracts run in continuous integration")
+	}
+	command := exec.Command(python, append([]string{"release-artifacts.py"}, arguments...)...)
 	output, err := command.CombinedOutput()
 	if wantSuccess && err != nil {
 		t.Fatalf("release-artifacts.py failed: %v\n%s", err, output)

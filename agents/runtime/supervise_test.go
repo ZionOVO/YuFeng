@@ -3,7 +3,8 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"os/exec"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -24,6 +25,7 @@ type fakeWork struct {
 	failProgress bool
 	progress     []string
 	saga         testSagaJournal
+	onExtend     func() error
 }
 
 func (f *fakeWork) Poll(context.Context) (*workerv1.WorkItem, error) { return nil, nil }
@@ -36,10 +38,17 @@ func (f *fakeWork) Fail(context.Context, string, string, int64, string, string) 
 
 func (f *fakeWork) Extend(context.Context, string, string, int64) (LeaseExtension, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.extends++
-	if f.failExtend {
+	failExtend := f.failExtend
+	onExtend := f.onExtend
+	f.mu.Unlock()
+	if failExtend {
 		return LeaseExtension{}, fmt.Errorf("lease lost")
+	}
+	if onExtend != nil {
+		if err := onExtend(); err != nil {
+			return LeaseExtension{}, err
+		}
 	}
 	return LeaseExtension{CapabilityToken: "cap-rotated"}, nil
 }
@@ -85,21 +94,24 @@ func (t *captureTools) Invoke(_ context.Context, accessToken, capabilityToken, n
 }
 
 func TestSuperviseLostLeaseKillsChild(t *testing.T) {
-	if _, err := exec.LookPath("sleep"); err != nil {
-		t.Skip("sleep not available")
-	}
+	ready := filepath.Join(t.TempDir(), "ready")
+	child := newRuntimeProcessTestHelper(t, runtimeProcessHelperConfig{Mode: "block", ReadyPath: ready})
 	lost := make(chan struct{})
 	done := make(chan HatchResult, 1)
 	go func() {
 		done <- Supervise(context.Background(), SuperviseConfig{
-			Bin: "sleep", Args: []string{"30"}, TTL: time.Minute,
+			Bin: child, TTL: time.Minute,
 			WorkID: "work-lost", RunID: "run-lost", LeaseLost: lost,
 		})
 	}()
-	time.Sleep(100 * time.Millisecond)
+	waitRuntimeProcessHelperReady(t, ready)
 	close(lost)
-	res := <-done
-	time.Sleep(50 * time.Millisecond)
+	var res HatchResult
+	select {
+	case res = <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("supervise did not return after lease loss")
+	}
 	if ProcessAlive(res.PID) {
 		_ = KillProcessGroup(res.PID)
 		t.Fatalf("child pid %d remained after lost lease", res.PID)
@@ -107,12 +119,18 @@ func TestSuperviseLostLeaseKillsChild(t *testing.T) {
 }
 
 func TestSuperviseExtendContinues(t *testing.T) {
-	if _, err := exec.LookPath("sleep"); err != nil {
-		t.Skip("sleep not available")
-	}
-	fw := &fakeWork{}
+	dir := t.TempDir()
+	ready := filepath.Join(dir, "ready")
+	exitPath := filepath.Join(dir, "exit")
+	child := newRuntimeProcessTestHelper(t, runtimeProcessHelperConfig{Mode: "wait-file", ReadyPath: ready, ExitPath: exitPath})
+	var writeExit sync.Once
+	var writeErr error
+	fw := &fakeWork{onExtend: func() error {
+		writeExit.Do(func() { writeErr = os.WriteFile(exitPath, []byte("exit"), 0o600) })
+		return writeErr
+	}}
 	res := Supervise(context.Background(), SuperviseConfig{
-		Bin: "sleep", Args: []string{"0.15"}, TTL: time.Second,
+		Bin: child, TTL: 10 * time.Second,
 		WorkID: "work-ext", RunID: "run-ext", Client: fw, ExtendEvery: 20 * time.Millisecond,
 	})
 	if res.Err == nil || !strings.Contains(res.Err.Error(), "terminal broker receipt") {
@@ -127,15 +145,12 @@ func TestSuperviseExtendContinues(t *testing.T) {
 }
 
 func TestSuperviseLostOnExtendFailure(t *testing.T) {
-	if _, err := exec.LookPath("sleep"); err != nil {
-		t.Skip("sleep not available")
-	}
+	child := newRuntimeProcessTestHelper(t, runtimeProcessHelperConfig{Mode: "block"})
 	fw := &fakeWork{failExtend: true}
 	res := Supervise(context.Background(), SuperviseConfig{
-		Bin: "sleep", Args: []string{"30"}, TTL: time.Minute,
+		Bin: child, TTL: time.Minute,
 		WorkID: "work-ext-fail", RunID: "run-ext-fail", Client: fw, ExtendEvery: 50 * time.Millisecond,
 	})
-	time.Sleep(50 * time.Millisecond)
 	if ProcessAlive(res.PID) {
 		_ = KillProcessGroup(res.PID)
 		t.Fatalf("child pid %d remained after extend failure", res.PID)
@@ -144,7 +159,7 @@ func TestSuperviseLostOnExtendFailure(t *testing.T) {
 
 func TestSuperviseBudgetBeforeSpawn(t *testing.T) {
 	res := Supervise(context.Background(), SuperviseConfig{
-		Bin: "sleep", Args: []string{"1"}, Budget: &CallBudget{Remaining: 0},
+		Bin: "must-not-start", Budget: &CallBudget{Remaining: 0},
 	})
 	if res.Err == nil || res.Err.Error() != "resource_exhausted" {
 		t.Fatalf("got %v", res.Err)
