@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Maximize2, Minimize2, RotateCcw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { AccessMode, AssetDetail, Criticality } from '../../api/types'
+import { formatTime } from '../format'
 import { HealthBadge } from '../ui'
 import { drawAssetFigure, drawBox, drawPlaneFigure } from './draw'
 import {
@@ -67,6 +68,7 @@ const TH = 28
 const ZOOM_MIN = 0.4
 const ZOOM_MAX = 3.2
 const ZOOM_FACTOR = 1.2
+const UNIT_ONLINE_WINDOW_MS = 90_000
 const PAD_INK: Record<string, string> = {
   payments: '#1a3a2e',
   mall: '#1a2e3a',
@@ -90,6 +92,20 @@ function liveLabel(live: boolean | null): string {
   if (live === true) return '在线'
   if (live === false) return '离线'
   return '岗位'
+}
+
+function enrollmentStateLabel(status: string): string {
+  if (status === 'EDGE_ENROLLMENT_STATUS_ONLINE') return '在线且收敛'
+  if (status === 'EDGE_ENROLLMENT_STATUS_OUT_OF_SYNC') return '制品未收敛'
+  if (status === 'EDGE_ENROLLMENT_STATUS_OFFLINE') return '离线'
+  if (status === 'EDGE_ENROLLMENT_STATUS_WAITING_FOR_REGISTRATION') return '等待注册'
+  return '未知'
+}
+
+function unitHeartbeatOnline(lastHeartbeatAt?: string): boolean {
+  if (lastHeartbeatAt === undefined) return false
+  const heartbeat = Date.parse(lastHeartbeatAt)
+  return Number.isFinite(heartbeat) && Date.now() - heartbeat <= UNIT_ONLINE_WINDOW_MS
 }
 
 function clampZoom(s: number): number {
@@ -148,6 +164,15 @@ export function AssetEstateMap({
     setCanvasReady(el !== null)
   }, [])
   const graph = buildEstate(assets, plane)
+  const enrollments = assets.flatMap((asset) => asset.edgeEnrollments)
+  const enrolledUnitIds = new Set(enrollments.map((enrollment) => enrollment.unitId))
+  const unenrolledEdges = assets.flatMap((asset) => asset.units).filter(
+    (unit) => unit.kind.toLowerCase().includes('edge') && !enrolledUnitIds.has(unit.unitId),
+  )
+  const edgeOnline = enrollments.filter((enrollment) => enrollment.status === 'EDGE_ENROLLMENT_STATUS_ONLINE').length
+  const hosts = assets.flatMap((asset) => asset.units).filter((unit) => unit.kind.toLowerCase().includes('host'))
+  const hostOnline = hosts.filter((unit) => unit.health === 'UNIT_HEALTH_HEALTHY' && unitHeartbeatOnline(unit.lastHeartbeatAt)).length
+  const modelsideOnline = enrollments.filter((enrollment) => enrollment.modelsideStatus === 'EDGE_ENROLLMENT_STATUS_ONLINE').length
   const [hover, setHover] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const cam = useRef({ x: 0, y: 0, s: 1 })
@@ -217,6 +242,7 @@ export function AssetEstateMap({
   }, [expanded, stageH])
 
   const selectedAsset = graph.assets.find((a) => a.id === selected) ?? null
+  const selectedDetail = selectedAsset === null ? null : assets.find((asset) => asset.asset.id === selectedAsset.id) ?? null
   const selectedPlane = graph.plane.find((n) => n.id === selected) ?? null
   const graphKey =
     graph.assets.map((a) => a.id).join(',') +
@@ -736,7 +762,10 @@ export function AssetEstateMap({
           {graph.assets.length} 台资产 · {graph.units.length} 个单元
           {truncated ? ' · 仅前 200 台' : ''}
           {` · 贾维斯${jarvis?.live ? '在线' : '离线'}`}
-          {` · Edge${plane?.edgeReady ? '就绪' : '未就绪'}`}
+          {` · Edge ${edgeOnline}/${enrollments.length} 在线`}
+          {unenrolledEdges.length > 0 ? ` · Edge 未登记 ${unenrolledEdges.length}` : ''}
+          {` · Host ${hostOnline}/${hosts.length} 在线`}
+          {` · ModelSide ${modelsideOnline}/${enrollments.length} 在线`}
           {graph.source === 'none' ? ' · 无业务线/环境标签，未分组' : ` · 按 labels.${graph.source} 弱分组`}
         </p>
       </div>
@@ -778,6 +807,21 @@ export function AssetEstateMap({
               <span>在役 {selectedAsset.activeReleaseCount}</span>
               {(caseStats[selectedAsset.id]?.openCount ?? 0) > 0 && <span>未结案件 {caseStats[selectedAsset.id].openCount} · 最高 {caseStats[selectedAsset.id].highestPriority}</span>}
             </p>
+            {(selectedDetail?.edgeEnrollments ?? []).map((enrollment) => (
+              <p key={enrollment.unitId} className="yf-estate-ins-mute">
+                Edge {enrollment.unitId}：{enrollmentStateLabel(enrollment.status)} · ModelSide：{enrollmentStateLabel(enrollment.modelsideStatus)}
+              </p>
+            ))}
+            {(selectedDetail?.units ?? []).filter((unit) => unit.kind.toLowerCase().includes('edge') && !enrolledUnitIds.has(unit.unitId)).map((unit) => (
+              <p key={unit.unitId} className="yf-estate-ins-mute">
+                Edge {unit.unitId}：未登记人工接入 · 最近心跳 {formatTime(unit.lastHeartbeatAt)}
+              </p>
+            ))}
+            {(selectedDetail?.units ?? []).filter((unit) => unit.kind.toLowerCase().includes('host')).map((unit) => (
+              <p key={unit.unitId} className="yf-estate-ins-mute">
+                Host {unit.unitId}：{unit.health === 'UNIT_HEALTH_HEALTHY' && unitHeartbeatOnline(unit.lastHeartbeatAt) ? '在线' : '离线'} · 最近心跳 {formatTime(unit.lastHeartbeatAt)}
+              </p>
+            ))}
             {selectedAsset.unitIds.length === 0 && <p className="yf-estate-ins-mute">未绑定单元，没有保护边</p>}
             <Link to={`/assets/${selectedAsset.id}`} className="yf-estate-open">
               打开详情

@@ -243,6 +243,7 @@ export function createAssets(): AssetDetail[] {
       },
       unitIds: ['unit-edge-01'],
       units: [producerUnit('unit-edge-01')],
+      edgeEnrollments: [],
       health: 'UNIT_HEALTH_HEALTHY',
       activeReleaseCount: 2,
     },
@@ -270,6 +271,7 @@ export function createAssets(): AssetDetail[] {
       },
       unitIds: ['unit-edge-02'],
       units: [producerUnit('unit-edge-02')],
+      edgeEnrollments: [],
       health: 'UNIT_HEALTH_HEALTHY',
       activeReleaseCount: 1,
     },
@@ -285,6 +287,7 @@ export function createAssets(): AssetDetail[] {
       },
       unitIds: [],
       units: [],
+      edgeEnrollments: [],
       health: 'UNIT_HEALTH_UNSPECIFIED',
       activeReleaseCount: 0,
     },
@@ -644,6 +647,7 @@ export function createDashboard(): DashboardSummary {
     },
     events24hTotal: '1241',
     events24hBlocked: '37',
+    modelAlerts24h: '0',
     pendingRetireSoon: '0',
   }
 }

@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// 控制台源文件必须含引导六步、授予约束、提案意图、canOnAsset、会话与幂等键复用。
-func TestConsoleSourcesCoverSetupGrantProposeSession(t *testing.T) {
+// 控制台源文件必须覆盖控制面引导、人工 Edge 接入、授予约束、会话与幂等键复用。
+func TestConsoleSourcesCoverSetupEnrollmentGrantAndSession(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("caller")
@@ -21,20 +21,33 @@ func TestConsoleSourcesCoverSetupGrantProposeSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(setup)
-	for _, phrase := range []string{"配置模型", "探测连通", "提交部署规格", "人工安装 Edge", "设置防御资产", "授权值守账户", "原生 Go 二进制", "Docker Compose", "入口姿态", "流量键", "真实上游地址", "Envoy", "createUser", "putGrant", "completeOnboarding", "createAsset"} {
+	for _, phrase := range []string{"配置模型网关", "探测连通性", "确认贾维斯在线", "进入主控制台", "jarvisOnline", "completeOnboarding"} {
 		if !strings.Contains(s, phrase) {
 			t.Errorf("SetupPage missing %q", phrase)
 		}
 	}
-	if !strings.Contains(s, "不是单独点探针") {
-		t.Fatal("setup must state that probing is not a sixth step")
-	}
 	if strings.Contains(s, "label=\"业务私钥\"") || strings.Contains(s, "label=\"业务证书\"") {
 		t.Fatal("setup must not collect business tls material")
 	}
-	for _, forbidden := range []string{"等待贾维斯", "部署本机数据面", "deployDataplane"} {
+	for _, forbidden := range []string{"提交部署规格", "人工安装 Edge", "设置防御资产", "授权值守账户", "putDeploymentSpecification", "createAsset", "createUser", "putGrant", "deployDataplane"} {
 		if strings.Contains(s, forbidden) {
-			t.Fatalf("setup must not retain automatic Edge deployment phrase %q", forbidden)
+			t.Fatalf("setup must not retain data-plane or account onboarding path %q", forbidden)
+		}
+	}
+
+	enrollment, err := os.ReadFile(filepath.Join(root, "src", "pages", "assets", "EdgeEnrollmentCard.tsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := string(enrollment)
+	for _, phrase := range []string{"人工 Edge 接入", "putEdgeEnrollment", "入口姿态", "监听地址", "反向代理上游", "流量键", "可信代理网段", "所需文件", "人工安装命令", "期望监听计划", "实际监听计划", "ModelSide"} {
+		if !strings.Contains(e, phrase) {
+			t.Errorf("EdgeEnrollmentCard missing %q", phrase)
+		}
+	}
+	for _, forbidden := range []string{"docker compose", "systemctl restart", "bootstrap_token", "private_key"} {
+		if strings.Contains(e, forbidden) {
+			t.Errorf("EdgeEnrollmentCard must not execute lifecycle actions or expose secrets: %q", forbidden)
 		}
 	}
 
@@ -102,7 +115,7 @@ func TestConsoleSourcesCoverSetupGrantProposeSession(t *testing.T) {
 	if !strings.Contains(c, "GetModelGateway") || !strings.Contains(c, "UpdateModelGateway") || !strings.Contains(c, "ProbeModelGateway") {
 		t.Fatal("ConnectClient must call model gateway admin RPCs")
 	}
-	if !strings.Contains(c, "'PutDeploymentSpecification'") || strings.Contains(c, "'DeployDataplane'") {
-		t.Fatal("ConnectClient must submit the typed manual Edge deployment specification only")
+	if !strings.Contains(c, "'PutEdgeEnrollment'") || strings.Contains(c, "'PutDeploymentSpecification'") || strings.Contains(c, "'DeployDataplane'") {
+		t.Fatal("ConnectClient must use AssetService.PutEdgeEnrollment and omit retired deployment methods")
 	}
 }

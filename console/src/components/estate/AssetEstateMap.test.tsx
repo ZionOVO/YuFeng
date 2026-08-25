@@ -52,16 +52,31 @@ describe('AssetEstateMap', () => {
     mount(
       <AssetEstateMap
         assets={createAssets()}
-        plane={{ jarvisOnline: true, edgeReady: true }}
+        plane={{ jarvisOnline: true }}
         onOpenJarvis={onJarvis}
       />,
     )
     expect(screen.getByText(/贾维斯在线/)).toBeInTheDocument()
-    expect(screen.getByText(/Edge就绪/)).toBeInTheDocument()
+    expect(screen.getByText(/Edge 0\/0 在线/)).toBeInTheDocument()
+    expect(screen.getByText(/Edge 未登记 2/)).toBeInTheDocument()
+    expect(screen.getByText(/ModelSide 0\/0 在线/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '选中贾维斯' }))
     expect(screen.getByLabelText('选中岗位')).toBeInTheDocument()
     expect(screen.getByText(/只连中台/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '打开编排' })).toHaveAttribute('href', '/agent')
+  })
+
+  it('Host 必须同时健康且心跳未过期才显示在线', async () => {
+    const user = userEvent.setup()
+    const assets = createAssets()
+    const unit = assets[0].units[0]
+    unit.kind = 'host'
+    unit.lastHeartbeatAt = '2020-01-01T00:00:00Z'
+    mount(<AssetEstateMap assets={assets} />)
+
+    expect(screen.getByText(/Host 0\/1 在线/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '选中资产 core-payments' }))
+    expect(screen.getByText(/Host unit-edge-01：离线/)).toBeInTheDocument()
   })
 
   it('工具链点名的资产会进选中轨道', () => {

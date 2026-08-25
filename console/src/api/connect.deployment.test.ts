@@ -1,12 +1,39 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ConnectClient } from './connect'
 
-describe('Edge 人工部署规格契约', () => {
-  it('按入口姿态发送完整签名输入而不调用部署动作', async () => {
-    const bodies: unknown[] = []
-    const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      bodies.push(JSON.parse(String(init?.body ?? '{}')))
-      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+const modelProfile = {
+  profileId: 'http-threat/PVM/gpvm-e9eceef3',
+  modelGroup: 'http-threat',
+  modelType: 'PVM',
+  modelVersion: 'gpvm-e9eceef3',
+  alertThreshold: 0.9,
+  reviewFloor: 0.5,
+  reviewWindowSeconds: 300,
+  maxReviewPerUnit: 4,
+  maxReviewPerRoute: 1,
+  dedupeRule: 'MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE' as const,
+  allowedHeaders: ['content-type'],
+  maxBodyBytes: 65536,
+  reviewNewRoutes: true,
+  reviewInsufficientCoverage: true,
+}
+
+const modelIngressWindow = {
+  maxItems: 4096,
+  maxRetainedBytes: String(128 * 1024 * 1024),
+  maxQueueAge: '2s',
+}
+
+describe('人工 Edge 接入契约', () => {
+  it('按资产发送反向代理与外部授权接入配置，不调用旧引导部署方法', async () => {
+    const calls: { method: string; body: unknown }[] = []
+    const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const method = String(input).split('/').at(-1) ?? ''
+      calls.push({ method, body: JSON.parse(String(init?.body ?? '{}')) })
+      return new Response(JSON.stringify({ enrollment: { assetId: 'asset-1', unitId: 'edge-1' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
     })
     const client = new ConnectClient({
       getToken: () => 'tok',
@@ -14,83 +41,88 @@ describe('Edge 人工部署规格契约', () => {
       fetchFn: fetchFn as unknown as typeof fetch,
     })
 
-    const common = {
-      unitId: 'edge-1',
+    await client.putEdgeEnrollment({
       assetId: 'asset-1',
-      modelIngressWindow: {
-        maxItems: 4096,
-        maxRetainedBytes: String(128 * 1024 * 1024),
-        maxQueueAge: '2s',
-      },
-      modelProfile: {
-        profileId: 'http/default',
-        modelGroup: 'http',
-        modelType: 'PVM',
-        modelVersion: 'v1',
-        alertThreshold: 0.9,
-        reviewFloor: 0.5,
-        reviewWindowSeconds: 300,
-        maxReviewPerUnit: 4,
-        maxReviewPerRoute: 1,
-        dedupeRule: 'MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE' as const,
-        allowedHeaders: ['content-type'],
-        maxBodyBytes: 65536,
-        reviewNewRoutes: true,
-        reviewInsufficientCoverage: true,
-      },
-    }
-    await client.putDeploymentSpecification({
-      ...common,
+      unitId: 'edge-1',
       posture: 'INGRESS_POSTURE_REVERSE_PROXY',
+      listenAddress: ':18080',
+      upstreamUrl: 'http://app:8080',
       trafficKey: 'site-a',
       trustedProxyCidrs: ['10.0.0.0/8'],
-      reverseProxy: { listenAddress: ':18080', upstreamUrl: 'http://app:8080' },
+      modelProfile,
+      modelIngressWindow,
     })
-    await client.putDeploymentSpecification({
-      ...common,
+    await client.putEdgeEnrollment({
+      assetId: 'asset-1',
+      unitId: 'edge-2',
       posture: 'INGRESS_POSTURE_EXT_AUTHZ',
+      listenAddress: ':18081',
+      upstreamUrl: '',
       trafficKey: 'gateway-a',
       trustedProxyCidrs: [],
-      extAuthz: { listenAddress: ':18081' },
+      modelProfile,
+      modelIngressWindow,
     })
 
-    expect(bodies).toEqual([
+    expect(calls).toEqual([
       {
-        ...common,
-        posture: 'INGRESS_POSTURE_REVERSE_PROXY',
-        trafficKey: 'site-a',
-        trustedProxyCidrs: ['10.0.0.0/8'],
-        reverseProxy: { listenAddress: ':18080', upstreamUrl: 'http://app:8080' },
+        method: 'PutEdgeEnrollment',
+        body: {
+          assetId: 'asset-1',
+          unitId: 'edge-1',
+          posture: 'INGRESS_POSTURE_REVERSE_PROXY',
+          listenAddress: ':18080',
+          upstreamUrl: 'http://app:8080',
+          trafficKey: 'site-a',
+          trustedProxyCidrs: ['10.0.0.0/8'],
+          modelProfile,
+          modelIngressWindow,
+        },
       },
       {
-        ...common,
-        posture: 'INGRESS_POSTURE_EXT_AUTHZ',
-        trafficKey: 'gateway-a',
-        trustedProxyCidrs: [],
-        extAuthz: { listenAddress: ':18081' },
+        method: 'PutEdgeEnrollment',
+        body: {
+          assetId: 'asset-1',
+          unitId: 'edge-2',
+          posture: 'INGRESS_POSTURE_EXT_AUTHZ',
+          listenAddress: ':18081',
+          upstreamUrl: '',
+          trafficKey: 'gateway-a',
+          trustedProxyCidrs: [],
+          modelProfile,
+          modelIngressWindow,
+        },
       },
     ])
+    expect('putDeploymentSpecification' in client).toBe(false)
   })
 
-  it('读取 Edge 主动回执坐标并只调用显式引导操作', async () => {
+  it('读取逐项接入状态，并让初次配置客户端只保留两项完成谓词', async () => {
     const methods: string[] = []
     const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
       const method = String(input).split('/').at(-1) ?? ''
       methods.push(method)
-      if (method === 'GetOnboarding') {
-        return new Response(
-          JSON.stringify({
-            state: 'ONBOARDING_STATE_EDGE_LIVE',
-            edgeReady: true,
-            localUnitId: 'edge-1',
-            localAssetId: 'asset-1',
-            deploymentSpecDigest: 'sha256:spec',
-            expectedGenerationId: 'generation-1',
-            expectedGenerationSeq: '7',
+      if (method === 'GetEdgeEnrollment') {
+        return new Response(JSON.stringify({
+          enrollment: {
+            assetId: 'asset-1',
+            unitId: 'edge-1',
+            status: 'EDGE_ENROLLMENT_STATUS_ONLINE',
+            modelsideStatus: 'EDGE_ENROLLMENT_STATUS_OUT_OF_SYNC',
             expectedListenPlanVersion: '3',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
+            currentListenPlanVersion: '3',
+            expectedGenerationSeq: '7',
+            currentGenerationSeq: '7',
+          },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (method === 'GetOnboarding') {
+        return new Response(JSON.stringify({
+          state: 'ONBOARDING_STATE_MODEL_LIVE',
+          jarvisOnline: true,
+          edgeReady: true,
+          localAssetId: 'legacy-asset',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       }
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
@@ -100,22 +132,21 @@ describe('Edge 人工部署规格契约', () => {
       fetchFn: fetchFn as unknown as typeof fetch,
     })
 
-    await expect(client.getOnboarding()).resolves.toEqual(
-      expect.objectContaining({
-        state: 'ONBOARDING_STATE_EDGE_LIVE',
-        edgeReady: true,
-        localUnitId: 'edge-1',
-        localAssetId: 'asset-1',
-        deploymentSpecDigest: 'sha256:spec',
-        expectedGenerationId: 'generation-1',
-        expectedGenerationSeq: '7',
-        expectedListenPlanVersion: '3',
-      }),
-    )
+    await expect(client.getEdgeEnrollment('asset-1', 'edge-1')).resolves.toMatchObject({
+      assetId: 'asset-1',
+      unitId: 'edge-1',
+      status: 'EDGE_ENROLLMENT_STATUS_ONLINE',
+      modelsideStatus: 'EDGE_ENROLLMENT_STATUS_OUT_OF_SYNC',
+      expectedListenPlanVersion: '3',
+      currentListenPlanVersion: '3',
+    })
+    await expect(client.getOnboarding()).resolves.toEqual(expect.objectContaining({
+      state: 'ONBOARDING_STATE_MODEL_LIVE',
+      jarvisOnline: true,
+    }))
     await client.testModelConnectivity()
     await client.completeOnboarding()
-    await client.probeModelGateway()
 
-    expect(methods).toEqual(['GetOnboarding', 'TestModelConnectivity', 'CompleteOnboarding', 'ProbeModelGateway'])
+    expect(methods).toEqual(['GetEdgeEnrollment', 'GetOnboarding', 'TestModelConnectivity', 'CompleteOnboarding'])
   })
 })

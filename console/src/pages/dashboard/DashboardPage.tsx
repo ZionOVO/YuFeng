@@ -1,6 +1,6 @@
 // 仪表盘：关键指标卡 + 资产拓扑 + 防护策略状态分布 + 最近事件。
 // 数据来自 ConsoleService.Dashboard、ListAssets（拓扑，pageSize=上限）、ListEvents（pageSize=8）
-// 与 GetOnboarding（贾维斯在线 / 数据面就绪）。int64 字段是 string，一律 Number() 后再用。
+// 与 GetOnboarding（仅贾维斯在线）。int64 字段是 string，一律 Number() 后再用。
 
 import { Spinner } from '@heroui/react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -76,6 +76,7 @@ export function DashboardPage() {
           value={eventsBlocked}
           hint={eventsTotal > 0 ? `阻断率 ${((eventsBlocked / eventsTotal) * 100).toFixed(1)}%` : undefined}
         />
+        <Metric label="24H 模型告警" value={Number(d.modelAlerts24h)} amber={Number(d.modelAlerts24h) > 0} />
         <Metric label="将到期策略" value={Number(d.pendingRetireSoon)} />
       </section>
 
@@ -90,7 +91,6 @@ export function DashboardPage() {
           assets={estate.data.items}
           plane={{
             jarvisOnline: onboarding?.jarvisOnline,
-            edgeReady: onboarding?.edgeReady,
           }}
           truncated={estate.data.nextPageToken !== ''}
           density="compact"

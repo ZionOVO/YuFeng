@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@heroui/react'
 import { Search } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { ListEventsFilter } from '../../api/client'
 import { hasCode } from '../../api/errors'
 import type { EventKind, Verdict } from '../../api/types'
@@ -32,6 +32,8 @@ const KIND_LABEL: Record<EventKind, string> = {
   KIND_SENSOR: '传感',
   KIND_INTEL: '情报',
   KIND_AGENT: 'Agent',
+  KIND_MODEL_ALERT: '模型告警',
+  KIND_MODEL_REVIEW_SAMPLE: '模型复核样本',
 }
 
 const VERDICT_OPTIONS: { key: Verdict; label: string }[] = [
@@ -46,12 +48,15 @@ const KIND_OPTIONS: { key: EventKind; label: string }[] = [
   { key: 'KIND_SENSOR', label: '传感' },
   { key: 'KIND_INTEL', label: '情报' },
   { key: 'KIND_AGENT', label: 'Agent' },
+  { key: 'KIND_MODEL_ALERT', label: '模型告警' },
+  { key: 'KIND_MODEL_REVIEW_SAMPLE', label: '模型复核样本' },
 ]
 
 export function EventsPage() {
   const { client } = useAuth()
   const navigate = useNavigate()
-  const [assetKey, setAssetKey] = useState('all')
+  const [searchParams] = useSearchParams()
+  const [assetKey, setAssetKey] = useState(() => searchParams.get('assetId')?.trim() || 'all')
   const [verdictKey, setVerdictKey] = useState('all')
   const [kindKey, setKindKey] = useState('all')
   const [query, setQuery] = useState('')

@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApiError } from '../../api/errors'
-import type { Event } from '../../api/types'
+import type { EventDetail } from '../../api/types'
 import { ConsoleClientFixture } from '../../test/fixtures/consoleClient'
 import { createEvents, FIXTURE_BLOCK_EVENT_ID, FIXTURE_BLOCK_EVENT_RELEASE_ID } from '../../test/fixtures/data'
 import { loginAs, renderApp } from '../../test/renderApp'
@@ -15,7 +15,7 @@ describe('事件详情状态与误报门禁', () => {
     ['unavailable', 'event service unavailable'],
   ] as const)('GetEvent 返回 %s 时区分详情状态', async (code, expected) => {
     class FailedEventClient extends ConsoleClientFixture {
-      override async getEvent(): Promise<Event> {
+      override async getEvent(): Promise<EventDetail> {
         throw new ApiError({ code, message: 'event service unavailable', httpStatus: code === 'not_found' ? 404 : 503 })
       }
     }
@@ -79,8 +79,34 @@ describe('事件详情状态与误报门禁', () => {
     }]
 
     class RichEventClient extends ConsoleClientFixture {
-      override async getEvent(): Promise<Event> {
-        return structuredClone(rich)
+      override async getEvent(): Promise<EventDetail> {
+        return structuredClone({
+          event: rich,
+          modelInferences: [{
+            inferenceId: 'inference-rich',
+            eventId: rich.id,
+            modelGroup: 'http-threat',
+            modelType: 'PVM',
+            modelVersion: 'gpvm-e9eceef3',
+            threshold: 0.9,
+            score: 0.9731,
+            attackClass: 'ATTACK_CLASS_SQLI',
+            taxonomyVersion: 'http-threat/v1',
+            recordedAt: rich.occurredAt,
+            modelProfileDigest: 'sha256:model-profile',
+            requestId: rich.requestId,
+            resultKind: 'MODEL_RESULT_KIND_ALERT',
+          }],
+          triageDeliveries: [{
+            caseId: 'case_traffic_01',
+            instructionId: 'instruction-rich',
+            handlerId: 'jarvis',
+            kind: 'INSTRUCTION_KIND_EVENT_TRIAGE',
+            status: 'INSTRUCTION_STATUS_ACKNOWLEDGED',
+            createdAt: rich.occurredAt,
+            acknowledgedAt: rich.occurredAt,
+          }],
+        })
       }
     }
 
@@ -98,6 +124,10 @@ describe('事件详情状态与误报门禁', () => {
     expect(screen.getByRole('region', { name: '检测结论' })).toHaveTextContent('taxonomy=owasp-crs-4')
     expect(screen.getByText('tags=attack-sqli,paranoia-level/1')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: '发布轨迹' })).toHaveTextContent('未选中')
+    expect(screen.getByRole('region', { name: '模型推理' })).toHaveTextContent('gpvm-e9eceef3')
+    expect(screen.getByRole('region', { name: '模型推理' })).toHaveTextContent('0.9731 / 0.9000')
+    expect(screen.getByRole('region', { name: '研判交付' })).toHaveTextContent('instruction-rich')
+    expect(screen.getByRole('link', { name: 'case_traffic_01' })).toHaveAttribute('href', '/cases?caseId=case_traffic_01')
     expect(screen.queryByRole('button', { name: '举报误报' })).toBeNull()
   })
 

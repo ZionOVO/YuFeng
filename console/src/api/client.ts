@@ -50,53 +50,21 @@ import type {
   TrafficReviewPolicyStatus,
   ModelIngressWindow,
   ModelIngressWindowStatus,
+  ModelProfile,
+  EdgeEnrollment,
+  EventDetail,
 } from './types'
 
-export interface ModelProfileSpecification {
-  profileId: string
-  modelGroup: string
-  modelType: string
-  modelVersion: string
-  alertThreshold: number
-  reviewFloor: number
-  reviewWindowSeconds: number
-  maxReviewPerUnit: number
-  maxReviewPerRoute: number
-  dedupeRule: 'MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE'
-  allowedHeaders: string[]
-  maxBodyBytes: number
-  reviewNewRoutes: boolean
-  reviewInsufficientCoverage: boolean
-}
-
-type EdgeIngressTarget =
-  | {
-      posture: 'INGRESS_POSTURE_REVERSE_PROXY'
-      trafficKey: string
-      trustedProxyCidrs: string[]
-      reverseProxy: { listenAddress: string; upstreamUrl: string }
-    }
-  | {
-      posture: 'INGRESS_POSTURE_EXT_AUTHZ'
-      trafficKey: string
-      trustedProxyCidrs: string[]
-      extAuthz: { listenAddress: string }
-    }
-
-export type EdgeDeploymentSpecification = EdgeIngressTarget & {
+export type EdgeEnrollmentInput = {
   unitId: string
   assetId: string
-  modelProfile: ModelProfileSpecification
+  posture: 'INGRESS_POSTURE_REVERSE_PROXY' | 'INGRESS_POSTURE_EXT_AUTHZ'
+  listenAddress: string
+  upstreamUrl: string
+  trafficKey: string
+  trustedProxyCidrs: string[]
+  modelProfile: ModelProfile
   modelIngressWindow: ModelIngressWindow
-}
-
-export interface EdgeDeploymentCoordinates {
-  unitId: string
-  assetId: string
-  deploymentSpecDigest: string
-  listenPlanVersion: string
-  generationId: string
-  generationSeq: string
 }
 
 /** 分页请求：pageSize 默认 50、上限 200；pageToken 不透明，只回传不解析（docs/api.md §0.6）。 */
@@ -188,6 +156,8 @@ export interface ConsoleClient {
   deleteAsset(assetId: string): Promise<void>
   attachUnit(assetId: string, unitId: string): Promise<AssetDetail>
   detachUnit(assetId: string, unitId: string): Promise<AssetDetail>
+  putEdgeEnrollment(req: EdgeEnrollmentInput): Promise<EdgeEnrollment>
+  getEdgeEnrollment(assetId: string, unitId: string): Promise<EdgeEnrollment>
   getTrafficReviewPolicy(assetId: string): Promise<TrafficReviewPolicyStatus>
   updateTrafficReviewPolicy(assetId: string, mode: TrafficReviewMode, expectedGenerationId?: string): Promise<TrafficReviewPolicyStatus>
   getModelIngressWindow(assetId: string, unitId: string): Promise<ModelIngressWindowStatus>
@@ -196,7 +166,7 @@ export interface ConsoleClient {
   /* ----- ConsoleService ----- */
   dashboard(): Promise<DashboardSummary>
   listEvents(filter?: ListEventsFilter, page?: PageQuery): Promise<Page<Event>>
-  getEvent(eventId: string): Promise<Event>
+  getEvent(eventId: string): Promise<EventDetail>
 
   /* ----- GovernService（写操作均带 Idempotency-Key） ----- */
   /** 门禁不通过不是错误：返回的 replayReport.passed === false，状态留在 draft。 */
@@ -224,7 +194,6 @@ export interface ConsoleClient {
   getOnboarding(): Promise<Onboarding>
   putModelConfig(req: { baseUrl: string; secret: string; model?: string; dialect?: ModelDialect }): Promise<void>
   testModelConnectivity(): Promise<void>
-  putDeploymentSpecification(req: EdgeDeploymentSpecification): Promise<EdgeDeploymentCoordinates>
   completeOnboarding(): Promise<void>
 
   /* ----- ModelGatewayService（docs/api.md §19.4；仅管理员；引导完成后） ----- */

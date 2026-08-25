@@ -93,6 +93,18 @@ describe('列表四态（AssetsPage）', () => {
 })
 
 describe('事件列表分页与筛选（EventsPage）', () => {
+  it('资产详情入口通过查询参数预置资产筛选', async () => {
+    const client = new ConsoleClientFixture()
+    await loginAs(client)
+    const listEvents = vi.spyOn(client, 'listEvents')
+
+    renderApp({ route: '/events?assetId=asset-02', client })
+
+    await waitFor(() => {
+      expect(listEvents).toHaveBeenCalledWith(expect.objectContaining({ assetId: 'asset-02' }), expect.any(Object))
+    })
+  })
+
   it('游标分页：下一页出现与第一页不同的事件，上一页可点回', async () => {
     const user = userEvent.setup()
     const client = new ConsoleClientFixture()

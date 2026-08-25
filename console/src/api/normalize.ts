@@ -12,6 +12,8 @@ import type {
   ArtifactKind,
   Asset,
   AssetDetail,
+  EdgeEnrollment,
+  EdgeEnrollmentStatus,
   AttackClass,
   BindingRef,
   CapabilityMatrix,
@@ -25,6 +27,7 @@ import type {
   Detection,
   DetectionKey,
   Event,
+  EventDetail,
   EventKind,
   EffectiveAccess,
   Grant,
@@ -54,8 +57,11 @@ import type {
   TrafficReviewPolicyStatus,
   ModelIngressWindow,
   ModelIngressWindowStatus,
+  ModelInference,
+  ModelProfile,
   Transport,
   TriageReason,
+  TriageDelivery,
   UnitProjection,
   User,
   UserRole,
@@ -198,6 +204,48 @@ export function normalizeEvent(raw: unknown): Event {
   }
 }
 
+/** normalizeEventDetail 补齐异步模型推理与贾维斯交付的只读投影。 */
+export function normalizeEventDetail(raw: unknown): EventDetail {
+  const src = asObj(raw)
+  return {
+    event: normalizeEvent(src.event),
+    modelInferences: asArray(src.modelInferences).map(normalizeModelInference),
+    triageDeliveries: asArray(src.triageDeliveries).map(normalizeTriageDelivery),
+  }
+}
+
+function normalizeModelInference(raw: unknown): ModelInference {
+  const inference = asObj(raw)
+  return {
+    inferenceId: asString(inference.inferenceId),
+    eventId: asString(inference.eventId),
+    modelGroup: asString(inference.modelGroup),
+    modelType: asString(inference.modelType),
+    modelVersion: asString(inference.modelVersion),
+    threshold: asNumber(inference.threshold),
+    score: asNumber(inference.score),
+    attackClass: (asString(inference.attackClass) || 'ATTACK_CLASS_UNSPECIFIED') as AttackClass,
+    taxonomyVersion: asString(inference.taxonomyVersion),
+    recordedAt: optionalString(inference.recordedAt),
+    modelProfileDigest: asString(inference.modelProfileDigest),
+    requestId: asString(inference.requestId),
+    resultKind: asString(inference.resultKind),
+  }
+}
+
+function normalizeTriageDelivery(raw: unknown): TriageDelivery {
+  const delivery = asObj(raw)
+  return {
+    caseId: asString(delivery.caseId),
+    instructionId: asString(delivery.instructionId),
+    handlerId: asString(delivery.handlerId),
+    kind: asString(delivery.kind),
+    status: asString(delivery.status),
+    createdAt: optionalString(delivery.createdAt),
+    acknowledgedAt: optionalString(delivery.acknowledgedAt),
+  }
+}
+
 function normalizeCoverage(raw: unknown): InspectionCoverage {
   const c = asObj(raw)
   return {
@@ -288,8 +336,58 @@ export function normalizeAssetDetail(raw: unknown): AssetDetail {
     asset: normalizeAsset(src.asset),
     unitIds: asArray(src.unitIds).map(asString).filter((id) => id !== ''),
     units: asArray(src.units).map(normalizeUnitProjection),
+    edgeEnrollments: asArray(src.edgeEnrollments).map(normalizeEdgeEnrollment),
     health: asString(src.health),
     activeReleaseCount: asNumber(src.activeReleaseCount),
+  }
+}
+
+/** normalizeEdgeEnrollment 补齐人工接入的配置坐标与逐项运行状态。 */
+export function normalizeEdgeEnrollment(raw: unknown): EdgeEnrollment {
+  const enrollment = asObj(raw)
+  return {
+    assetId: asString(enrollment.assetId),
+    unitId: asString(enrollment.unitId),
+    posture: (asString(enrollment.posture) || 'INGRESS_POSTURE_UNSPECIFIED') as IngressPosture,
+    listenAddress: asString(enrollment.listenAddress),
+    upstreamUrl: asString(enrollment.upstreamUrl),
+    trafficKey: asString(enrollment.trafficKey),
+    trustedProxyCidrs: asArray(enrollment.trustedProxyCidrs).map(asString),
+    modelProfile: normalizeModelProfile(enrollment.modelProfile),
+    modelIngressWindow: normalizeModelIngressWindow(enrollment.modelIngressWindow),
+    modelsideId: asString(enrollment.modelsideId),
+    specificationDigest: asString(enrollment.specificationDigest),
+    expectedListenPlanVersion: asString(enrollment.expectedListenPlanVersion) || '0',
+    expectedGenerationId: asString(enrollment.expectedGenerationId),
+    expectedGenerationSeq: asString(enrollment.expectedGenerationSeq) || '0',
+    status: (asString(enrollment.status) || 'EDGE_ENROLLMENT_STATUS_UNSPECIFIED') as EdgeEnrollmentStatus,
+    lastHeartbeatAt: optionalString(enrollment.lastHeartbeatAt),
+    currentListenPlanVersion: asString(enrollment.currentListenPlanVersion) || '0',
+    currentGenerationId: asString(enrollment.currentGenerationId),
+    currentGenerationSeq: asString(enrollment.currentGenerationSeq) || '0',
+    modelsideStatus: (asString(enrollment.modelsideStatus) || 'EDGE_ENROLLMENT_STATUS_UNSPECIFIED') as EdgeEnrollmentStatus,
+    modelsideLastResultAt: optionalString(enrollment.modelsideLastResultAt),
+    modelProfileDigest: asString(enrollment.modelProfileDigest),
+  }
+}
+
+function normalizeModelProfile(raw: unknown): ModelProfile {
+  const profile = asObj(raw)
+  return {
+    profileId: asString(profile.profileId),
+    modelGroup: asString(profile.modelGroup),
+    modelType: asString(profile.modelType),
+    modelVersion: asString(profile.modelVersion),
+    alertThreshold: asNumber(profile.alertThreshold),
+    reviewFloor: asNumber(profile.reviewFloor),
+    reviewWindowSeconds: asNumber(profile.reviewWindowSeconds),
+    maxReviewPerUnit: asNumber(profile.maxReviewPerUnit),
+    maxReviewPerRoute: asNumber(profile.maxReviewPerRoute),
+    dedupeRule: 'MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE',
+    allowedHeaders: asArray(profile.allowedHeaders).map(asString),
+    maxBodyBytes: asNumber(profile.maxBodyBytes),
+    reviewNewRoutes: asBool(profile.reviewNewRoutes),
+    reviewInsufficientCoverage: asBool(profile.reviewInsufficientCoverage),
   }
 }
 
@@ -489,6 +587,7 @@ export function normalizeDashboard(raw: unknown): DashboardSummary {
     events24hTotal: asString(src.events24hTotal) || '0',
     events24hBlocked: asString(src.events24hBlocked) || '0',
     pendingRetireSoon: asString(src.pendingRetireSoon) || '0',
+    modelAlerts24h: asString(src.modelAlerts24h) || '0',
   }
 }
 

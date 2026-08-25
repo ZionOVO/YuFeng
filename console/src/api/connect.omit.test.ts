@@ -88,9 +88,11 @@ describe('ConnectClient protojson 省略字段', () => {
     const event = await clientWith({
       event: { id: 'e2', kind: 'KIND_TRAFFIC', verdict: 'VERDICT_BLOCK', assetId: 'local-1' },
     }).getEvent('e2')
-    expect(event.detections).toEqual([])
-    expect(event.releaseTraces).toEqual([])
-    expect(event.labels).toEqual({})
+    expect(event.event.detections).toEqual([])
+    expect(event.event.releaseTraces).toEqual([])
+    expect(event.event.labels).toEqual({})
+    expect(event.modelInferences).toEqual([])
+    expect(event.triageDeliveries).toEqual([])
   })
 
   it('updateAsset 省略空 expectedUpdatedAt，并以 lowerCamel 编码 FieldMask', async () => {

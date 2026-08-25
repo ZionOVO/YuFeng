@@ -85,7 +85,6 @@ export function AssetsPage() {
   const deleteDialog = useDisclosure()
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const localAssetId = onboarding?.localAssetId ?? ''
 
   const submitCreate = async () => {
     setCreateBusy(true)
@@ -136,7 +135,6 @@ export function AssetsPage() {
         assets={mapQuery.data.items}
         plane={{
           jarvisOnline: onboarding?.jarvisOnline,
-          edgeReady: onboarding?.edgeReady,
         }}
         truncated={mapQuery.data.nextPageToken !== ''}
         density="full"
@@ -240,7 +238,7 @@ export function AssetsPage() {
                     <Link to={to} className="text-xs text-[#62e6a7] hover:underline">
                       详情
                     </Link>
-                    {assetAdmin && canOnAsset(access, 'asset.delete', item.asset.id) && item.asset.id !== localAssetId && (
+                    {assetAdmin && canOnAsset(access, 'asset.delete', item.asset.id) && item.edgeEnrollments.length === 0 && (
                       <Button
                         size="sm"
                         radius="md"
@@ -303,7 +301,7 @@ export function AssetsPage() {
       onClose={deleteDialog.onClose}
     >
       <p className="text-sm text-foreground-500">
-        将删除资产 <span className="fs-mono">{deleteTarget?.asset.displayName}</span>（{deleteTarget?.asset.id}）。本机数据面资产不能删。
+        将删除资产 <span className="fs-mono">{deleteTarget?.asset.displayName}</span>（{deleteTarget?.asset.id}）。存在人工 Edge 接入配置的资产必须先完成退役。
       </p>
       {deleteError !== null && <p className="text-xs text-[#ff746c]">{deleteError}</p>}
     </ConfirmDialog>
