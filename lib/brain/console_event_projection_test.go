@@ -71,7 +71,7 @@ func TestConsoleEventProjectsModelInferenceAndJarvisDeliveryWithinAssetScope(t *
 		t.Fatal(err)
 	}
 	if _, err := st.Pool().Exec(ctx, `INSERT INTO agent_threads(thread_id,source_kind,source_ref,agent_id)
-		VALUES($1,'triage',$2,'jarvis-console')`, threadID, clusterID); err != nil {
+		VALUES($1,$2,$3,'jarvis-console')`, threadID, threadSourceTriage, clusterID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.Pool().Exec(ctx, `INSERT INTO agent_turns(turn_id,thread_id,source_version,input_snapshot)

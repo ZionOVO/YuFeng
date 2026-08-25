@@ -244,11 +244,11 @@ func loadEventTriageDeliveries(ctx context.Context, db dbTX, eventID string) ([]
 	caseRows, err := db.Query(ctx, `SELECT DISTINCT r.case_id,i.instruction_id,i.agent_id,i.kind,i.status,i.created_at,i.acked_at
 		FROM model_result_receipts r
 		LEFT JOIN triage_clusters c ON c.event_ids @> jsonb_build_array(r.event_id)
-		LEFT JOIN agent_threads th ON th.source_kind='triage' AND th.source_ref=c.cluster_id
+		LEFT JOIN agent_threads th ON th.source_kind=$2 AND th.source_ref=c.cluster_id
 		LEFT JOIN agent_turns t ON t.thread_id=th.thread_id
 		LEFT JOIN agent_instructions i ON i.turn_id=t.turn_id OR i.payload_ref=c.cluster_id OR i.payload_ref=r.case_id
 		WHERE r.event_id=$1 AND r.case_id<>''
-		ORDER BY r.case_id,i.created_at,i.instruction_id`, eventID)
+		ORDER BY r.case_id,i.created_at,i.instruction_id`, eventID, threadSourceTriage)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func loadEventTriageDeliveries(ctx context.Context, db dbTX, eventID string) ([]
 	}
 	triageRows, err := db.Query(ctx, `SELECT DISTINCT '' AS case_id,i.instruction_id,i.agent_id,i.kind,i.status,i.created_at,i.acked_at
 		FROM triage_clusters c
-		JOIN agent_threads th ON th.source_kind='triage' AND th.source_ref=c.cluster_id
+		JOIN agent_threads th ON th.source_kind=$2 AND th.source_ref=c.cluster_id
 		JOIN agent_turns t ON t.thread_id=th.thread_id
 		JOIN agent_instructions i ON i.turn_id=t.turn_id
 		WHERE c.event_ids @> $1::jsonb
@@ -283,7 +283,7 @@ func loadEventTriageDeliveries(ctx context.Context, db dbTX, eventID string) ([]
 		SELECT DISTINCT '' AS case_id,i.instruction_id,i.agent_id,i.kind,i.status,i.created_at,i.acked_at
 		FROM triage_clusters c JOIN agent_instructions i ON i.payload_ref=c.cluster_id
 		WHERE c.event_ids @> $1::jsonb
-		ORDER BY created_at,instruction_id`, eventRaw)
+		ORDER BY created_at,instruction_id`, eventRaw, threadSourceTriage)
 	if err != nil {
 		return nil, err
 	}
