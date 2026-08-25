@@ -19,6 +19,7 @@ func TestHumanDeliveryDocsAligned(t *testing.T) {
 	requireContains(t, "glossary.md#onboarding", glossary, `<a id="onboarding"></a>`, "初次配置引导", "https://127.0.0.1:9050/app/setup")
 	requireContains(t, "glossary.md#onboarding-state", glossary, `<a id="onboarding-state"></a>`, "ONBOARDING_STATE_PENDING", "ONBOARDING_STATE_COMPLETED")
 	requireContains(t, "glossary.md#manual-edge-lifecycle", glossary, `<a id="manual-edge-lifecycle"></a>`, "Edge 人工生命周期", "Docker Compose")
+	requireContains(t, "glossary.md#edge-enrollment", glossary, `<a id="edge-enrollment"></a>`, "Edge 人工接入配置", "规范摘要")
 	requireContains(t, "glossary.md#async-detection-worker", glossary, `<a id="async-detection-worker"></a>`, "yufeng-modelside", "不持 Gate")
 	requireContains(t, "glossary.md#human-delivery", glossary, `<a id="human-delivery"></a>`, "人机交付闭环")
 	requireContains(t, "glossary.md#modelgateway", glossary, `<a id="modelgateway"></a>`, "模型网关")
@@ -41,15 +42,15 @@ func TestHumanDeliveryDocsAligned(t *testing.T) {
 	section1812 := section(api, "### 18.1.2", "### 18.2")
 	requireContains(t, "api.md §17.1", section171, "/app", "只连接真实 brain")
 	requireContains(t, "api.md §17.9", section179, "https://127.0.0.1:9050/app/setup", "ONBOARDING_STATE_COMPLETED", "onboarding_incomplete")
-	requireContains(t, "api.md §19", section19, "OnboardingGate", "missing_predicates", "ONBOARDING_STATE_PENDING", "PutDeploymentSpecification", "edge_ready")
+	requireContains(t, "api.md §19", section19, "OnboardingGate", "missing_predicates", "ONBOARDING_STATE_PENDING", "PutDeploymentSpecification", "PutEdgeEnrollment", "jarvis_online")
 	requireContains(t, "api.md §18.1.2", section1812, "KIND_RULE", "rules/v1", "failed_precondition")
 
 	requireContains(t, "operations/deployment.md", deployment,
-		"yufeng-modelside", "人工安装", "Brain、贾维斯", "部署规格", "主动注册")
+		"yufeng-modelside", "人工安装", "Brain、贾维斯", "Edge 人工接入配置", "主动注册")
 	requireContains(t, "development/code-map.md", codeMap,
-		"deployment_onboarding", "PutDeploymentSpecification", "Edge 人工部署")
+		"edge_enrollments", "PutEdgeEnrollment", "Edge 人工接入")
 	requireContains(t, "guides/getting-started.md", gettingStarted,
-		"make compose-up", "六步引导", "人工安装数据面")
+		"make compose-up", "初次配置只有四步", "人工安装数据面")
 	requireContains(t, "README.md", readme,
 		"部署与上线", "软件 Release 公开不等于客户现场上线完成")
 
@@ -74,7 +75,7 @@ func TestPilotChangeRecordTemplateCoversReleaseFields(t *testing.T) {
 	deployment := readDoc(t, "operations/deployment.md")
 	requireContains(t, "deploy/pilot-change-record.md", record,
 		"候选提交", "发布标签", "入口姿态", "业务 TLS 证书", "真实上游", "可信代理网段",
-		"部署规格摘要", "上一版入口配置", "切换负责人", "回退负责人",
+		"Edge 接入配置摘要", "上一版入口配置", "切换负责人", "回退负责人",
 		"密钥轮换负责人", "备份恢复负责人", "回退触发条件", "不得记录")
 	requireContains(t, "deploy/README.md", deployReadme, "pilot-change-record.md")
 	requireContains(t, "operations/deployment.md", deployment, "pilot-change-record.md")

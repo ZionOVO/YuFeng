@@ -20,6 +20,8 @@ docker compose -f deploy/compose.yaml up -d --build
 
 `keys` 幂等生成签名密钥、Edge 来源假名密钥和各进程的相互传输层安全协议材料。Brain 只取得服务端私钥、签名套接字、单元引导令牌和 ModelSide 结果令牌；贾维斯与 agentd 不取得 Edge、ModelSide、来源假名或 Docker 权限。
 
+控制面健康后打开 `https://127.0.0.1:9050/app/setup`，只配置并探测 Brain 模型网关、等待贾维斯主动注册在线，然后显式进入主控制台。资产、Edge、Host、ModelSide 和批准账户不是初次配置谓词。
+
 ## 0.1.1 交付物
 
 发布工作流分别交付原生 Edge 二进制与 systemd 物料、`yufeng-modelside` Python wheel 与 systemd 物料、Compose 部署包，以及 Linux amd64 的 Edge 和 ModelSide 容器镜像归档。容器目标主机可以先校验 `yufeng-v0.1.2-checksums.txt`，再显式载入镜像：
@@ -35,13 +37,13 @@ export YUFENG_MODELSIDE_IMAGE=yufeng-modelside:v0.1.2
 
 ## 同一物理节点的 Edge 与 ModelSide
 
-管理员先在 `/app/setup` 提交部署规格。技术人员再明确提供单元、ModelSide 身份和权重目录，并把扩展 Compose 与控制面 Compose 一起启动：
+管理员先在 `/app/assets` 登记真实资产，再在资产详情执行“接入 Edge”，记录单元、ModelSide 身份和期望制品坐标。技术人员提供相同单元、ModelSide 身份和权重目录，并把扩展 Compose 与控制面 Compose 一起启动：
 
 ```sh
 YUFENG_EDGE_UNIT=site-a-edge \
 YUFENG_MODELSIDE_ID=site-a-modelside \
 YUFENG_MODELSIDE_WEIGHTS_DIR=/srv/yufeng/models \
-docker compose -f deploy/compose.yaml -f deploy/compose.edge-modelside.yaml up -d --build edge modelside
+docker compose -f deploy/compose.yaml -f deploy/compose.edge-modelside.yaml up -d edge modelside
 ```
 
 停止或升级也必须由技术人员显式运行 Docker Compose。Brain 和贾维斯不会调用这些命令。Edge 启动后主动注册并拉取签名监听计划、资产世代和模型档案；ModelSide 只接收 Edge 的规范流量并向 Brain 上报无原文结果。
@@ -52,6 +54,14 @@ docker compose -f deploy/compose.yaml -f deploy/compose.edge-modelside.yaml up -
 
 Edge 与 ModelSide 分机时不使用这份同机 Unix 套接字编排：分别启动容器或原生服务，Edge 到 ModelSide 改用 HTTPS 双向传输层安全协议，ModelSide 到 Brain 继续使用独立 HTTPS 双向传输层安全协议；两条连接都必须由防火墙限制在同一受控防御网络。原始头、查询参数和正文不得发送给 Brain。
 
+ModelSide 主动向 Brain 上报，Brain 不反向拨号，因此 ModelSide 位于网络地址转换设备之后时不需要 Brain 入站映射。Edge 到分机 ModelSide 仍必须由技术人员提供可达的受控专网、私有覆盖网络或运维隧道；该连接不能借网络地址转换环境跳过双向传输层安全协议。
+
+## Host 人工注册
+
+`yufeng-host` 只支持 Linux 与 OpenWrt 上的非特权原生进程。先在主控制台登记资产，再把该资产标识作为 Host 的 `-unit`；Host 首次注册会把同名单元绑定到该资产，并保留管理员填写的资产名称、关键性和标签。所需材料为单元引导令牌、Brain 信任根、Host 客户端证书和私钥、制品签名公钥，以及权限严格为 `0600` 的 Host JSON 配置。完整命令与允许根、允许服务约束见[部署与上线](../docs/operations/deployment.md#34-host-人工注册)。
+
 ## 交付验证
 
-软件 Release 下载后先按 `yufeng-v0.1.2-release-manifest.json` 与 `yufeng-v0.1.2-checksums.txt` 复核实际文件，再在目标环境运行 `scripts/delivery-evidence.sh static` 和所需的活栈、恢复、容量诊断。部署验收必须覆盖旁路关闭、ModelSide 空闲、ModelSide 稳定消费、ModelSide 满载和 ModelSide 不可达下的小正文与接近检查上限正文、默认窗口与本地硬上限窗口组合，验证每秒 2000 个请求、模型旁路第 99 百分位延迟增量不超过 1 毫秒、中央处理器占用增量不超过 5 个百分点、Edge 常驻内存不超过 512 MiB，并记录客户现场的代理网段、上游、证书、网络核对和变更责任人。部署结果不覆盖 Release 资产，也不改变软件已经发布的事实。
+软件 Release 下载后先按 `yufeng-v0.1.2-release-manifest.json` 与 `yufeng-v0.1.2-checksums.txt` 复核实际文件，再在目标环境运行 `scripts/delivery-evidence.sh static` 和所需的活栈、恢复、容量诊断。部署验收必须覆盖旁路关闭、ModelSide 空闲、ModelSide 稳定消费、ModelSide 满载和 ModelSide 不可达下的小正文与接近检查上限正文、默认窗口与本地硬上限窗口组合，验证每秒 2000 个请求、模型旁路第 99 百分位延迟增量不超过 1 毫秒、中央处理器占用增量不超过 5 个百分点、Edge 常驻内存不超过 512 MiB。
+
+前端验收还必须确认：资产详情显示 Edge 与 ModelSide 的期望/实际坐标；事件列表可筛选模型告警和模型复核样本；事件详情展示模型组、类型、版本、分数、阈值、攻击分类、档案摘要，以及关联案件和贾维斯指令的交付/确认状态。最后记录客户现场的代理网段、上游、证书、网络核对和变更责任人。部署结果不覆盖 Release 资产，也不改变软件已经发布的事实。
