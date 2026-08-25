@@ -1,5 +1,9 @@
 # 御锋 2.0
 
+[![CI](https://img.shields.io/github/actions/workflow/status/ZionOVO/YuFeng/ci.yml?branch=main&label=build)](https://github.com/ZionOVO/YuFeng/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ZionOVO/YuFeng?label=release)](https://github.com/ZionOVO/YuFeng/releases/latest)
+[![Go](https://img.shields.io/github/go-mod/go-version/ZionOVO/YuFeng)](go.mod)
+
 御锋是在正式补丁尚未落地时保护企业超文本传输协议（Hypertext Transfer Protocol，HTTP）服务的安全修复系统。数据面边缘执行经过签名和回放验证的[虚拟补丁](docs/glossary.md#virtual-patch)，中台负责研判、审批、发布与审计；智能代理只能通过中台契约行动，不能直接接触业务流量。
 
 [开始使用](docs/guides/getting-started.md) · [部署与上线](docs/operations/deployment.md) · [完整文档](docs/README.md) · [Latest Release](https://github.com/ZionOVO/YuFeng/releases/latest)
