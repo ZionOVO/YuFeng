@@ -512,7 +512,7 @@ brain 重启不删除 `refresh_token_hash`；只使尚未到期的访问令牌�
 | deduped | int32 | 按事件 id 去重数，边缘可安全丢弃 |
 | rejected | repeated RejectedEvent | 逐条拒因，边缘记日志后丢弃，不无限重投 |
 
-**`RejectedEvent`**：`event_id`、`code`（`invalid_event` / `unknown_unit` / `unknown_asset`）、`message`。
+**`RejectedEvent`**：`event_id`、`code`（`invalid_event` / `unknown_unit` / `unknown_asset`）、`message`。任何字符串字段含 PostgreSQL `jsonb` 无法表示的空字符时，该条必须在开启数据库事务前返回 `invalid_event`；不得让一条畸形事件把同批其它事件变成整批重试。
 
 **语义**：`accepted + deduped + rejected == len(events)`。令牌中的单元必须等于每条事件的 `unit_id`；`asset_id` 必须已绑定到该单元，否则该条 `rejected.code=permission_denied`（不要用 `unknown_asset` 区分「不存在」和「不是你的」）。服务端在同一数据库事务内写入事件账与事务发件箱后返回；内部流投递由发件箱消费者完成，失败时重试，不得出现“已接受但异步检测永久丢失”。当前实现使用事务发件箱与持久消费者，不采用“入账后尽力发布”的旁路。
 

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	artifactv1 "yufeng/proto/gen/artifactv1"
 	commonv1 "yufeng/proto/gen/commonv1"
@@ -101,6 +102,13 @@ func (s *TelemetryServer) ingestEvent(ctx context.Context, unitID string, event 
 	if h := event.GetHttp(); h != nil && h.QueryRedacted != "" {
 		h.QueryRedacted = RedactQuery(h.QueryRedacted)
 	}
+	if messageContainsNullCharacter(event.ProtoReflect()) {
+		return "", &telemetryv1.RejectedEvent{
+			EventId: event.Id,
+			Code:    "invalid_event",
+			Message: "event contains unsupported null character",
+		}, nil
+	}
 	if !s.demoTriage && event.GetTriageReason() == 0 && len(event.GetDetections()) > 0 {
 		event.TriageReason = commonv1.TriageReason_TRIAGE_REASON_DETECTED_UNMITIGATED
 	}
@@ -158,6 +166,47 @@ func (s *TelemetryServer) ingestEvent(ctx context.Context, unitID string, event 
 		return "", nil, err
 	}
 	return "accepted", nil, nil
+}
+
+func messageContainsNullCharacter(message protoreflect.Message) bool {
+	found := false
+	message.Range(func(field protoreflect.FieldDescriptor, value protoreflect.Value) bool {
+		switch {
+		case field.IsList():
+			list := value.List()
+			for index := 0; index < list.Len(); index++ {
+				if valueContainsNullCharacter(field.Kind(), list.Get(index)) {
+					found = true
+					break
+				}
+			}
+		case field.IsMap():
+			values := value.Map()
+			values.Range(func(key protoreflect.MapKey, item protoreflect.Value) bool {
+				if field.MapKey().Kind() == protoreflect.StringKind && strings.ContainsRune(key.String(), '\x00') {
+					found = true
+					return false
+				}
+				found = valueContainsNullCharacter(field.MapValue().Kind(), item)
+				return !found
+			})
+		default:
+			found = valueContainsNullCharacter(field.Kind(), value)
+		}
+		return !found
+	})
+	return found
+}
+
+func valueContainsNullCharacter(kind protoreflect.Kind, value protoreflect.Value) bool {
+	switch kind {
+	case protoreflect.StringKind:
+		return strings.ContainsRune(value.String(), '\x00')
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		return messageContainsNullCharacter(value.Message())
+	default:
+		return false
+	}
 }
 
 func (s *TelemetryServer) maybeEnqueueTriage(ctx context.Context, tx dbTX, event *eventv1.Event) error {
