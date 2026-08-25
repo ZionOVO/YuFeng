@@ -66,7 +66,7 @@ func TestReleaseDocumentationSeparatesSoftwareReleaseFromDeploymentEvidence(t *t
 	agents := readRepoFile(t, "AGENTS.md")
 
 	requireContains(t, "README.md", readme,
-		"v0.1.1", "2026-08-24", "releases/latest", "软件 Release 公开不等于客户现场上线完成")
+		"v0.1.2", "2026-08-24", "releases/latest", "软件 Release 公开不等于客户现场上线完成")
 	for name, document := range map[string]string{
 		"AGENTS.md":                               agents,
 		"docs/architecture.md":                    architecture,
