@@ -25,17 +25,14 @@ func configureChildProcess(cmd *exec.Cmd) (func(), error) {
 		return func() {}, fmt.Errorf("open process token: %w", err)
 	}
 	defer source.Close() //nolint:errcheck // 受限令牌创建完成后释放源令牌。
-	user, err := source.GetTokenUser()
-	if err != nil {
-		return func() {}, fmt.Errorf("read process token user: %w", err)
-	}
-	restrictedSID := windows.SIDAndAttributes{Sid: user.User.Sid}
 	var restricted windows.Token
-	const disableMaxPrivilege = 0x1
+	const (
+		disableMaxPrivilege = 0x1
+		limitedUserToken    = 0x4
+	)
 	result, _, callErr := createRestrictedToken.Call(
-		uintptr(source), disableMaxPrivilege,
-		0, 0, 0, 0,
-		1, uintptr(unsafe.Pointer(&restrictedSID)),
+		uintptr(source), disableMaxPrivilege|limitedUserToken,
+		0, 0, 0, 0, 0, 0,
 		uintptr(unsafe.Pointer(&restricted)),
 	)
 	if result == 0 {
