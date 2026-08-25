@@ -19,6 +19,8 @@ admin_user=${YUFENG_ADMIN_USER:-admin}
 admin_pass=${YUFENG_ADMIN_PASS:-}
 edge_name=${YUFENG_EDGE_CONTAINER:-yufeng-edge-1}
 edge_admin_port=${YUFENG_EDGE_ADMIN_PORT:-19092}
+edge_asset_id=${YUFENG_EDGE_ASSET:-asset-local-1}
+edge_unit_id=${YUFENG_EDGE_UNIT:-local-1}
 mode=${1:-live}
 
 compose() {
@@ -63,6 +65,8 @@ export YUFENG_BRAIN_URL="$base"
 export YUFENG_ADMIN_USER="$admin_user"
 export YUFENG_ADMIN_PASS="$admin_pass"
 export YUFENG_EDGE_ADMIN_PORT="$edge_admin_port"
+export YUFENG_EDGE_ASSET="$edge_asset_id"
+export YUFENG_EDGE_UNIT="$edge_unit_id"
 
 python3 <<'PY'
 import datetime
@@ -84,6 +88,8 @@ model_base_url = os.environ["YUFENG_MODEL_BASE_URL"]
 model_name = os.environ["YUFENG_CHAT_MODEL"]
 model_key = os.environ["YUFENG_MODEL_API_KEY"]
 edge_admin_port = os.environ["YUFENG_EDGE_ADMIN_PORT"]
+configured_asset_id = os.environ["YUFENG_EDGE_ASSET"]
+configured_unit_id = os.environ["YUFENG_EDGE_UNIT"]
 report_path = os.environ.get("YUFENG_TRAFFIC_REVIEW_REPORT", "")
 tls = ssl._create_unverified_context()
 
@@ -146,50 +152,39 @@ def parse_time(value):
     return datetime.datetime.fromisoformat(value)
 
 
-def local_edge_ready():
+def local_edge_runtime_status():
     request = urllib.request.Request("http://127.0.0.1:" + edge_admin_port + "/ready")
     with urllib.request.urlopen(request, timeout=10) as response:
         return json.loads(response.read().decode())
 
 
-def current_edge_generation_loaded(token, onboarding):
-    asset_id = onboarding.get("localAssetId", "")
-    unit_id = onboarding.get("localUnitId", "")
-    if not asset_id or not unit_id:
-        return False
-    detail = rpc(
-        "/yufeng.asset.v1.AssetService/GetAsset",
-        {"assetId": asset_id},
+def current_edge_generation_loaded(token, asset_id, unit_id):
+    enrollment = rpc(
+        "/yufeng.asset.v1.AssetService/GetEdgeEnrollment",
+        {"assetId": asset_id, "unitId": unit_id},
         token,
-    )
-    units = (detail.get("asset") or {}).get("units") or []
-    unit = next(
-        (
-            value
-            for value in units
-            if value.get("unitId") == unit_id
-            and str(value.get("kind", "")).lower() in ("edge", "unit_kind_edge")
-        ),
-        None,
-    )
-    if unit is None:
-        return False
-    heartbeat = parse_time(unit.get("lastHeartbeatAt", ""))
+    ).get("enrollment") or {}
+    heartbeat = parse_time(enrollment.get("lastHeartbeatAt", ""))
     if heartbeat is None:
         return False
     age = (datetime.datetime.now(datetime.timezone.utc) - heartbeat).total_seconds()
     if age < -5 or age > 90:
         return False
-    local = local_edge_ready()
-    current_id = unit.get("currentGenerationId", "")
-    current_sequence = int(unit.get("currentGenerationSeq") or 0)
-    expected_sequence = int(onboarding.get("expectedGenerationSeq") or 0)
-    expected_listen_plan_version = int(onboarding.get("expectedListenPlanVersion") or 0)
+    local = local_edge_runtime_status()
+    current_id = enrollment.get("currentGenerationId", "")
+    current_sequence = int(enrollment.get("currentGenerationSeq") or 0)
+    expected_id = enrollment.get("expectedGenerationId", "")
+    expected_sequence = int(enrollment.get("expectedGenerationSeq") or 0)
+    current_listen_plan_version = int(enrollment.get("currentListenPlanVersion") or 0)
+    expected_listen_plan_version = int(enrollment.get("expectedListenPlanVersion") or 0)
     return (
-        local.get("ready") is True
+        enrollment.get("status") == "EDGE_ENROLLMENT_STATUS_ONLINE"
+        and local.get("ready") is True
         and current_id != ""
+        and current_id == expected_id
         and expected_sequence > 0
-        and current_sequence >= expected_sequence
+        and current_sequence == expected_sequence
+        and current_listen_plan_version == expected_listen_plan_version
         and local.get("generation_id", "") == current_id
         and int(local.get("generation_seq") or 0) == current_sequence
         and int(local.get("listen_plan_version") or 0) == expected_listen_plan_version
@@ -318,9 +313,9 @@ try:
     )
     if onboarding.get("state") != "ONBOARDING_STATE_COMPLETED":
         raise RuntimeError("onboarding must be completed before traffic review evidence")
-    asset_id = onboarding.get("localAssetId", "")
-    if not asset_id or onboarding.get("jarvisOnline") is not True or not current_edge_generation_loaded(admin_token, onboarding):
-        raise RuntimeError("completed onboarding is missing the live local asset, manually deployed Edge, or Jarvis")
+    asset_id = configured_asset_id
+    if onboarding.get("jarvisOnline") is not True or not current_edge_generation_loaded(admin_token, asset_id, configured_unit_id):
+        raise RuntimeError("completed onboarding is missing the enrolled and converged Edge or Jarvis")
 
     rpc(
         "/yufeng.model.v1.ModelGatewayService/UpdateModelGateway",

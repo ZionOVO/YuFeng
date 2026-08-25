@@ -111,14 +111,16 @@ func TestOnboardingLiveKeycheckExitsTwoWithoutSecret(t *testing.T) {
 func TestOnboardingLiveLeavesEdgeLifecycleWithOperator(t *testing.T) {
 	body := readScript(t, "onboarding-live.sh")
 	for _, required := range []string{
-		"/yufeng.onboarding.v1.OnboardingService/PutDeploymentSpecification",
+		"/yufeng.asset.v1.AssetService/PutEdgeEnrollment",
+		"/yufeng.asset.v1.AssetService/CreateAsset",
+		"/yufeng.asset.v1.AssetService/GetEdgeEnrollment",
 		"deploy/compose.edge-modelside.yaml",
 		"operator action: start the separately delivered Edge and ModelSide services",
 		"up -d --build modelside edge",
 		"YUFENG_MODELSIDE_WEIGHTS_DIR",
 		"edge_admin_port=${YUFENG_EDGE_ADMIN_PORT:-19092}",
 		"${unit_id}-modelside",
-		`"edgeReady"`,
+		`"EDGE_ENROLLMENT_STATUS_ONLINE"`,
 		"http://127.0.0.1:19092/ready",
 		`http://127.0.0.1:${edge_admin_port}/ready`,
 		`"modelProfile"`,
@@ -131,8 +133,8 @@ func TestOnboardingLiveLeavesEdgeLifecycleWithOperator(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
-		"DeployDataplane", "ONBOARDING_DEPLOY", "unit.ensure_local", "generation.publish_baseline", "edge.probe",
-		"docker rm -f", "jarvisOnline", "dataplaneReady",
+		"PutDeploymentSpecification", "DeployDataplane", "ONBOARDING_DEPLOY", "unit.ensure_local", "generation.publish_baseline", "edge.probe",
+		"docker rm -f", `"edgeReady"`, "dataplaneReady",
 	} {
 		if strings.Contains(body, forbidden) {
 			t.Errorf("manual onboarding script retains forbidden lifecycle path %q", forbidden)
@@ -140,18 +142,20 @@ func TestOnboardingLiveLeavesEdgeLifecycleWithOperator(t *testing.T) {
 	}
 }
 
-func TestOnboardingLiveCompletedStateVerifiesCurrentSignedGeneration(t *testing.T) {
+func TestOnboardingLiveVerifiesEnrollmentHeartbeatAndCurrentSignedGeneration(t *testing.T) {
 	body := readScript(t, "onboarding-live.sh")
 	for _, required := range []string{
-		"/yufeng.asset.v1.AssetService/GetAsset",
-		`last.get("state") == "ONBOARDING_STATE_COMPLETED"`,
-		`unit.get("currentGenerationId", "")`,
-		`unit.get("currentGenerationSeq")`,
+		"/yufeng.asset.v1.AssetService/GetEdgeEnrollment",
+		`last.get("status") == "EDGE_ENROLLMENT_STATUS_ONLINE"`,
+		`last.get("currentGenerationId", "")`,
+		`last.get("currentGenerationSeq")`,
+		`last.get("expectedGenerationId", "")`,
+		`last.get("expectedGenerationSeq")`,
 		`local.get("generation_id", "")`,
 		`local.get("generation_seq")`,
 		`local.get("listen_plan_version")`,
-		`unit.get("lastHeartbeatAt", "")`,
-		"current_sequence >= expected_sequence",
+		`last.get("lastHeartbeatAt", "")`,
+		"current_sequence == expected_sequence",
 	} {
 		if !strings.Contains(body, required) {
 			t.Errorf("completed onboarding verification missing %q", required)
@@ -164,8 +168,9 @@ func TestOnboardingLiveMutationsCarryIdempotencyKeys(t *testing.T) {
 	for _, call := range []string{
 		`PutModelConfig" "$model_body" "$token" 1`,
 		`TestModelConnectivity" "{}" "$token" 1`,
-		`PutDeploymentSpecification" "$specification" "$token" 1`,
 		`CompleteOnboarding" "{}" "$token" 1`,
+		`CreateAsset" "$create_body" "$token" 1`,
+		`PutEdgeEnrollment" "$enrollment" "$token" 1`,
 	} {
 		if !strings.Contains(body, call) {
 			t.Errorf("state-changing onboarding call missing idempotency key: %s", call)

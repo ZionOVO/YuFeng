@@ -57,11 +57,11 @@ compose-down:
 	docker compose -f deploy/compose.yaml down
 	docker compose -f deploy/compose.yaml logs --tail=20 || true
 
-# 人机交付活栈门禁：Brain 签发规格后由本脚本代表技术人员显式启动 Edge 与 ModelSide。
+# 人机交付活栈门禁：Brain 签发人工接入制品后由本脚本代表技术人员显式启动 Edge 与 ModelSide。
 compose-live:
 	./scripts/onboarding-live.sh live
 
-# 显式删除本地 compose 测试卷后重跑六步引导，用于已执行过活栈门禁的开发机。
+# 显式删除本地 compose 测试卷后重跑控制面初次配置，用于已执行过活栈门禁的开发机。
 compose-live-reset:
 	YUFENG_LIVE_RESET=1 ./scripts/onboarding-live.sh live
 
