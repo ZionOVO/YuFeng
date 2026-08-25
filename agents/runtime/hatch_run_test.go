@@ -85,5 +85,9 @@ func buildYufengRun(t *testing.T) string {
 }
 
 func sharedYufengRunPath() string {
-	return filepath.Join(os.TempDir(), "yufeng-run-test-"+strconv.Itoa(os.Getpid()))
+	name := "yufeng-run-test-" + strconv.Itoa(os.Getpid())
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return filepath.Join(os.TempDir(), name)
 }

@@ -25,6 +25,9 @@ type runtimeProcessHelperConfig struct {
 }
 
 func TestKilledSupervisorReapsRunProcessTree(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Windows job object allows only the supervised run process and prevents a grandchild")
+	}
 	if _, err := exec.LookPath("sleep"); err != nil {
 		t.Skip("sleep not available")
 	}
