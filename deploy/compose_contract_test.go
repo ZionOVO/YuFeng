@@ -136,6 +136,10 @@ func TestControlPlaneComposeCredentialsAndConfinement(t *testing.T) {
 	if !strings.Contains(agentd, "-worker-bootstrap-token-file") {
 		t.Fatal("central agentd bootstrap credential must be a mounted file")
 	}
+	if !strings.Contains(agentd, "-public-key-file=/registration/worker-public.pem") ||
+		!strings.Contains(agentd, "yufeng_agentd_public:/registration:ro") {
+		t.Fatal("central agentd must receive its generated registration public key as read-only material")
+	}
 	if strings.Contains(agentd, "/var/run/docker.sock") || strings.Contains(agentd, "YUFENG_MODEL_API_KEY") || strings.Contains(agentd, "modelside_result_token") {
 		t.Fatal("central agentd must not receive docker or model inference credentials")
 	}
@@ -266,6 +270,11 @@ func TestContainerImagesSeparateControlPlaneEdgeAndModelSide(t *testing.T) {
 	}
 	if !strings.Contains(text, "/usr/share/yufeng/console") {
 		t.Fatal("image must install console dist for /app hosting")
+	}
+	for _, stateDir := range []string{"/var/lib/yufeng/jarvis", "/var/lib/yufeng/agentd"} {
+		if !strings.Contains(text, stateDir) {
+			t.Fatalf("control-plane image must pre-create writable state directory %q", stateDir)
+		}
 	}
 	for _, forbidden := range []string{"./cmd/yufeng-edge", "./cmd/yufeng-dataplane", "/out/yufeng-edge", "/out/yufeng-dataplane"} {
 		if strings.Contains(text, forbidden) {

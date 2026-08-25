@@ -44,6 +44,7 @@ func main() {
 		devAgentCompat      = flag.Bool("dev-agent-compat", false, "开发期使用旧 Agent 身份领取 run")
 		devInsecure         = flag.Bool("dev-insecure", false, "允许连接明文中台（仅本地开发）")
 		publicKey           = flag.String("public-key", "", "登记用公钥；外部客户端默认读取 state-dir/worker-public.pem")
+		publicKeyFile       = flag.String("public-key-file", "", "登记用公钥文件；标准部署以只读方式挂载")
 		runBin              = flag.String("run", "", "yufeng-run 路径；空则同目录或 PATH")
 		tlsCA               = flag.String("tls-ca", os.Getenv("YUFENG_TLS_CA"), "中台 TLS 权威")
 		tlsCert             = flag.String("tls-cert", os.Getenv("YUFENG_TLS_CERT"), "Agent 客户端证书")
@@ -81,13 +82,11 @@ func main() {
 		}
 		return
 	}
-	if strings.TrimSpace(*publicKey) == "" {
-		raw, err := os.ReadFile(workerPublicKeyPath(*stateDir))
-		if err != nil {
-			log.Fatalf("读取 worker 公钥: %v", err)
-		}
-		*publicKey = string(raw)
+	resolvedPublicKey, err := resolveWorkerPublicKey(*publicKey, *publicKeyFile, *stateDir)
+	if err != nil {
+		log.Fatalf("读取 worker 公钥: %v", err)
 	}
+	*publicKey = resolvedPublicKey
 	activationPath := strings.TrimSpace(*activationPack)
 	if *activate {
 		if activationPath != "" {
@@ -228,6 +227,28 @@ func validateAgentdTransport(brain string, devInsecure bool, tlsCA, tlsCert, tls
 		return errors.New("https brain requires -tls-ca -tls-cert -tls-key")
 	}
 	return nil
+}
+
+func resolveWorkerPublicKey(inline, path, stateDir string) (string, error) {
+	inline, path = strings.TrimSpace(inline), strings.TrimSpace(path)
+	if inline != "" && path != "" {
+		return "", errors.New("worker public key and public key file are mutually exclusive")
+	}
+	if path == "" && inline == "" {
+		path = workerPublicKeyPath(stateDir)
+	}
+	if path == "" {
+		return inline, nil
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	publicKey := strings.TrimSpace(string(raw))
+	if publicKey == "" {
+		return "", errors.New("worker public key file is empty")
+	}
+	return publicKey, nil
 }
 
 type connectWork struct {
