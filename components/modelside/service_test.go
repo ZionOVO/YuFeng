@@ -11,15 +11,7 @@ import (
 )
 
 func TestPythonModelSideContractsAndSampling(t *testing.T) {
-	python := os.Getenv("PYTHON")
-	if python == "" {
-		for _, candidate := range []string{"python3", "python"} {
-			if resolved, err := exec.LookPath(candidate); err == nil {
-				python = resolved
-				break
-			}
-		}
-	}
+	python, prefix := modelSidePython()
 	if python == "" {
 		t.Skip("Python 3 is not installed; ModelSide contracts run in continuous integration")
 	}
@@ -28,7 +20,8 @@ func TestPythonModelSideContractsAndSampling(t *testing.T) {
 		t.Fatal("caller information is unavailable")
 	}
 	dir := filepath.Dir(source)
-	cmd := exec.Command(python, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py")
+	args := append(append([]string(nil), prefix...), "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py")
+	cmd := exec.Command(python, args...)
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -37,6 +30,34 @@ func TestPythonModelSideContractsAndSampling(t *testing.T) {
 	if bytes.Contains(bytes.ToLower(output), []byte("redis")) {
 		t.Fatalf("modelside test output must not expose a Redis dependency: %s", output)
 	}
+}
+
+func modelSidePython() (string, []string) {
+	type candidate struct {
+		executable string
+		prefix     []string
+	}
+	candidates := []candidate{}
+	if configured := strings.TrimSpace(os.Getenv("PYTHON")); configured != "" {
+		candidates = append(candidates, candidate{executable: configured})
+	}
+	candidates = append(candidates,
+		candidate{executable: "python3"},
+		candidate{executable: "python"},
+		candidate{executable: "py", prefix: []string{"-3"}},
+	)
+	for _, item := range candidates {
+		resolved, err := exec.LookPath(item.executable)
+		if err != nil {
+			continue
+		}
+		args := append(append([]string(nil), item.prefix...), "--version")
+		output, err := exec.Command(resolved, args...).CombinedOutput()
+		if err == nil && strings.HasPrefix(strings.TrimSpace(string(output)), "Python 3") {
+			return resolved, item.prefix
+		}
+	}
+	return "", nil
 }
 
 func TestModelSidePackageUsesCrossPlatformTensorFlowDistribution(t *testing.T) {
