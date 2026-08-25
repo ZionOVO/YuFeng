@@ -431,6 +431,9 @@ func TestEvidenceVaultQuarantinesOnlyCorruptSegment(t *testing.T) {
 }
 
 func TestEvidenceVaultRestrictsBroadDirectoryPermissions(t *testing.T) {
+	if !enforcesPOSIXVaultPermissions {
+		t.Skip("Windows uses access control lists instead of POSIX permission bits")
+	}
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0o755); err != nil {
 		t.Fatal(err)

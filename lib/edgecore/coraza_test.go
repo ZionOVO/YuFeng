@@ -3,6 +3,7 @@ package edgecore
 import (
 	"bufio"
 	"encoding/json"
+	"io/fs"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -11,6 +12,12 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestCorazaRootFSNormalizesWindowsSeparators(t *testing.T) {
+	if _, err := fs.ReadFile(newCorazaRootFS(), `@owasp_crs\REQUEST-901-INITIALIZATION.conf`); err != nil {
+		t.Fatalf("read embedded rule with Windows separators: %v", err)
+	}
+}
 
 func TestCorazaDetectionOnlyNoBlock(t *testing.T) {
 	d, err := NewCorazaDetector()

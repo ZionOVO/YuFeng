@@ -226,15 +226,14 @@ func TestWorkloadCertificateIssuerRejectsDataBeyondMessageLimit(t *testing.T) {
 	_, _ = connection.Write(payload)
 	_ = connection.(*net.UnixConn).CloseWrite()
 	var response workloadIssueResponse
-	if err := json.NewDecoder(connection).Decode(&response); err != nil {
-		t.Fatal(err)
-	}
+	decodeErr := json.NewDecoder(connection).Decode(&response)
 	select {
 	case <-called:
 		t.Fatal("oversized issuer request must not reach the certificate authority")
 	default:
 	}
-	if response.Error == "" || response.Certificate.Certificate != "" {
+	// Windows 可以在服务端拒绝仍有未读数据的连接时返回重置；错误响应和传输关闭都表示拒绝。
+	if decodeErr == nil && (response.Error == "" || response.Certificate.Certificate != "") {
 		t.Fatalf("request beyond issuer message limit was accepted: %+v", response)
 	}
 }

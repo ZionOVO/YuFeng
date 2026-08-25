@@ -3,6 +3,7 @@ package edgecore
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"strings"
 	"sync"
@@ -55,6 +56,30 @@ type CorazaDetector struct {
 	waf coraza.WAF
 }
 
+type corazaRootFS struct{ fs.FS }
+
+func (root corazaRootFS) Open(name string) (fs.File, error) {
+	return root.FS.Open(normalizeCorazaPath(name))
+}
+
+func (root corazaRootFS) ReadFile(name string) ([]byte, error) {
+	return fs.ReadFile(root.FS, normalizeCorazaPath(name))
+}
+
+func (root corazaRootFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	return fs.ReadDir(root.FS, normalizeCorazaPath(name))
+}
+
+func (root corazaRootFS) Glob(pattern string) ([]string, error) {
+	return fs.Glob(root.FS, normalizeCorazaPath(pattern))
+}
+
+func normalizeCorazaPath(name string) string {
+	return strings.ReplaceAll(name, `\`, "/")
+}
+
+func newCorazaRootFS() fs.FS { return corazaRootFS{FS: coreruleset.FS} }
+
 // NewCorazaDetector 按架构冻结清单装载核心规则集。
 func NewCorazaDetector() (*CorazaDetector, error) {
 	directives := `
@@ -76,7 +101,7 @@ Include @owasp_crs/REQUEST-934-APPLICATION-ATTACK-GENERIC.conf
 Include @owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf
 Include @owasp_crs/REQUEST-942-APPLICATION-ATTACK-SQLI.conf
 `
-	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithRootFS(coreruleset.FS).WithDirectives(directives))
+	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithRootFS(newCorazaRootFS()).WithDirectives(directives))
 	if err != nil {
 		return nil, fmt.Errorf("create coraza waf: %w", err)
 	}

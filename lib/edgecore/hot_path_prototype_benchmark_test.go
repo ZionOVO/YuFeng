@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
 
 	artifactv1 "yufeng/proto/gen/artifactv1"
@@ -723,7 +722,7 @@ Include @owasp_crs/REQUEST-934-APPLICATION-ATTACK-GENERIC.conf
 Include @owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf
 Include @owasp_crs/REQUEST-942-APPLICATION-ATTACK-SQLI.conf
 `
-	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithRootFS(coreruleset.FS).WithDirectives(directives))
+	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithRootFS(newCorazaRootFS()).WithDirectives(directives))
 	if err != nil {
 		return nil, err
 	}
