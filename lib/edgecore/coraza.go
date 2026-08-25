@@ -1,15 +1,18 @@
 package edgecore
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/fs"
 	"net/url"
+	"path"
 	"strings"
 	"sync"
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/experimental/plugins"
 	"github.com/corazawaf/coraza/v3/types"
 
 	"yufeng/lib/kernel"
@@ -31,6 +34,13 @@ func SharedCoraza() (*CorazaDetector, error) {
 }
 
 const corazaDetectorID = "crs"
+
+const corazaPortableNormalizePathWin = "yufengNormalizePathWin"
+
+func init() {
+	// Coraza 的扩展注册表是进程级的；使用唯一名称并在任何 WAF 装载前完成一次注册。
+	plugins.RegisterTransformation(corazaPortableNormalizePathWin, normalizeCorazaRulePath)
+}
 
 // CRSAutoGovernRule 判定规则标识是否允许进入自动治理通道。
 // 91x / 920 / 913 等协议与扫描器类不得进自动治理。
@@ -63,7 +73,11 @@ func (root corazaRootFS) Open(name string) (fs.File, error) {
 }
 
 func (root corazaRootFS) ReadFile(name string) ([]byte, error) {
-	return fs.ReadFile(root.FS, normalizeCorazaPath(name))
+	raw, err := fs.ReadFile(root.FS, normalizeCorazaPath(name))
+	if err != nil {
+		return nil, err
+	}
+	return bytes.ReplaceAll(raw, []byte("t:normalizePathWin"), []byte("t:"+corazaPortableNormalizePathWin)), nil
 }
 
 func (root corazaRootFS) ReadDir(name string) ([]fs.DirEntry, error) {
@@ -76,6 +90,21 @@ func (root corazaRootFS) Glob(pattern string) ([]string, error) {
 
 func normalizeCorazaPath(name string) string {
 	return strings.ReplaceAll(name, `\`, "/")
+}
+
+func normalizeCorazaRulePath(value string) (string, bool, error) {
+	if value == "" {
+		return value, false, nil
+	}
+	slashed := strings.ReplaceAll(value, `\`, "/")
+	cleaned := path.Clean(slashed)
+	if cleaned == "." {
+		return "", true, nil
+	}
+	if strings.HasSuffix(slashed, "/") {
+		cleaned += "/"
+	}
+	return cleaned, cleaned != value, nil
 }
 
 func newCorazaRootFS() fs.FS { return corazaRootFS{FS: coreruleset.FS} }
