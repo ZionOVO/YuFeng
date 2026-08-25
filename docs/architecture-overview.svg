@@ -79,7 +79,7 @@
 
   <rect x="516" y="210" width="248" height="50" rx="10" fill="#101826" stroke="#1c2635"/>
   <text x="528" y="230" font-size="12.5" font-weight="600" fill="#cdd8e6">控制台 /app</text>
-  <text x="528" y="248" font-size="10.5" fill="#8494ab">态势 · 审批 · 引导六步</text>
+  <text x="528" y="248" font-size="10.5" fill="#8494ab">态势 · 审批 · 控制面初次配置</text>
 
   <rect x="776" y="210" width="248" height="50" rx="10" fill="#101826" stroke="#1c2635"/>
   <text x="788" y="230" font-size="12.5" font-weight="600" fill="#cdd8e6">认证 / 授予 / 用户</text>
