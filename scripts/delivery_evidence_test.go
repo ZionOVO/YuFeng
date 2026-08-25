@@ -64,7 +64,7 @@ func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
 		"govulncheck@v1.7.0",
 		"protoc-gen-go@v1.36.12",
 		"protoc-gen-connect-go@v1.20.0",
-		`version: "1.72.0"`,
+		"github.com/bufbuild/buf/cmd/buf@v1.72.0",
 		"buf breaking",
 		"npm run build",
 		"GOARCH=mips",
@@ -76,7 +76,7 @@ func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
 			t.Errorf("continuous integration workflow missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"branches: [develop]", "release-gate.yml", "pull-request.yml"} {
+	for _, forbidden := range []string{"branches: [develop]", "release-gate.yml", "pull-request.yml", "bufbuild/buf-setup-action"} {
 		if strings.Contains(workflow, forbidden) {
 			t.Errorf("continuous integration retains retired topology %q", forbidden)
 		}
