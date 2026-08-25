@@ -24,6 +24,8 @@ services:
       - "/models"
       - "--workers"
       - "${YUFENG_MODELSIDE_WORKERS:-2}"
+      - "--ingress-capacity"
+      - "${YUFENG_MODELSIDE_INGRESS_CAPACITY:-0}"
     security_opt:
       - no-new-privileges:true
     cap_drop:

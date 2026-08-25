@@ -184,9 +184,16 @@ func trackedRepositoryFiles(t *testing.T, root string) []string {
 	fields := bytes.Split(raw, []byte{0})
 	files := make([]string, 0, len(fields))
 	for _, field := range fields {
-		if len(field) > 0 {
-			files = append(files, string(field))
+		if len(field) == 0 {
+			continue
 		}
+		relative := filepath.ToSlash(string(field))
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(relative))); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			t.Fatalf("inspect tracked repository file %s: %v", relative, err)
+		}
+		files = append(files, relative)
 	}
 	return files
 }

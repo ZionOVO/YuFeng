@@ -30,6 +30,7 @@ function asset(partial: {
     },
     unitIds: partial.unitIds ?? [],
     units: [],
+    edgeEnrollments: [],
     health: partial.health ?? 'UNIT_HEALTH_UNSPECIFIED',
     activeReleaseCount: 0,
   }
@@ -111,7 +112,6 @@ describe('buildEstate', () => {
   it('贾维斯与其它 Agent 只连中台，不连资产', () => {
     const g = buildEstate(sample, {
       jarvisOnline: true,
-      edgeReady: true,
       workers: [{
         workerId: 'agentd-central',
         workerKind: 'WORKER_KIND_INVESTIGATION',

@@ -23,6 +23,7 @@ message DashboardResponse {
   int64 events_24h_total = 4;
   int64 events_24h_blocked = 5;
   int64 pending_retire_soon = 6;
+  int64 model_alerts_24h = 7;
 }
 
 message ListEventsRequest {
@@ -47,4 +48,17 @@ message GetEventRequest {
 }
 message GetEventResponse {
   yufeng.event.v1.Event event = 1;
+  repeated yufeng.event.v1.ModelInference model_inferences = 2;
+  repeated TriageDelivery triage_deliveries = 3;
+}
+
+// TriageDelivery 是事件关联案件向贾维斯交付的非敏感投影。
+message TriageDelivery {
+  string case_id = 1;
+  string instruction_id = 2;
+  string handler_id = 3;
+  string kind = 4;
+  string status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp acknowledged_at = 7;
 }

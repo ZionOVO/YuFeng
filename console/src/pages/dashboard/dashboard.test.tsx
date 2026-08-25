@@ -73,6 +73,7 @@ describe('仪表盘', () => {
     expect(await screen.findByRole('region', { name: '关键指标' })).toBeInTheDocument()
     expect(screen.getByText('资产总数').parentElement).toHaveTextContent('3')
     expect(screen.getByText('24H 拦截').parentElement).toHaveTextContent('阻断率')
+    expect(screen.getByText('24H 模型告警').parentElement).toHaveTextContent('0')
     expect(screen.getByLabelText('最近事件')).toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: /小比例/ })[0])

@@ -14,7 +14,7 @@ import type {
   Page,
   PageQuery,
 } from '../../api/client'
-import type { ConsoleClient, EdgeDeploymentCoordinates, EdgeDeploymentSpecification } from '../../api/client'
+import type { ConsoleClient, EdgeEnrollmentInput } from '../../api/client'
 import type {
   AssetDetail,
   AssetPatch,
@@ -22,7 +22,9 @@ import type {
   ChainVerification,
   ChatMessage,
   DashboardSummary,
+  EdgeEnrollment,
   Event,
+  EventDetail,
   GateOutcome,
   BindingRef,
   EffectiveAccess,
@@ -86,7 +88,6 @@ interface FixtureChatSession {
 interface FixtureOnboarding extends Onboarding {
   secret: string
   modelLiveOk: boolean
-  deployment?: EdgeDeploymentSpecification
 }
 
 interface FixtureGatewayCall {
@@ -224,23 +225,15 @@ function projectModelGateway(o: FixtureOnboarding, calls: FixtureGatewayCall[]):
 
 function defaultOnboarding(state: OnboardingState): FixtureOnboarding {
   const completed = state === 'ONBOARDING_STATE_COMPLETED'
-  const edge = completed || state === 'ONBOARDING_STATE_EDGE_LIVE'
-  const modelLive = completed || edge || state === 'ONBOARDING_STATE_MODEL_LIVE'
+  const modelLive = completed || state === 'ONBOARDING_STATE_EDGE_LIVE' || state === 'ONBOARDING_STATE_MODEL_LIVE'
   return {
-    state,
+    state: state === 'ONBOARDING_STATE_EDGE_LIVE' ? 'ONBOARDING_STATE_MODEL_LIVE' : state,
     baseUrl: modelLive ? 'https://api.x.ai/v1' : '',
     model: modelLive ? 'grok-4-1-fast-non-reasoning' : '',
     dialect: 'MODEL_DIALECT_OPENAI_CHAT',
     hasSecret: modelLive,
     secretHint: modelLive ? '****test' : '',
-    jarvisOnline: modelLive,
-    edgeReady: edge,
-    localAssetId: edge ? 'asset-01' : '',
-    localUnitId: edge ? 'edge-01' : '',
-    deploymentSpecDigest: edge ? 'sha256:fixture-spec' : '',
-    expectedGenerationId: edge ? 'generation-fixture' : '',
-    expectedGenerationSeq: edge ? '2' : '0',
-    expectedListenPlanVersion: edge ? '1' : '0',
+    jarvisOnline: completed,
     lastError: '',
     updatedAt: '2026-08-16T00:00:00.000Z',
     secret: modelLive ? 'sk-fixture-test' : '',
@@ -252,7 +245,7 @@ function freshState(onboardingState: OnboardingState = 'ONBOARDING_STATE_COMPLET
   const completed = onboardingState === 'ONBOARDING_STATE_COMPLETED'
   return structuredClone({
     accounts: FIXTURE_ACCOUNTS,
-    assets: completed || onboardingState === 'ONBOARDING_STATE_EDGE_LIVE' ? createAssets() : [],
+    assets: completed ? createAssets() : [],
     events: createEvents(),
     releases: createReleases(),
     stats: createStats(),
@@ -385,14 +378,6 @@ export class ConsoleClientFixture implements ConsoleClient {
   /** 单测用：模拟贾维斯已在线（与探测成败无关）。 */
   setJarvisOnline(on: boolean): void {
     this.state.onboarding.jarvisOnline = on
-  }
-
-  setEdgeReady(on: boolean): void {
-    const onboarding = this.state.onboarding
-    onboarding.edgeReady = on
-    if (on && onboarding.deploymentSpecDigest !== '') {
-      onboarding.state = 'ONBOARDING_STATE_EDGE_LIVE'
-    }
   }
 
   /* ----- 守卫 ----- */
@@ -686,11 +671,7 @@ export class ConsoleClientFixture implements ConsoleClient {
     this.me()
     if (!this.onboardingCompleted()) {
       this.requireAdminRole()
-      const local = this.state.onboarding.localAssetId
       let assets: AssetDetail[] = []
-      if (local !== '') {
-        assets = this.state.assets
-      }
       if (filter.query !== undefined && filter.query !== '') {
         assets = assets.filter((a) => a.asset.id.includes(filter.query ?? '') || a.asset.displayName.includes(filter.query ?? ''))
       }
@@ -739,6 +720,7 @@ export class ConsoleClientFixture implements ConsoleClient {
       },
       unitIds: [],
       units: [],
+      edgeEnrollments: [],
       health: 'UNIT_HEALTH_UNSPECIFIED',
       activeReleaseCount: 0,
     }
@@ -767,12 +749,12 @@ export class ConsoleClientFixture implements ConsoleClient {
 
   async deleteAsset(assetId: string): Promise<void> {
     const actor = this.requireAdminRole()
-    if (assetId === this.state.onboarding.localAssetId) {
-      throw err('failed_precondition', 'cannot delete local asset')
-    }
     if (this.onboardingCompleted()) this.requireAsset('asset.delete', assetId)
     const idx = this.state.assets.findIndex((a) => a.asset.id === assetId)
     if (idx < 0) throw err('permission_denied', 'asset not found')
+    if (this.state.assets[idx].edgeEnrollments.length > 0) {
+      throw err('failed_precondition', 'asset has edge enrollments')
+    }
     this.state.assets.splice(idx, 1)
     this.pruneBinding(assetId)
     this.audit('asset.delete', 'asset', assetId, actor.username)
@@ -796,6 +778,100 @@ export class ConsoleClientFixture implements ConsoleClient {
     detail.unitIds = detail.unitIds.filter((u) => u !== unitId)
     this.audit('unit.detach', 'asset', assetId, actor.username)
     return structuredClone(detail)
+  }
+
+  async putEdgeEnrollment(req: EdgeEnrollmentInput): Promise<EdgeEnrollment> {
+    const actor = this.requireAdminRole()
+    if (this.onboardingCompleted()) this.requireAsset('asset.update', req.assetId)
+    const detail = this.findAsset(req.assetId)
+    const unitId = req.unitId.trim()
+    const listenAddress = req.listenAddress.trim()
+    const trafficKey = req.trafficKey.trim()
+    const upstreamUrl = req.upstreamUrl.trim()
+    if (unitId === '' || unitId.length > 64 || listenAddress === '' || trafficKey === '') {
+      throw err('invalid_argument', 'unit_id, listen_address and traffic_key are required')
+    }
+    const trustedProxyCidrs = [...new Set(req.trustedProxyCidrs.map((value) => value.trim()).filter(Boolean))].sort()
+    if (trustedProxyCidrs.length > 64 || trustedProxyCidrs.some((value) => !validProxyCIDR(value))) {
+      throw err('invalid_argument', 'trusted_proxy_cidrs is invalid')
+    }
+    if (req.posture === 'INGRESS_POSTURE_REVERSE_PROXY') {
+      let upstream: URL
+      try {
+        upstream = new URL(upstreamUrl)
+      } catch {
+        throw err('invalid_argument', 'upstream_url must be absolute')
+      }
+      if (!['http:', 'https:'].includes(upstream.protocol) || upstream.hostname === '' || upstream.username !== '' || upstream.password !== '' || upstream.hash !== '') {
+        throw err('invalid_argument', 'upstream_url is invalid')
+      }
+    } else if (req.posture !== 'INGRESS_POSTURE_EXT_AUTHZ') {
+      throw err('invalid_argument', 'unsupported edge enrollment posture')
+    }
+    const conflict = this.state.assets.find(
+      (asset) => asset.asset.id !== req.assetId && asset.edgeEnrollments.some((enrollment) => enrollment.unitId === unitId),
+    )
+    if (conflict !== undefined) throw err('already_exists', `edge ${unitId} is already enrolled for another asset`)
+    const normalized: EdgeEnrollmentInput = {
+      ...structuredClone(req),
+      assetId: req.assetId,
+      unitId,
+      listenAddress,
+      upstreamUrl: req.posture === 'INGRESS_POSTURE_REVERSE_PROXY' ? upstreamUrl : '',
+      trafficKey,
+      trustedProxyCidrs,
+      modelProfile: {
+        ...structuredClone(req.modelProfile),
+        profileId: req.modelProfile.profileId.trim(),
+        modelGroup: req.modelProfile.modelGroup.trim(),
+        modelType: req.modelProfile.modelType.trim(),
+        modelVersion: req.modelProfile.modelVersion.trim(),
+        allowedHeaders: [...new Set(req.modelProfile.allowedHeaders.map((value) => value.trim().toLowerCase()).filter(Boolean))].sort(),
+      },
+    }
+    const specificationDigest = `sha256:${fakeHash(JSON.stringify(normalized)).repeat(8)}`
+    const existingIndex = detail.edgeEnrollments.findIndex((enrollment) => enrollment.unitId === unitId)
+    const existing = existingIndex >= 0 ? detail.edgeEnrollments[existingIndex] : undefined
+    if (existing?.specificationDigest === specificationDigest) return structuredClone(existing)
+    const nextListenPlan = String(Number(existing?.expectedListenPlanVersion ?? '0') + 1)
+    const nextGenerationSeq = String(Number(existing?.expectedGenerationSeq ?? '0') + 1)
+    const enrollment: EdgeEnrollment = {
+      assetId: req.assetId,
+      unitId,
+      posture: normalized.posture,
+      listenAddress,
+      upstreamUrl: normalized.upstreamUrl,
+      trafficKey,
+      trustedProxyCidrs,
+      modelProfile: normalized.modelProfile,
+      modelIngressWindow: normalized.modelIngressWindow,
+      modelsideId: `${unitId}-modelside`,
+      specificationDigest,
+      expectedListenPlanVersion: nextListenPlan,
+      expectedGenerationId: `generation-${fakeHash(`${req.assetId}:${nextGenerationSeq}:${specificationDigest}`)}`,
+      expectedGenerationSeq: nextGenerationSeq,
+      status: existing?.lastHeartbeatAt === undefined
+        ? 'EDGE_ENROLLMENT_STATUS_WAITING_FOR_REGISTRATION'
+        : 'EDGE_ENROLLMENT_STATUS_OUT_OF_SYNC',
+      lastHeartbeatAt: existing?.lastHeartbeatAt,
+      currentListenPlanVersion: existing?.currentListenPlanVersion ?? '0',
+      currentGenerationId: existing?.currentGenerationId ?? '',
+      currentGenerationSeq: existing?.currentGenerationSeq ?? '0',
+      modelsideStatus: existing?.modelsideStatus ?? 'EDGE_ENROLLMENT_STATUS_WAITING_FOR_REGISTRATION',
+      modelsideLastResultAt: existing?.modelsideLastResultAt,
+      modelProfileDigest: `sha256:${fakeHash(JSON.stringify(normalized.modelProfile)).repeat(8)}`,
+    }
+    if (existingIndex >= 0) detail.edgeEnrollments[existingIndex] = enrollment
+    else detail.edgeEnrollments.push(enrollment)
+    this.audit('asset.edge_enrollment.put', 'asset', req.assetId, actor.username)
+    return structuredClone(enrollment)
+  }
+
+  async getEdgeEnrollment(assetId: string, unitId: string): Promise<EdgeEnrollment> {
+    this.requireAsset('console.read', assetId)
+    const enrollment = this.findAsset(assetId).edgeEnrollments.find((candidate) => candidate.unitId === unitId)
+    if (enrollment === undefined) throw err('not_found', `edge ${unitId} is not enrolled for ${assetId}`)
+    return structuredClone(enrollment)
   }
 
   async getTrafficReviewPolicy(assetId: string): Promise<TrafficReviewPolicyStatus> {
@@ -911,6 +987,7 @@ export class ConsoleClientFixture implements ConsoleClient {
     summary.assetsTotal = String(visible.size)
     summary.events24hTotal = String(events.length)
     summary.events24hBlocked = String(events.filter((e) => e.verdict === 'VERDICT_BLOCK').length)
+    summary.modelAlerts24h = String(events.filter((e) => e.kind === 'KIND_MODEL_ALERT').length)
     return { ...summary, releasesByState: byState }
   }
 
@@ -936,14 +1013,43 @@ export class ConsoleClientFixture implements ConsoleClient {
     return this.paginate(structuredClone(events), page)
   }
 
-  async getEvent(eventId: string): Promise<Event> {
+  async getEvent(eventId: string): Promise<EventDetail> {
     this.requireOnboardingComplete()
     this.requireTool('console.read')
     const event = this.state.events.find((e) => e.id === eventId)
     if (event === undefined || !this.visibleAssetIds().has(event.assetId)) {
       throw err('permission_denied', 'object out of bindings')
     }
-    return structuredClone(event)
+    return structuredClone({
+      event,
+      modelInferences: event.kind === 'KIND_MODEL_ALERT' || event.kind === 'KIND_MODEL_REVIEW_SAMPLE'
+        ? [{
+            inferenceId: `inference-${event.id}`,
+            eventId: event.id,
+            modelGroup: 'http-threat',
+            modelType: 'PVM',
+            modelVersion: 'gpvm-e9eceef3',
+            threshold: 0.9,
+            score: 0.97,
+            attackClass: 'ATTACK_CLASS_SQLI',
+            taxonomyVersion: 'http-threat/v1',
+            recordedAt: event.occurredAt,
+            modelProfileDigest: `sha256:${fakeHash('fixture-model-profile').repeat(8)}`,
+            requestId: event.requestId,
+            resultKind: event.kind === 'KIND_MODEL_ALERT' ? 'MODEL_RESULT_KIND_ALERT' : 'MODEL_RESULT_KIND_REVIEW_SAMPLE',
+          }]
+        : [],
+      triageDeliveries: event.clusterId === ''
+        ? []
+        : [{
+            caseId: this.state.cases.find((item) => item.assetId === event.assetId)?.caseId ?? '',
+            instructionId: `instruction-${event.id}`,
+            handlerId: 'jarvis',
+            kind: 'INSTRUCTION_KIND_EVENT_TRIAGE',
+            status: 'INSTRUCTION_STATUS_PENDING',
+            createdAt: event.occurredAt,
+          }],
+    })
   }
 
   /* ----- GovernService：状态机按 docs/api.md §7.1 执行 ----- */
@@ -1190,12 +1296,7 @@ export class ConsoleClientFixture implements ConsoleClient {
     const accountOnly = new Set(['user.admin', 'grant.write', 'catalog.manage', 'worker.enroll', 'worker.capacity.approve'])
     const needsAsset = req.tools.some((tool) => !accountOnly.has(tool))
     if (needsAsset && req.bindings.length === 0) throw err('permission_denied', 'wildcard bindings forbidden', { reasonKey: 'grant_wildcard' })
-    const local = this.state.onboarding.localAssetId
-    const onboardingGrant =
-      !this.onboardingCompleted() &&
-      actor.role === 'USER_ROLE_ADMIN' &&
-      req.bindings.every((b) => b.kind === 'asset' && b.id === local && local !== '')
-    if (!onboardingGrant && !req.bindings.every((b) => mine.some((m) => m.kind === b.kind && m.id === b.id))) {
+    if (!req.bindings.every((b) => mine.some((m) => m.kind === b.kind && m.id === b.id))) {
       throw err('permission_denied', 'granted scope exceeds caller bindings', { reasonKey: 'grant_scope' })
     }
     const grant: Grant = {
@@ -1232,13 +1333,6 @@ export class ConsoleClientFixture implements ConsoleClient {
       hasSecret: o.hasSecret,
       secretHint: o.secretHint,
       jarvisOnline: o.jarvisOnline,
-      edgeReady: o.edgeReady,
-      localAssetId: o.localAssetId,
-      localUnitId: o.localUnitId,
-      deploymentSpecDigest: o.deploymentSpecDigest,
-      expectedGenerationId: o.expectedGenerationId,
-      expectedGenerationSeq: o.expectedGenerationSeq,
-      expectedListenPlanVersion: o.expectedListenPlanVersion,
       lastError: o.lastError,
       updatedAt: o.updatedAt,
     }
@@ -1287,71 +1381,8 @@ export class ConsoleClientFixture implements ConsoleClient {
       throw err('unavailable', 'model endpoint unreachable')
     }
     this.state.onboarding.modelLiveOk = true
-    this.state.onboarding.jarvisOnline = true
     this.state.onboarding.lastError = ''
     this.state.onboarding.state = 'ONBOARDING_STATE_MODEL_LIVE'
-  }
-
-  async putDeploymentSpecification(req: EdgeDeploymentSpecification): Promise<EdgeDeploymentCoordinates> {
-    const actor = this.me()
-    if (actor.role !== 'USER_ROLE_ADMIN') throw err('permission_denied', 'only admin may submit deployment specification')
-    const o = this.state.onboarding
-    if (!o.modelLiveOk) {
-      throw err('failed_precondition', 'model is not live')
-    }
-    if (req.unitId.trim() === '' || req.assetId.trim() === '') throw err('invalid_argument', 'unit_id and asset_id are required')
-    const trafficKey = req.trafficKey.trim()
-    const target = req.posture === 'INGRESS_POSTURE_REVERSE_PROXY' ? req.reverseProxy : req.extAuthz
-    if (trafficKey === '' || target.listenAddress.trim() === '') {
-      throw err('invalid_argument', 'traffic_key and listen_address are required')
-    }
-    const trustedProxyCidrs = [...new Set(req.trustedProxyCidrs.map((value) => value.trim()).filter(Boolean))].sort()
-    if (trustedProxyCidrs.length > 64 || trustedProxyCidrs.some((value) => !validProxyCIDR(value))) {
-      throw err('invalid_argument', 'trusted_proxy_cidrs is invalid')
-    }
-    if (req.posture === 'INGRESS_POSTURE_REVERSE_PROXY') {
-      let upstream: URL
-      try {
-        upstream = new URL(req.reverseProxy.upstreamUrl)
-      } catch {
-        throw err('invalid_argument', 'upstream_url must be absolute')
-      }
-      if (
-        !['http:', 'https:'].includes(upstream.protocol) ||
-        upstream.hostname === '' ||
-        upstream.username !== '' ||
-        upstream.password !== '' ||
-        upstream.hash !== '' ||
-        req.reverseProxy.upstreamUrl.trim() === 'builtin'
-      ) {
-        throw err('invalid_argument', 'upstream_url is invalid')
-      }
-    }
-    o.deployment = structuredClone({ ...req, trustedProxyCidrs })
-    o.localUnitId = req.unitId.trim()
-    o.localAssetId = req.assetId.trim()
-    o.deploymentSpecDigest = 'sha256:fixture-spec'
-    o.expectedGenerationId = 'generation-fixture'
-    o.expectedGenerationSeq = '2'
-    o.expectedListenPlanVersion = '1'
-    o.edgeReady = false
-    o.lastError = ''
-    o.state = 'ONBOARDING_STATE_MODEL_LIVE'
-    if (!this.state.assets.some((a) => a.asset.id === o.localAssetId)) {
-      const local = createAssets()[0]
-      local.asset.id = o.localAssetId
-      local.asset.displayName = o.localAssetId
-      local.unitIds = [o.localUnitId]
-      this.state.assets.push(local)
-    }
-    return {
-      unitId: o.localUnitId,
-      assetId: o.localAssetId,
-      deploymentSpecDigest: o.deploymentSpecDigest,
-      listenPlanVersion: o.expectedListenPlanVersion,
-      generationId: o.expectedGenerationId,
-      generationSeq: o.expectedGenerationSeq,
-    }
   }
 
   async completeOnboarding(): Promise<void> {
@@ -1361,14 +1392,6 @@ export class ConsoleClientFixture implements ConsoleClient {
     const missing: number[] = []
     if (!o.modelLiveOk || !o.hasSecret) missing.push(1)
     if (!o.jarvisOnline) missing.push(2)
-    if (!o.edgeReady || o.localAssetId === '') missing.push(3)
-    const otherGrant = this.state.grants.find(
-      (g) =>
-        g.subjectUserId !== actor.userId &&
-        g.tools.includes('govern.promote_enforce') &&
-        g.bindings.some((b) => b.kind === 'asset' && b.id === o.localAssetId),
-    )
-    if (otherGrant === undefined) missing.push(4)
     if (missing.length > 0) {
       throw new ApiError({
         code: 'failed_precondition',
@@ -1391,10 +1414,7 @@ export class ConsoleClientFixture implements ConsoleClient {
         'asset.attach',
         'asset.detach',
       ],
-      bindings:
-        this.state.assets.length > 0
-          ? this.state.assets.map((a) => ({ kind: 'asset' as const, id: a.asset.id }))
-          : [{ kind: 'asset', id: o.localAssetId }],
+      bindings: this.state.assets.map((a) => ({ kind: 'asset' as const, id: a.asset.id })),
       createdBy: 'system',
       createdAt: '2026-08-16T00:00:00.000Z',
     })

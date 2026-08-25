@@ -54,6 +54,15 @@ func authorizeWrite(ctx context.Context, pool *pgxpool.Pool, user *authv1.User, 
 	if user == nil {
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("missing user"))
 	}
+	if tool == "asset.create" && user.Role == commonv1.UserRole_USER_ROLE_ADMIN {
+		access, err := loadEffectiveAccess(ctx, pool, user)
+		if err != nil {
+			return err
+		}
+		if scopeFromAccess(access).hasTool(tool) {
+			return nil
+		}
+	}
 	if err := requireUserGrant(ctx, pool, user.UserId, tool, bindKind, bindID); err == nil {
 		return nil
 	} else if connect.CodeOf(err) != connect.CodePermissionDenied {

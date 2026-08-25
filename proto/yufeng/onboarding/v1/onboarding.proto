@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// 初次配置引导：部署一行状态机、模型凭据与人工 Edge 部署规格。
+// 初次配置引导：部署一行状态机、模型凭据与贾维斯在线确认。
 package yufeng.onboarding.v1;
 
 import "google/protobuf/timestamp.proto";
@@ -22,9 +22,11 @@ service OnboardingService {
   rpc DeployDataplane(DeployDataplaneRequest) returns (DeployDataplaneResponse) {
     option deprecated = true;
   }
-  // PutDeploymentSpecification 确定性签发监听计划、基线世代与模型档案。
-  rpc PutDeploymentSpecification(PutDeploymentSpecificationRequest) returns (PutDeploymentSpecificationResponse);
-  // CompleteOnboarding 只检查四条谓词后写入系统授予。
+  // 兼容保留；人工 Edge 接入已迁移到 AssetService.PutEdgeEnrollment。
+  rpc PutDeploymentSpecification(PutDeploymentSpecificationRequest) returns (PutDeploymentSpecificationResponse) {
+    option deprecated = true;
+  }
+  // CompleteOnboarding 只检查模型网关与贾维斯在线两条谓词。
   rpc CompleteOnboarding(CompleteOnboardingRequest) returns (CompleteOnboardingResponse);
 }
 
@@ -42,13 +44,13 @@ enum OnboardingState {
   ONBOARDING_STATE_COMPLETED = 5;
   // 最近一步失败，保留原因与已配密钥。
   ONBOARDING_STATE_FAILED = 6;
-  // 人工部署的 Edge 已主动注册并确认装载期望制品。
-  ONBOARDING_STATE_EDGE_LIVE = 7;
+  // 旧 Edge 引导状态只保留线缆编码，不再写入。
+  ONBOARDING_STATE_EDGE_LIVE = 7 [deprecated = true];
 }
 
 // OnboardingGate 是 CompleteOnboarding 失败时 Connect details 的唯一条目。
 message OnboardingGate {
-  // missing_predicates 是未满足的 §19.1 谓词编号，取值 1–4，升序去重。
+  // missing_predicates 是未满足的 §19.1 谓词编号，取值 1–2，升序去重。
   repeated int32 missing_predicates = 1;
 }
 
@@ -64,16 +66,16 @@ message GetOnboardingResponse {
   string secret_hint = 5;
   bool jarvis_online = 6;
   bool dataplane_ready = 7 [deprecated = true];
-  string local_asset_id = 8;
+  string local_asset_id = 8 [deprecated = true];
   string last_error = 9;
   google.protobuf.Timestamp updated_at = 10;
   yufeng.model.v1.ModelDialect dialect = 11;
-  bool edge_ready = 12;
-  string local_unit_id = 13;
-  string deployment_spec_digest = 14;
-  string expected_generation_id = 15;
-  int64 expected_generation_seq = 16;
-  uint64 expected_listen_plan_version = 17;
+  bool edge_ready = 12 [deprecated = true];
+  string local_unit_id = 13 [deprecated = true];
+  string deployment_spec_digest = 14 [deprecated = true];
+  string expected_generation_id = 15 [deprecated = true];
+  int64 expected_generation_seq = 16 [deprecated = true];
+  uint64 expected_listen_plan_version = 17 [deprecated = true];
 }
 
 // PutModelConfigRequest 写入模型端点与密钥。
@@ -138,6 +140,7 @@ enum ModelDedupeRule {
 
 // ModelProfileSpecification 是管理员提交、由 Brain 编进签名制品的模型策略。
 message ModelProfileSpecification {
+  option deprecated = true;
   string profile_id = 1;
   string model_group = 2;
   string model_type = 3;
@@ -156,6 +159,7 @@ message ModelProfileSpecification {
 
 // PutDeploymentSpecificationRequest 提交人工部署所需的确定性规格。
 message PutDeploymentSpecificationRequest {
+  option deprecated = true;
   string unit_id = 1;
   string asset_id = 2;
   yufeng.common.v1.IngressPosture posture = 3;
@@ -172,6 +176,7 @@ message PutDeploymentSpecificationRequest {
 
 // PutDeploymentSpecificationResponse 返回人工安装后 Edge 应装载的版本坐标。
 message PutDeploymentSpecificationResponse {
+  option deprecated = true;
   string unit_id = 1;
   string asset_id = 2;
   string deployment_spec_digest = 3;

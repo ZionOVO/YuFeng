@@ -111,7 +111,7 @@ brain 为每条 Agent instruction 或 run work item 签发的短期最小权限�
 
 <a id="workload-identity"></a>
 ### 工作负载身份（Workload Identity）
-独立服务连接 brain 时使用的进程身份，与贾维斯的 Agent 身份分开。agentd 的一次性 bootstrap token 绑定精确 `worker_id + RUN_SUPERVISOR + 公钥/客户端证书指纹`；注册后换取 `aud=worker` 的可轮换 refresh token 和短期 access token，只有代持当前 run 能力令牌时可代表 run 调 Generate / ToolGateway。`yufeng-modelside` 使用独立 `aud=modelside` 身份；部署规格确定性预声明 `${unit_id}-modelside` 并绑定精确单元与资产，首次合法上报再固定客户端证书指纹，只能上报类型化结果。自报能力、身份或种类不能产生 Bindings。
+独立服务连接 brain 时使用的进程身份，与贾维斯的 Agent 身份分开。agentd 的一次性 bootstrap token 绑定精确 `worker_id + RUN_SUPERVISOR + 公钥/客户端证书指纹`；注册后换取 `aud=worker` 的可轮换 refresh token 和短期 access token，只有代持当前 run 能力令牌时可代表 run 调 Generate / ToolGateway。`yufeng-modelside` 使用独立 `aud=modelside` 身份；`PutEdgeEnrollment` 确定性预声明 `${unit_id}-modelside` 并绑定精确单元与资产，首次合法上报再固定客户端证书指纹，只能上报类型化结果。自报能力、身份或种类不能产生 Bindings。
 
 ## Agent 座架
 
@@ -457,7 +457,7 @@ brain 模型网关出网时使用的供应商 HTTP 协议。线上只许 proto �
 
 <a id="onboarding"></a>
 ### 初次配置引导（onboarding）
-单机交付后、主控制台可用前的强制向导。库里一行部署状态；管理员登录若未到 `ONBOARDING_STATE_COMPLETED`，整站只能走 `https://127.0.0.1:9050/app/setup`。界面固定 **六步**。未失败时禁止跳步；`TestModelConnectivity` 三次失败后可跳过配置模型与设置防御资产，进入授权值守账户。权威定义见 `docs/api.md` §19.0。第三步提交部署规格并由 Brain 确定性签发监听计划、基线世代和模型档案；第四步由技术人员人工安装并启动 Edge 与可选 ModelSide；第五步设置防御资产；第六步授权值守账户。Brain 与贾维斯不创建、启动或探测 Edge。非管理员在完成前只看到「等待管理员完成初次配置」。密钥只写不回读。
+单机交付后、主控制台可用前的强制向导。库里一行部署状态；管理员登录若未到 `ONBOARDING_STATE_COMPLETED`，整站只能走 `https://127.0.0.1:9050/app/setup`。界面只完成四个动作：配置 brain 模型网关、执行连通性探测、确认贾维斯已主动注册在线、显式进入主控制台。Edge、ModelSide、Host、防御资产和批准账户均在主控制台中按常规人工接入流程处理，不是完成谓词。Brain 与贾维斯不创建、启动或探测任何数据面进程。非管理员在完成前只看到「等待管理员完成初次配置」。密钥只写不回读；权威定义见 `docs/api.md` §19。
 
 <a id="onboarding-state"></a>
 ### 引导状态（OnboardingState）
@@ -468,8 +468,8 @@ brain 模型网关出网时使用的供应商 HTTP 协议。线上只许 proto �
 | `ONBOARDING_STATE_PENDING` | 刚装完，未配模型 | 初态，不是某一步的产物 |
 | `ONBOARDING_STATE_MODEL_CONFIGURED` | 密钥已存，探测尚未成功 | 步骤 1 `PutModelConfig` |
 | `ONBOARDING_STATE_MODEL_LIVE` | 探测成功 | 步骤 2 `TestModelConnectivity` |
-| `ONBOARDING_STATE_EDGE_LIVE` | 人工部署的 Edge 已主动注册并在心跳中确认装载期望监听计划与资产世代 | 步骤 4 等待 Edge 主动回执（步骤 5 设置防御资产不改此态） |
-| `ONBOARDING_STATE_COMPLETED` | 引导结束，主控制台开放 | 步骤 6 `CompleteOnboarding` |
+| `ONBOARDING_STATE_EDGE_LIVE` | 退役兼容值；旧库升级后按 `ONBOARDING_STATE_MODEL_LIVE` 投影，不再由心跳写入 | 无新写入方 |
+| `ONBOARDING_STATE_COMPLETED` | 模型网关已探测、贾维斯在线且管理员显式结束引导，主控制台开放 | `CompleteOnboarding` |
 | `ONBOARDING_STATE_FAILED` | 最近一步失败，保留原因码 | 任一步失败；从本态出发的重试边见 `docs/api.md` §19 合法边表，不丢已配密钥 |
 
 `ONBOARDING_STATE_COMPLETED` 的服务端谓词**只认** `docs/api.md` §19.1，本文不另写一套。引导完成前贾维斯令牌不得含 `govern.propose` / `govern.promote_*`。
@@ -480,11 +480,15 @@ brain 模型网关出网时使用的供应商 HTTP 协议。线上只许 proto �
 
 <a id="manual-edge-lifecycle"></a>
 ### Edge 人工生命周期（Manual Edge Lifecycle）
-`yufeng-edge` 的安装、启动、升级、回退和卸载由技术人员通过操作系统服务管理器或 Docker Compose 显式执行。Brain 只在管理员提交部署规格时确定性签发监听计划、基线世代与模型档案；Edge 启动后主动注册、拉取并用心跳回执已装载版本。Brain、贾维斯和智能代理工具均不持 Docker、进程管理、Edge 安装或管理口探测权限。
+`yufeng-edge` 的安装、启动、升级、回退和卸载由技术人员通过操作系统服务管理器或 Docker Compose 显式执行。管理员先在主控制台登记资产，再写入该资产的 [Edge 人工接入配置](#edge-enrollment)；Brain 只确定性签发监听计划、保留既有非相关策略的下一资产世代与模型档案。Edge 启动后主动注册、拉取并用心跳回执已装载版本。Brain、贾维斯和智能代理工具均不持 Docker、进程管理、Edge 安装或管理口探测权限。
+
+<a id="edge-enrollment"></a>
+### Edge 人工接入配置（Edge enrollment）
+主控制台中绑定一个既有资产与预声明 Edge 单元的规范化配置，包含入口姿态、监听地址、上游、流量键、可信代理网段、签名模型档案、模型输入缓存窗口、确定性 ModelSide 身份和期望制品坐标。相同规范摘要不重复签发；配置变化递增监听计划并签发保留既有非相关策略的新资产世代。状态只从该单元的注册心跳、实际装载坐标和最近 ModelSide 结果计算，不代表 Brain 执行过安装。
 
 <a id="human-delivery"></a>
 ### 人机交付闭环
-操作员用 Docker Compose 或原生包安装中台，登录后提交部署规格；技术人员再按[Edge 人工生命周期](#manual-edge-lifecycle)安装 Edge 与可选 ModelSide，Edge 主动注册并取得签名制品；控制台可授予并由另一操作员人工推进策略。该闭环的软件版本只有在根目录 [`VERSION`](../VERSION)、同名公开 [GitHub Release](https://github.com/ZionOVO/YuFeng/releases/latest) 与精确提交证据一致时才算通过机器验收，客户现场仍须填写真实网络参数和变更责任记录。
+操作员用 Docker Compose 或原生包安装 Brain、贾维斯和 agentd，完成模型网关与贾维斯初次配置后进入主控制台；随后登记资产与 Edge 人工接入配置。技术人员再按[Edge 人工生命周期](#manual-edge-lifecycle)安装 Edge 与可选 ModelSide，Edge 主动注册并取得签名制品；控制台可授予并由另一操作员人工推进策略。该闭环的软件版本只有在根目录 [`VERSION`](../VERSION)、同名公开 [GitHub Release](https://github.com/ZionOVO/YuFeng/releases/latest) 与精确提交证据一致时才算通过机器验收，客户现场仍须填写真实网络参数和变更责任记录。
 
 <a id="enterprise-pilot"></a>
 ### 企业试点（Enterprise Pilot）

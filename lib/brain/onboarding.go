@@ -171,16 +171,15 @@ func isUndefinedTable(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
 }
 
-// completeCheck 是 §19.1 四条谓词的输入。
+// completeCheck 是 §19.1 两条谓词的输入。
 type completeCheck struct {
 	AdminUserID   string
 	JarvisAgentID string
 	LocalAssetID  string
 	ModelLive     bool
-	EdgeReady     bool
 }
 
-// missingCompletePredicates 返回未满足的 §19.1 谓词编号（1–4，升序）。
+// missingCompletePredicates 返回未满足的 §19.1 谓词编号（1–2，升序）。
 func missingCompletePredicates(ctx context.Context, db dbTX, c completeCheck) []int32 {
 	var missing []int32
 	if !c.ModelLive {
@@ -188,12 +187,6 @@ func missingCompletePredicates(ctx context.Context, db dbTX, c completeCheck) []
 	}
 	if !jarvisOnline(ctx, db, c.JarvisAgentID) {
 		missing = append(missing, 2)
-	}
-	if !c.EdgeReady || c.LocalAssetID == "" || c.LocalAssetID == "bootstrap" {
-		missing = append(missing, 3)
-	}
-	if !hasOtherPromoteEnforce(ctx, db, c.AdminUserID, c.LocalAssetID) {
-		missing = append(missing, 4)
 	}
 	return missing
 }
@@ -211,47 +204,14 @@ func jarvisOnline(ctx context.Context, db dbTX, agentID string) bool {
 }
 
 func onboardingSlotChanged(before, after onboardingView) bool {
-	return before.SecretPlain != after.SecretPlain || before.BaseURL != after.BaseURL || before.Model != after.Model || before.Dialect != after.Dialect || before.DeploymentSpecDigest != after.DeploymentSpecDigest
-}
-
-func hasOtherPromoteEnforce(ctx context.Context, db dbTX, adminUserID, localAssetID string) bool {
-	if localAssetID == "" || localAssetID == "bootstrap" {
-		return false
-	}
-	rows, err := db.Query(ctx, `SELECT subject_id, tools, bindings FROM grants
-		WHERE subject_kind='user' AND subject_id<>$1 AND (expires_at IS NULL OR expires_at > now())`, adminUserID)
-	if err != nil {
-		return false
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var subject string
-		var toolsRaw, bindsRaw []byte
-		if err := rows.Scan(&subject, &toolsRaw, &bindsRaw); err != nil {
-			return false
-		}
-		var tools []string
-		var binds []*grantv1.BindingRef
-		if json.Unmarshal(toolsRaw, &tools) != nil || json.Unmarshal(bindsRaw, &binds) != nil {
-			continue
-		}
-		if !claimsAllows(tools, "govern.promote_enforce") {
-			continue
-		}
-		for _, b := range binds {
-			if b != nil && b.Kind == "asset" && b.Id == localAssetID && b.Id != "*" && b.Id != "bootstrap" {
-				return true
-			}
-		}
-	}
-	return false
+	return before.SecretPlain != after.SecretPlain || before.BaseURL != after.BaseURL || before.Model != after.Model || before.Dialect != after.Dialect
 }
 
 func adminSystemTools() []string {
 	return []string{"grant.write", "user.admin", "catalog.manage", "console.read", "case.read", "case.manage", "evidence.approve", "worker.enroll", "worker.capacity.approve", "agent.manage", "asset.create", "asset.update", "asset.delete", "asset.attach", "asset.detach"}
 }
 
-// writeAdminSystemGrant 写入引导管理员系统授予（无 govern.propose，Bindings 为 local_asset_id）。
+// writeAdminSystemGrant 写入引导管理员系统授予；零资产时 Bindings 可以为空。
 func writeAdminSystemGrant(ctx context.Context, pool *pgxpool.Pool, adminUserID, localAssetID string) error {
 	return writeAdminSystemGrantAssets(ctx, pool, adminUserID, []string{localAssetID})
 }
@@ -265,9 +225,6 @@ func writeAdminSystemGrantAssets(ctx context.Context, db dbTX, adminUserID strin
 		}
 		seen[id] = true
 		binds = append(binds, &grantv1.BindingRef{Kind: "asset", Id: id})
-	}
-	if len(binds) == 0 {
-		return errors.New("system grant requires local_asset_id")
 	}
 	tools, err := json.Marshal(adminSystemTools())
 	if err != nil {
@@ -297,7 +254,7 @@ func writeAdminSystemGrantAssets(ctx context.Context, db dbTX, adminUserID strin
 	return err
 }
 
-// completeOnboarding 只在 §19.1 四条齐备时写入系统授予并进入 COMPLETED。
+// completeOnboarding 只在 §19.1 两条齐备时写入系统授予并进入 COMPLETED。
 func completeOnboarding(ctx context.Context, pool *pgxpool.Pool, c completeCheck) ([]int32, error) {
 	missing := missingCompletePredicates(ctx, pool, c)
 	if len(missing) > 0 {
@@ -308,12 +265,10 @@ func completeOnboarding(ctx context.Context, pool *pgxpool.Pool, c completeCheck
 		if err != nil {
 			return err
 		}
-		ids := []string{c.LocalAssetID}
-		extra, err := listAssetIDs(ctx, tx)
+		ids, err := listAssetIDs(ctx, tx)
 		if err != nil {
 			return err
 		}
-		ids = append(ids, extra...)
 		if err := writeAdminSystemGrantAssets(ctx, tx, c.AdminUserID, ids); err != nil {
 			return err
 		}
@@ -341,13 +296,6 @@ type onboardingView struct {
 	ExpectedGenerationID      string
 	ExpectedGenerationSeq     int64
 	ExpectedListenPlanVersion uint64
-}
-
-func (v onboardingView) publicAssetID() string {
-	if v.LocalAssetID == "bootstrap" {
-		return ""
-	}
-	return v.LocalAssetID
 }
 
 func loadOnboardingView(ctx context.Context, pool *pgxpool.Pool) (onboardingView, error) {
@@ -539,7 +487,7 @@ func onboardingGateError(missing []int32) error {
 	seen := map[int32]bool{}
 	var uniq []int32
 	for _, n := range missing {
-		if n < 1 || n > 4 || seen[n] {
+		if n < 1 || n > 2 || seen[n] {
 			continue
 		}
 		seen[n] = true

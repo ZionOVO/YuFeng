@@ -57,8 +57,10 @@ import type {
   TrafficReviewPolicyStatus,
   ModelIngressWindow,
   ModelIngressWindowStatus,
+  EdgeEnrollment,
+  EventDetail,
 } from './types'
-import type { ConsoleClient, EdgeDeploymentCoordinates, EdgeDeploymentSpecification } from './client'
+import type { ConsoleClient, EdgeEnrollmentInput } from './client'
 import {
   normalizeApprovalView,
   normalizeAssetDetail,
@@ -66,6 +68,8 @@ import {
   normalizeDashboard,
   normalizeDefenseModule,
   normalizeEvent,
+  normalizeEventDetail,
+  normalizeEdgeEnrollment,
   normalizeEffectiveAccess,
   normalizeGrant,
   normalizeInvestigationCase,
@@ -358,6 +362,25 @@ export class ConnectClient implements ConsoleClient {
     return normalizeAssetDetail(res.asset)
   }
 
+  async putEdgeEnrollment(req: EdgeEnrollmentInput): Promise<EdgeEnrollment> {
+    const res = await this.call<{ enrollment?: unknown }>(
+      'yufeng.asset.v1.AssetService',
+      'PutEdgeEnrollment',
+      req,
+      { idempotent: true },
+    )
+    return normalizeEdgeEnrollment(res.enrollment)
+  }
+
+  async getEdgeEnrollment(assetId: string, unitId: string): Promise<EdgeEnrollment> {
+    const res = await this.call<{ enrollment?: unknown }>(
+      'yufeng.asset.v1.AssetService',
+      'GetEdgeEnrollment',
+      { assetId, unitId },
+    )
+    return normalizeEdgeEnrollment(res.enrollment)
+  }
+
   async getTrafficReviewPolicy(assetId: string): Promise<TrafficReviewPolicyStatus> {
 	const res = await this.call<{ status: TrafficReviewPolicyStatus }>(
 	  'yufeng.asset.v1.AssetService',
@@ -417,9 +440,8 @@ export class ConnectClient implements ConsoleClient {
     return { items: (res.events ?? []).map(normalizeEvent), nextPageToken: res.nextPageToken ?? '' }
   }
 
-  async getEvent(eventId: string): Promise<Event> {
-    const res = await this.call<{ event: Event }>('yufeng.console.v1.ConsoleService', 'GetEvent', { eventId })
-    return normalizeEvent(res.event)
+  async getEvent(eventId: string): Promise<EventDetail> {
+    return normalizeEventDetail(await this.call<unknown>('yufeng.console.v1.ConsoleService', 'GetEvent', { eventId }))
   }
 
   /* ----- GovernService（全部写 RPC 带 Idempotency-Key，docs/api.md §7.1） ----- */
@@ -560,13 +582,6 @@ export class ConnectClient implements ConsoleClient {
       hasSecret: res.hasSecret === true,
       secretHint: res.secretHint ?? '',
       jarvisOnline: res.jarvisOnline === true,
-      edgeReady: res.edgeReady === true,
-      localAssetId: res.localAssetId ?? '',
-      localUnitId: res.localUnitId ?? '',
-      deploymentSpecDigest: res.deploymentSpecDigest ?? '',
-      expectedGenerationId: res.expectedGenerationId ?? '',
-      expectedGenerationSeq: int64String(res.expectedGenerationSeq),
-      expectedListenPlanVersion: int64String(res.expectedListenPlanVersion),
       lastError: res.lastError ?? '',
       updatedAt: res.updatedAt,
       dialect: res.dialect ?? 'MODEL_DIALECT_OPENAI_CHAT',
@@ -584,23 +599,6 @@ export class ConnectClient implements ConsoleClient {
 
   async testModelConnectivity(): Promise<void> {
     await this.call('yufeng.onboarding.v1.OnboardingService', 'TestModelConnectivity', {}, { idempotent: true })
-  }
-
-  async putDeploymentSpecification(req: EdgeDeploymentSpecification): Promise<EdgeDeploymentCoordinates> {
-    const response = await this.call<Partial<EdgeDeploymentCoordinates>>(
-      'yufeng.onboarding.v1.OnboardingService',
-      'PutDeploymentSpecification',
-      req,
-      { idempotent: true },
-    )
-    return {
-      unitId: response.unitId ?? '',
-      assetId: response.assetId ?? '',
-      deploymentSpecDigest: response.deploymentSpecDigest ?? '',
-      listenPlanVersion: int64String(response.listenPlanVersion),
-      generationId: response.generationId ?? '',
-      generationSeq: int64String(response.generationSeq),
-    }
   }
 
   async completeOnboarding(): Promise<void> {

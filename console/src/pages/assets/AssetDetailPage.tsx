@@ -17,6 +17,7 @@ import { CaseCard } from '../../components/cases/CaseCards'
 import { ACCESS_MODE_LABEL, CRITICALITY_BADGE, EDITABLE_CRITICALITIES, EDITABLE_TIERS, TIER_LABEL } from './assetMeta'
 import { TrafficReviewPolicyCard } from './TrafficReviewPolicyCard'
 import { ModelIngressWindowCard } from './ModelIngressWindowCard'
+import { EdgeEnrollmentCard } from './EdgeEnrollmentCard'
 
 /** 布尔能力 → 徽章：支持 green / 不支持 mute。 */
 function BoolBadge({ on }: { on: boolean }) {
@@ -62,7 +63,7 @@ export function AssetDetailPage() {
   const canWrite = assetAdmin && canOnAsset(access, 'asset.update', assetId)
   const canAttach = assetAdmin && canOnAsset(access, 'asset.attach', assetId)
   const canDetach = assetAdmin && canOnAsset(access, 'asset.detach', assetId)
-  const canDelete = assetAdmin && canOnAsset(access, 'asset.delete', assetId) && assetId !== (onboarding?.localAssetId ?? '')
+  const canDelete = assetAdmin && canOnAsset(access, 'asset.delete', assetId)
   const { data, status, error, reload } = useAsyncData(() => client.getAsset(assetId), [assetId], false)
   const cases = useAsyncData(
     () => hasTool('case.read') ? client.listCases({ assetId }, { pageSize: 20 }) : Promise.resolve({ items: [], nextPageToken: '' }),
@@ -206,12 +207,15 @@ export function AssetDetailPage() {
           <Button as={Link} to={`/releases?assetId=${asset.id}`} size="sm" radius="md" variant="bordered">
             查看关联防护策略
           </Button>
+          <Button as={Link} to={`/events?assetId=${asset.id}`} size="sm" radius="md" variant="bordered">
+            查看检测事件
+          </Button>
           {canWrite && (
             <Button size="sm" radius="md" color="primary" onPress={openEditor}>
               编辑
             </Button>
           )}
-          {canDelete && (
+          {canDelete && data.edgeEnrollments.length === 0 && (
             <Button size="sm" radius="md" color="danger" variant="bordered" onPress={deleteAssetDialog.onOpen}>
               删除
             </Button>
@@ -228,12 +232,19 @@ export function AssetDetailPage() {
         assets={[data]}
         plane={{
           jarvisOnline: onboarding?.jarvisOnline,
-          edgeReady: onboarding?.edgeReady,
         }}
         density="compact"
         focusAssetIds={jarvis.focusAssetIds.includes(assetId) ? [assetId] : jarvis.focusAssetIds}
         onOpenJarvis={() => jarvis.setDockOpen(true)}
         onSelectAsset={() => jarvis.setContextLabel(`${asset.displayName} · ${asset.id}`)}
+      />
+
+      <EdgeEnrollmentCard
+        assetId={assetId}
+        enrollments={data.edgeEnrollments}
+        canWrite={canWrite}
+        client={client}
+        onRefresh={reload}
       />
 
       {cases.data !== null && cases.data.items.length > 0 && (
@@ -360,7 +371,7 @@ export function AssetDetailPage() {
                         </>
                       )}
                     </div>
-                    {canDetach && (
+                    {canDetach && !data.edgeEnrollments.some((enrollment) => enrollment.unitId === unitId) && (
                       <Button size="sm" radius="md" variant="light" color="danger" onPress={() => openDetach(unitId)}>
                         解绑
                       </Button>
@@ -424,7 +435,7 @@ export function AssetDetailPage() {
         onClose={deleteAssetDialog.onClose}
       >
         <p className="text-sm text-foreground-500">
-          将删除资产 <span className="fs-mono">{asset.displayName}</span>（{asset.id}）。本机数据面资产不能删。
+          将删除资产 <span className="fs-mono">{asset.displayName}</span>（{asset.id}）。存在人工 Edge 接入配置时必须先完成技术退役。
         </p>
         {deleteAssetError !== null && <p className="text-xs text-[#ff746c]">{deleteAssetError}</p>}
       </ConfirmDialog>

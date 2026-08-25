@@ -70,7 +70,7 @@
 ## 3. 中台（`yufeng-brain`）
 
 - **控制台（目标形态）**：登录、态势、案件工作台、Agent 管理、事件与审计追溯、系统设置；静态单页应用（SPA）由 brain 托管在 `/app`，单页路由回退到 `/app/index.html`。侧栏按“防护配置 / 记录追溯 / 系统设置”折叠分组；资产、Agent 管理与防护策略同属防护配置，事件与审计同属记录追溯，用户与模型网关同属系统设置。交付静态包只包含正式路由，禁止编入设计回廊、固定指标、演示账户或本地业务状态机；会话里的案件与审批附件只携带引用，控制台必须重新读取当前案件、资产和审批状态。人机交付闭环把托管与同源调用列为硬门禁；[Connect-ES](glossary.md#connect-es)（Connect 协议的 TypeScript 客户端生成与运行库）不是本档必交项，手写 Connect JSON 过渡层可交付。
-- **初次配置引导**：库中一行引导状态；管理员登录未到 `ONBOARDING_STATE_COMPLETED` 不得进主控制台。契约见 [glossary.md](glossary.md#onboarding) 与 `docs/api.md` §19。
+- **初次配置引导（架构决策记录 040）**：库中一行引导状态；管理员登录未到 `ONBOARDING_STATE_COMPLETED` 不得进主控制台。引导只配置并探测 brain 模型网关、等待贾维斯主动注册在线，然后显式进入主控制台；资产、Edge、Host、ModelSide、防御资产和批准账户都不是引导门槛。契约见 [glossary.md](glossary.md#onboarding) 与 `docs/api.md` §19。
 - **Agent 与工作控制面**：Agent 指令队列、run 工作队列、租约、Agent/worker 分 audience 身份、能力令牌签发与记账、工具调用网关、会话队列。brain 只负责排队、授权、投影与审计，**不运行 Agent 循环或流量分析模型**；生产大语言模型补全与连通性探测由 brain 内的[模型网关](glossary.md#modelgateway)发出，贾维斯不持密钥。
 - **受管短命 Agent**：控制台可以创建、停用、编辑和删除非贾维斯的[受管短命 Agent](glossary.md#managed-agent-profile)。Agent 是带稳定 `agent_id`、工具、资产范围和配置摘要的业务主体，但不是常驻网络进程；Jarvis 只编排案件，`agentd` 为每个案件启动绑定该 Agent 冻结配置的 `yufeng-run`。模型、工具、结论、run 与审计均归属该 Agent，不能归属或回落到 Jarvis。删除采用墓碑语义：禁止新委派，已分派案件按冻结快照结束。
 - **治理内核**：制品签名经 `Signer` 接口（Ed25519，门禁通过后按全信封计算制品身份；生产私钥由密钥管理服务、公钥密码标准 11 或独立套接字持有，brain 进程不读私钥文件；签名端只收已通过确定性校验的类型化对象，不接自然语言、任意 JSON 或任意字节）、能力令牌签发与预算记账、治理管道状态机（口语 draft→signed→shadow→canary→enforce→retired，线上键必须是 `RELEASE_STATE_*`；仅精确检测键策略门槛自动推进，无人审 pending；单单元禁止 canary，人手可从 shadow 直达 enforce）、审计哈希链与外部签名检查点。首版不保存远程登录或厂商接口凭据。逻辑上仍是一个中台；第一生产版不拆成 api / authority / signer 三个部署单元。生产中台在同一进程内持有治理池和流量池两个数据库连接池：流量池必须使用独立 `yufeng_traffic` 登录角色，且启动时由 `ValidateRestrictedTrafficRole` 验证 `NOINHERIT`、无高权限角色属性、只对 `traffic` schema 的规定表拥有 `SELECT` / `INSERT`，并且不能访问治理表。该数据库角色隔离是已经落地的纵深防御，不等于进程、地址空间或整个中台信任计算基已经拆分；Agent 工具网关仍不能直接更新发布状态。
@@ -80,7 +80,7 @@
 - **中台 worker**：情报摄取（外部三类源：库/数据集、API/接口、OSINT——溯源治理后入库为情报制品）、评测/回放门禁。
 - **模型网关**：大语言模型唯一出网口，挂在 **brain 进程内**（[定义](glossary.md#modelgateway)）。生产默认 `base_url=https://api.x.ai/v1`、方言 `MODEL_DIALECT_OPENAI_CHAT`、`model` 缺省 `DefaultChatModel`（引导里可改）；密钥只存在中台凭据槽。同时一条槽。出网按槽上的[模型方言](glossary.md#model-dialect)转发 OpenAI Chat、OpenAI Responses 或 Claude Messages（`docs/api.md` §19.4）。引导完成后管理员可在控制台 `/app/model` 改槽并看窗内成功率，不退引导状态。确定性模型剧本只存在于测试编译单元，不进入交付二进制；`-dev-insecure` 只放宽本地传输，不启用固定回答。贾维斯生产**禁止** `-model-url` 旗标（含指向 brain 或内网）。流量深度学习不经过本模型网关，也不在 brain 进程执行；生产贾维斯走带账本、租约与 ModelAttempt 的 `Generate`，`CompleteChat` 只保留迁移兼容和槽连通性探测（`docs/api.md` §18.10）。Google Agent Development Kit 只借形状，不进进程（ADR-003 / ADR-026）。
 - **内部总线 NATS JetStream**：内嵌于 brain；域档外置集群。
-- **Edge 生命周期**：`yufeng-edge` 的安装、启动、升级、回退与卸载只由技术人员操作。brain 在管理员提交部署规格时确定性预建资产并签发监听计划、基线世代和模型档案，但不创建进程、容器或主机服务，也不拨号探测 Edge；Edge 启动后主动注册、拉取并在心跳中报告已装载版本。贾维斯只做安全研判和治理建议，不获得 Docker、服务管理、Edge 安装或管理口探测权限。正式交付不包含自动创建 Edge 的数据面监督进程。
+- **Edge 生命周期**：`yufeng-edge` 的安装、启动、升级、回退与卸载只由技术人员操作。管理员先在主控制台登记真实资产，再通过 `AssetService.PutEdgeEnrollment` 写入人工接入配置；brain 只据此签发单元监听计划、保留既有非相关策略的下一资产世代和模型档案，不创建进程、容器或主机服务，也不拨号探测 Edge。Edge 启动后主动注册、拉取并在心跳中报告已装载版本。贾维斯只做安全研判和治理建议，不获得 Docker、服务管理、Edge 安装或管理口探测权限。正式交付不包含自动创建 Edge 的数据面监督进程。
 - **交付拓扑（架构决策记录 036）**：`deploy/compose.yaml` 只交付控制面的 `postgres`、一次性 `traffic-role`、`keys`、`signer`、`brain`、`jarvis` 与 `agentd`；技术人员可以把独立 `deploy/compose.edge-modelside.yaml` 合并到同一 Compose 项目显式启用 `edge` 与 `modelside`，也可以把二者作为原生进程、独立容器或独立主机连接远端 brain。`yufeng-edge` 同时交付原生 Go 二进制和独立容器镜像；`yufeng-modelside` 同时交付原生 Python 服务包和容器镜像。Compose 只声明期望进程，不把其生命周期授权给 brain 或 Agent。`keys` 只幂等生成正式制品签发密钥与传输层安全材料，不生成演示规则；`traffic-role` 只幂等创建 `yufeng_traffic` 受限登录角色并退出。Edge 与 modelside 同机优先使用 Unix 域套接字，跨主机必须使用双向传输层安全协议并限制在同一受控防御网络。不做 Kubernetes。
 
 ---
@@ -232,7 +232,7 @@ AgentThread
 | agentd 代表 run | `aud=worker, worker_kind=RUN_SUPERVISOR` 的 workload access_token | 工作项里的 capability_token；`sub=run_id`、`azp=worker_id` |
 | yufeng-modelside | `aud=modelside` 的工作负载令牌 + 生产相互传输层安全协议客户端证书 | 只允许批量上报与签名模型档案一致的结果；无工具、Gate 或 Agent 能力 |
 
-- **默认模板（可再收窄，不能只靠改角色名放宽）**：`USER_ROLE_VIEWER` 仅 `console.read`；`USER_ROLE_OPERATOR` 另有 `govern.propose` / `govern.gate` / `govern.start_shadow` / 绑定内 `run.create`，**默认无** `govern.promote_canary` / `govern.promote_enforce`、无 `user.admin` / `grant.write`、无资产增删改；持授予表里的 `govern.promote_*` 时**以授予为准**，角色模板不得再挡住已授工具。`USER_ROLE_ADMIN` 有 `user.admin`、`grant.write` 与 `asset.create` / `asset.update` / `asset.delete` / `asset.attach` / `asset.detach`。资产增删改另加角色硬门：非管理员即使被授对应工具也拒绝。自身治理写同样要非空 Bindings。初次配置引导完成时，系统写入一条 Bindings 至少含 [`local_asset_id`]、并含当时已有其它资产的授予（禁止 `asset:*`，禁止虚构 `bootstrap` 资产）；必须另有一条「非提案人」可 `govern.promote_enforce` 的授予路径。其后管理员 `CreateAsset` 只把新 ID 追加进自己的授予，不自动进入他人范围。
+- **默认模板（可再收窄，不能只靠改角色名放宽）**：`USER_ROLE_VIEWER` 仅 `console.read`；`USER_ROLE_OPERATOR` 另有 `govern.propose` / `govern.gate` / `govern.start_shadow` / 绑定内 `run.create`，**默认无** `govern.promote_canary` / `govern.promote_enforce`、无 `user.admin` / `grant.write`、无资产增删改；持授予表里的 `govern.promote_*` 时**以授予为准**，角色模板不得再挡住已授工具。`USER_ROLE_ADMIN` 有 `user.admin`、`grant.write` 与 `asset.create` / `asset.update` / `asset.delete` / `asset.attach` / `asset.detach`。资产增删改另加角色硬门：非管理员即使被授对应工具也拒绝。`asset.create` 是管理员全局工具，不要求目标资产预先存在于 Bindings；其它资产写仍要求目标资产 Binding。初次配置结束时系统授予允许零资产 Bindings；管理员创建资产后只把新 ID 追加进自己的授予，不自动进入他人范围。治理推进仍须另一主体获得精确资产 Binding，单单元资产禁止 canary。
 - **写授予**：`grant.write` 不能授给自己（禁止自我扩权）；被授 Bindings 必须是授予者 Bindings 的子集；被授 Tools 除 `grant.write` 外不要求授予者自己已有该工具（管理员可以给人 `promote_enforce` 而自己没有）。分组在写入时展开成具体资产 ID，分组事后加人必须再授一次。
 - **职责分离**：同一用户对同一 `release_id` 不得既 `propose` 又 `promote_*`。超过资产 `max_auto_tier` 的动作签不出来。
 - **自动晋升不吃提案人自己的数据**：调度器计算 canary/enforce 门槛时，排除「该 release 提案人创建或绑定的单元」上报的心跳计数与事件；排除后门槛不够则不得自动推进，只能由**另一用户**持 `govern.promote_*` 且 Bindings 覆盖该 release 手动推进。
@@ -302,7 +302,7 @@ AgentThread
 | 大模型客户端库 | 自写出网客户端；确定性提供者只在测试编译单元 | `agents/modelgateway`；brain `lib/brain/model_gateway.go`、`model_generate.go` | brain 读引导凭据槽、按[模型方言](glossary.md#model-dialect)转发；生产贾维斯调用 `Generate`，逻辑 Generation 只接受一个响应，物理 Attempt 全部落账。`CompleteChat` 仅迁移与探测；run 模型 attempt 已预留和结算持久多维预算，非 run 来源仍按各自账户演进 |
 | 输出运行时校验 | 类型化 Protocol Buffers 消息 + JSON Schema | `proto/yufeng/model/v1`、`santhosh-tekuri/jsonschema/v6` | 流量研判只接受闭集 `TrafficFinding` 并拒绝未知枚举或原文回显；通用工具参数按已签名制品 Schema 校验 |
 | 完整可观测栈 | OpenTelemetry + Prometheus + slog → NDJSON（逐行 JSON 日志） | 跟踪、指标与结构化日志 | 已落地（管理面 `/metrics`、Connect 追踪拦截器、固定字段 NDJSON） |
-| 控制台前端 | Vite + React + TypeScript + Tailwind CSS + HeroUI | 浏览器单页应用 | brain 托管 `/app`，开发与交付运行时均只装配真实 `ConnectClient`，不提供模拟业务模式、设计回廊、演示账户或固定业务指标。`/app/setup` 六步（含设置防御资产）、授予、提案意图、写按钮 `canOnAsset`、会话与幂等键复用已建；组件测试只在 `console/src/test/` 注入场景夹具，服务语义由 PostgreSQL 集成测试覆盖 |
+| 控制台前端 | Vite + React + TypeScript + Tailwind CSS + HeroUI | 浏览器单页应用 | brain 托管 `/app`，开发与交付运行时均只装配真实 `ConnectClient`，不提供模拟业务模式、设计回廊、演示账户或固定业务指标。`/app/setup` 只配置模型网关并确认贾维斯；资产页承载人工 Edge 接入，事件详情联查模型推理与研判交付。组件测试只在 `console/src/test/` 注入场景夹具，服务语义由 PostgreSQL 集成测试覆盖 |
 | 控制台 API 客户端 | Connect-ES 生成客户端（后接） | `@connectrpc/connect` + `@connectrpc/connect-web` | **本档不强制**。手写 `ConnectClient` 可交付；生成客户端落地后只替换适配层内部 |
 | 基础配置 | 命令行 flag + 环境变量 | Go 标准库 | 已落地 |
 | 文件配置 | 单 YAML 文件 | `yaml.v3` | 已选定未引入 |
@@ -434,10 +434,11 @@ L1 生产数据面不变量见 §4，网络结果与失败语义见 [`api.md`](a
 | 033 | 单站点企业试点：客户入口终止业务 TLS，反向代理首发，Envoy 外部授权可选；单元监听计划作为制品契约上的独立签名流下发 | 不让御锋持有业务私钥；把「如何挂流量」与「检测什么」分别版本化，先验证再开放业务口 |
 | 034 | 流量审查采用边缘有界证据、中央案件与跨平台执行池 | 完整计数与有界代表避免流量规模击穿 PostgreSQL；原文只在一次性资产审批后经内存中继进入无工具模型调用；外部 agentd 由用户安装并主动连接 brain |
 | 035 | 受管 Agent 是由 agentd 承载的短命分布式执行主体；正式构建无演示路径，账本与签名器按失败关闭边界交付 | Agent 获得独立身份、配置、run 与审计归属而不引入常驻智能进程；事件保存 30 天、审计保存 180 天且先检查点后删除；签名器只接受类型化对象；资产侧执行只交付 Linux/OpenWrt 白名单原语 |
-| 036 | Edge 生命周期归技术人员；Brain 只签发部署规格派生制品；深度学习下沉为 `edge → modelside → brain` 双队列旁路 | 基础设施权限不属于智能代理。原始流量必须留在入口附近，异步推理不能给当前请求施加背压或 Gate 权限；只有类型化无原文结果进入中台事务与案件 |
+| 036 | Edge 生命周期归技术人员；Brain 只签发人工接入配置派生制品；深度学习下沉为 `edge → modelside → brain` 双队列旁路 | 基础设施权限不属于智能代理。原始流量必须留在入口附近，异步推理不能给当前请求施加背压或 Gate 权限；只有类型化无原文结果进入中台事务与案件 |
 | 037 | 软件发布静态预检绑定预期合并 Git 树，最终提交只补活栈并提升证据 | 已由架构决策记录 038 取代；该流程把首次活栈反馈放在合入后，并把发布工具、源码谱系和部署环境绑定为一个失效域，形成无法稳定收敛的发布循环 |
 | 038 | `main` 单主干、冻结验收合同、一次构建并提升精确软件制品，部署证据独立 | 分支只管理源码；发布任务验证并上传同一批不可变文件。新发现不得由智能代理自动扩大发布范围；门禁缺陷先停止发布并作为独立变更修复 |
 | 039 | Edge 模型输入使用可配置易失最新窗口，ModelSide 只保留浅层批次交接 | 中央期望写进签名单元监听计划，本机配置只收窄条数、保留字节和排队年龄；窗口不落盘、不重试、不阻塞请求。只有在 2000 请求/秒、第 99 百分位增量、中央处理器和 512 MiB 内存硬门槛全部通过时保留内置实现，否则另立外部消息队列设计 |
+| 040 | 初次配置只建立模型网关与贾维斯控制面，所有数据面资产在主控制台人工接入 | 进入主控制台不应依赖尚未登记的资产或 Edge；Brain 只签发配置制品，技术人员负责安装，逐资产接入状态取代全局 `edge_ready`，同时允许零资产管理员从主控制台创建第一项资产 |
 
 ---
 
@@ -469,7 +470,8 @@ L1 生产数据面不变量见 §4，网络结果与失败语义见 [`api.md`](a
 | `ModelIngressDefaultItems` / `ModelIngressDefaultBytes` / `ModelIngressDefaultAge` | 4096 / 128 MiB / 2s | Brain 签发的 Edge → modelside 模型输入缓存窗口默认期望值 |
 | `ModelIngressLocalMaxItems` / `ModelIngressLocalMaxBytes` / `ModelIngressLocalMaxAge` | 16384 / 256 MiB / 5min | Edge 本机默认硬上限；启动参数可进一步收窄 |
 | `ModelIngressAbsoluteMaxItems` / `ModelIngressAbsoluteMinBytes` / `ModelIngressAbsoluteMaxBytes` / `ModelIngressAbsoluteMinAge` / `ModelIngressAbsoluteMaxAge` | 65536 / 1 MiB / 256 MiB / 10ms / 5min | Brain 与 Edge 接受模型输入缓存窗口配置的绝对范围 |
-| `ModelIngressBatchMaxItems` / `ModelIngressBatchWait` / `ModelSideIngressWorkers` | 32 / 10ms / 2 | Edge 后台同档案批量与并发发送上限 |
+| `ModelIngressBatchMaxItems` / `ModelIngressBatchWait` / `ModelSideIngressWorkers` | 32 / 10ms / 2 | Edge 后台同档案批量与 ModelSide 默认推理并发 |
+| `ModelSideIngressBatchSlotsMax` | 64 | ModelSide 本机可配置的浅层批次交接槽硬上限；0 使用推理线程数两倍且不超过该硬上限的默认值 |
 | `ModelSideResultQueueMax` / `ModelSideUploadBatchMax` | 1024 / 100 | modelside → brain 独立结果队列与单批上限 |
 | `ModelReviewWindow` / `ModelReviewPerUnit` / `ModelReviewPerRoute` | 5min / 4 / 1 | 初始签名模型档案的复核窗口与代表上限 |
 | `ModelAlertThresholdDefault` / `ModelReviewFloorDefault` | 0.9 / 0.5 | 初始签名模型档案阈值；运行时只认档案，不认进程默认值 |
@@ -484,8 +486,8 @@ L1 生产数据面不变量见 §4，网络结果与失败语义见 [`api.md`](a
 | `UnitRPCQPS` / `UploadBatchMax` | 10 / 100 | 单元限流 |
 | `IdempotencyPendingTTL` | 120s | 写 RPC 幂等键 `pending` 占用超过此时长后，同键同摘要允许接管并重新执行；必须大于 `ChatCompleteTimeout` |
 | `ArtifactPageMaxBytes` / `ArtifactPageHardMaxBytes` | 4 MiB / 16 MiB | `ListReleases` 与 `ListGenerations` 单次响应字节预算 |
-| `JarvisOnlineWindow` | 60s | `GetOnboarding.jarvis_online`：配置的贾维斯 `agent_id` 最近一次心跳或领指令必须落在此窗口内；只供引导完成谓词确认安全研判能力在线，不参与部署规格或 Edge 生命周期 |
-| `EdgeOnlineWindow` | 90s | Edge 最近心跳、已装载监听计划版本与世代都匹配部署规格时才算就绪 |
+| `JarvisOnlineWindow` | 60s | `GetOnboarding.jarvis_online`：配置的贾维斯 `agent_id` 最近一次心跳或领指令必须落在此窗口内；只供引导完成谓词确认安全研判能力在线，不参与 Edge 人工接入或生命周期 |
+| `EdgeOnlineWindow` | 90s | Edge 最近心跳、已装载监听计划版本与世代都匹配人工接入配置的期望坐标时才算在线且收敛 |
 | `SessionLongPollDefault` / `SessionLongPollMax` | 30s / 60s | `PollMessages.long_poll_seconds` |
 | `AgentLongPollDefault` / `AgentLongPollMax` | 30s / 60s | `PollInstructions.long_poll_seconds`；与会话常量成对，不是同一个标识符。`LongPollMax`（现 30s）不再作为 Agent 上限合同值 |
 | `DefaultModelSideSocket` | `/run/yufeng/modelside.sock` | 同机 Edge 与 modelside 的优先 Unix 域套接字 |

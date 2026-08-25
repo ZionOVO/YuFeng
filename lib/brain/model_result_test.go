@@ -251,11 +251,11 @@ func assertModelAlertLedger(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 		t.Fatalf("receipt event=%q case=%q kind=%q", eventID, caseID, resultKind)
 	}
 	var events, inferences, tickets, cases, outboxRows, instructions int
-	var payload string
+	var payload, attackClass string
 	if err := pool.QueryRow(ctx, `SELECT count(*),min(payload::text) FROM events WHERE event_id=$1`, eventID).Scan(&events, &payload); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM model_inferences WHERE event_id=$1 AND request_id=$2`, eventID, result.GetRequestId()).Scan(&inferences); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT count(*),min(attack_class) FROM model_inferences WHERE event_id=$1 AND request_id=$2`, eventID, result.GetRequestId()).Scan(&inferences, &attackClass); err != nil {
 		t.Fatal(err)
 	}
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM check_tickets WHERE event_id=$1 AND status='ready'`, eventID).Scan(&tickets); err != nil {
@@ -270,8 +270,8 @@ func assertModelAlertLedger(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM agent_instructions WHERE kind=$1 AND agent_id=$2`, instructionTriage, jarvisID).Scan(&instructions); err != nil {
 		t.Fatal(err)
 	}
-	if events != 1 || inferences != 1 || tickets != 1 || cases != 1 || outboxRows != 1 || instructions != 1 {
-		t.Fatalf("ledger counts events=%d inferences=%d tickets=%d cases=%d outbox=%d instructions=%d", events, inferences, tickets, cases, outboxRows, instructions)
+	if events != 1 || inferences != 1 || attackClass != commonv1.AttackClass_ATTACK_CLASS_UNMAPPED.String() || tickets != 1 || cases != 1 || outboxRows != 1 || instructions != 1 {
+		t.Fatalf("ledger counts events=%d inferences=%d attackClass=%q tickets=%d cases=%d outbox=%d instructions=%d", events, inferences, attackClass, tickets, cases, outboxRows, instructions)
 	}
 	for _, forbidden := range []string{"headers", "query_parameters", "query_redacted", "body"} {
 		if strings.Contains(payload, forbidden) {

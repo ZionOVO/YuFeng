@@ -61,7 +61,9 @@ curl "http://localhost:18080/api/items?id=1+UNION+SELECT+pw"
 make compose-up
 ```
 
-该命令只启动控制面 Docker Compose 基座。管理员仍须通过控制台六步引导提交部署规格，技术人员再按 [`deploy/edge/`](../../deploy/edge/README.md) 和 [`deploy/modelside/`](../../deploy/modelside/README.md) 的运行手册人工安装数据面。Brain 与贾维斯不会创建、启动或探测 Edge。
+浏览器打开 `https://127.0.0.1:9050/app/setup`。初次配置只有四步：配置 Brain 模型网关、执行真实连通性探测、等待贾维斯主动注册在线、显式进入主控制台。即使此时没有任何资产，也可以完成引导。
+
+进入主控制台后，在 `/app/assets` 登记真实资产，再打开资产详情执行“接入 Edge”。该操作只签发监听计划、资产世代和模型档案，不安装进程。技术人员随后按 [`deploy/edge/`](../../deploy/edge/README.md) 与 [`deploy/modelside/`](../../deploy/modelside/README.md) 人工安装数据面；Brain 与贾维斯不会创建、启动或探测 Edge。
 
 ## 4. 下一步
 

@@ -57,6 +57,12 @@ func TestGovernWriteGrantAndIdempotency(t *testing.T) {
 	if _, err := st.Pool().Exec(ctx, `INSERT INTO assets(asset_id, display_name, max_auto_tier) VALUES($1,$1,'L1')`, asset); err != nil {
 		t.Fatal(err)
 	}
+	if err := writeAdminSystemGrant(ctx, st.Pool(), adminLogin.Msg.GetUser().GetUserId(), asset); err != nil {
+		t.Fatal(err)
+	}
+	if err := SeedOnboardingState(ctx, st.Pool(), OnboardingStateCompleted, asset); err != nil {
+		t.Fatal(err)
+	}
 	clusterID := seedProposalCluster(t, ctx, st.Pool(), asset, "/api/items", "GET",
 		commonv1.TriageReason_TRIAGE_REASON_DETECTED_UNMITIGATED, []*commonv1.DetectionKey{{
 			DetectorId: "crs", DetectorVersion: kernel.CRSVersion, DetectorManifestDigest: kernel.CRSTarballSHA256,

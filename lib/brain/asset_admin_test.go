@@ -45,7 +45,10 @@ func TestAssetCRUDAdminOnly(t *testing.T) {
 	if _, err := st.Pool().Exec(ctx, `INSERT INTO assets(asset_id, display_name, max_auto_tier) VALUES($1,$1,'L1')`, local); err != nil {
 		t.Fatal(err)
 	}
-	if err := SeedOnboardingState(ctx, st.Pool(), OnboardingStateEdgeLive, local); err != nil {
+	if err := writeAdminSystemGrant(ctx, st.Pool(), adminLogin.Msg.User.UserId, local); err != nil {
+		t.Fatal(err)
+	}
+	if err := SeedOnboardingState(ctx, st.Pool(), OnboardingStateCompleted, local); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,12 +115,6 @@ func TestAssetCRUDAdminOnly(t *testing.T) {
 	}
 	if !seen[local] || !seen[extra] {
 		t.Fatalf("onboarding list want local+created, got %v", seen)
-	}
-
-	delLocal := connect.NewRequest(&assetv1.DeleteAssetRequest{AssetId: local})
-	delLocal.Header().Set("Authorization", "Bearer "+adminLogin.Msg.Token)
-	if _, err := assets.DeleteAsset(ctx, delLocal); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("delete local want failed_precondition got %v", err)
 	}
 
 	delOp := connect.NewRequest(&assetv1.DeleteAssetRequest{AssetId: extra})

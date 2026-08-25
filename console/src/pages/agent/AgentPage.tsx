@@ -190,7 +190,6 @@ export function AgentPage() {
             assets={estate.data.items}
             plane={{
               jarvisOnline: onboarding?.jarvisOnline,
-              edgeReady: onboarding?.edgeReady,
               managedAgents: profileItems.map((profile) => ({
                 agentId: profile.agentId,
                 displayName: profile.displayName,

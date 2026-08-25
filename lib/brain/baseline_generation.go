@@ -54,20 +54,6 @@ func firstNonEmpty(value, fallback string) string {
 	return fallback
 }
 
-func ensureDeploymentAssetAndUnit(ctx context.Context, tx dbTX, unitID, assetID string) error {
-	if _, err := tx.Exec(ctx, `INSERT INTO assets(asset_id,display_name,max_auto_tier)
-		VALUES($1,$1,'L1') ON CONFLICT(asset_id) DO NOTHING`, assetID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `INSERT INTO units(unit_id,kind,version,contract_version)
-		VALUES($1,'edge','','v1') ON CONFLICT(unit_id) DO NOTHING`, unitID); err != nil {
-		return err
-	}
-	_, err := tx.Exec(ctx, `INSERT INTO unit_assets(unit_id,asset_id,relation,is_primary)
-		VALUES($1,$2,'protects',true) ON CONFLICT(unit_id,asset_id) DO NOTHING`, unitID, assetID)
-	return err
-}
-
 func baselineSettings(profile *artifactv1.ModelProfile) []baselineSetting {
 	return []baselineSetting{
 		{key: "detector_manifest", kind: artifactv1.Kind_KIND_DETECTOR_MANIFEST, schema: detectorManifestSchema, payload: &artifactv1.DetectorManifest{
@@ -82,8 +68,8 @@ func baselineSettings(profile *artifactv1.ModelProfile) []baselineSetting {
 	}
 }
 
-// publishBaselineGenerationTx 用管理员规格重写单值基线设置并签发下一个完整资产世代。
-// 模型档案是世代成员，Edge 与 ModelSide 不能从本地默认值补齐策略。
+// publishBaselineGenerationTx 补齐缺失的基线设置、按内容更新模型档案并签发下一个完整资产世代。
+// 已有非模型设置保持原签名制品；Edge 与 ModelSide 不能从本地默认值补齐策略。
 func publishBaselineGenerationTx(ctx context.Context, tx pgx.Tx, key ed25519.PrivateKey, signer kernel.Signer, assetID, createdBy string, profile *artifactv1.ModelProfile) (string, int64, error) {
 	if strings.TrimSpace(assetID) == "" {
 		return "", 0, errors.New("asset_id is required")
@@ -92,10 +78,23 @@ func publishBaselineGenerationTx(ctx context.Context, tx pgx.Tx, key ed25519.Pri
 	if err != nil {
 		return "", 0, err
 	}
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, assetID); err != nil {
+		return "", 0, err
+	}
 	actor := firstNonEmpty(createdBy, "system")
 	for _, setting := range baselineSettings(normalized) {
 		payload, err := protojson.Marshal(setting.payload)
 		if err != nil {
+			return "", 0, err
+		}
+		sum := sha256.Sum256(payload)
+		payloadDigest := "sha256:" + hex.EncodeToString(sum[:])
+		var storedDigest string
+		err = tx.QueryRow(ctx, `SELECT payload_digest FROM asset_generation_settings WHERE asset_id=$1 AND kind=$2`, assetID, setting.key).Scan(&storedDigest)
+		if err == nil && (setting.key != "model_profile" || storedDigest == payloadDigest) {
+			continue
+		}
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return "", 0, err
 		}
 		artifact := &artifactv1.Artifact{
@@ -110,11 +109,10 @@ func publishBaselineGenerationTx(ctx context.Context, tx pgx.Tx, key ed25519.Pri
 		if err != nil {
 			return "", 0, err
 		}
-		sum := sha256.Sum256(payload)
 		if _, err := tx.Exec(ctx, `INSERT INTO asset_generation_settings(asset_id,kind,payload,payload_digest,updated_by)
 			VALUES($1,$2,$3::jsonb,$4,$5)
 			ON CONFLICT(asset_id,kind) DO UPDATE SET payload=EXCLUDED.payload,payload_digest=EXCLUDED.payload_digest,
-			updated_by=EXCLUDED.updated_by,updated_at=now()`, assetID, setting.key, raw, "sha256:"+hex.EncodeToString(sum[:]), actor); err != nil {
+			updated_by=EXCLUDED.updated_by,updated_at=now()`, assetID, setting.key, raw, payloadDigest, actor); err != nil {
 			return "", 0, err
 		}
 	}

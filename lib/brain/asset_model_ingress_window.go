@@ -80,6 +80,9 @@ func (s *AssetServer) UpdateModelIngressWindow(ctx context.Context, req *connect
 			return connect.NewError(connect.CodeFailedPrecondition, errors.New("listen_plan_version_mismatch"))
 		}
 		if kernel.EqualModelIngressWindow(current.GetModelIngressWindow(), desired) {
+			if err := syncEdgeEnrollmentListenPlan(ctx, tx, assetID, unitID, current.GetVersion(), desired); err != nil {
+				return err
+			}
 			response.Status, err = loadModelIngressWindowStatus(ctx, tx, assetID, unitID)
 			return err
 		}
@@ -99,6 +102,9 @@ func (s *AssetServer) UpdateModelIngressWindow(ctx context.Context, req *connect
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO unit_listen_plans(unit_id,version,envelope,signed) VALUES($1,$2,$3::jsonb,true)`,
 			unitID, next.GetVersion(), raw); err != nil {
+			return err
+		}
+		if err := syncEdgeEnrollmentListenPlan(ctx, tx, assetID, unitID, next.GetVersion(), desired); err != nil {
 			return err
 		}
 		if err := appendAuditTx(ctx, tx, "user", user.GetUserId(), "asset.model_ingress_window.update", "asset", assetID,

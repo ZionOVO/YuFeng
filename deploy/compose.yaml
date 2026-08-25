@@ -243,6 +243,7 @@ services:
       - "-worker=agentd-central"
       - "-worker-bootstrap-token-file"
       - "/run/secrets/central_worker_bootstrap_token"
+      - "-public-key-file=/registration/worker-public.pem"
       - "-tls-ca=/tls/ca.crt"
       - "-tls-seed-cert=/tls/client.crt"
       - "-tls-seed-key=/tls/client.key"
@@ -253,6 +254,7 @@ services:
       - ALL
     volumes:
       - yufeng_tls_agentd:/tls:ro
+      - yufeng_agentd_public:/registration:ro
       - yufeng_agentd:/var/lib/yufeng/agentd
     secrets:
       - central_worker_bootstrap_token

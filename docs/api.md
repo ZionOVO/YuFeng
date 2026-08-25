@@ -59,7 +59,7 @@ signature = Ed25519.Sign(canonical)
 | 公开域 | 探针、登录页、静态资源、可选账户自注册 | 无 | `/livez` `/readyz` `/metrics` `/version`、预留的 `/app` 静态资源、`AuthService.Login`；只有 `AuthService.Register` 是否公开由配置决定 |
 
 - **v1 有用户账户；三角色是默认模板，不是上帝开关。** `USER_ROLE_VIEWER` 无写工具；`USER_ROLE_OPERATOR` 默认可 `govern.propose`、`govern.gate`、`govern.start_shadow`、绑定范围内 `run.create`，默认**无** `govern.promote_enforce`、无用户管理、**无**资产增删改；`USER_ROLE_ADMIN` 可管理用户、写授予、管理签名目录，并独占 `asset.create` / `asset.update` / `asset.delete`（以及默认的 `asset.attach` / `asset.detach`）。资产增删改查和目录发布的写侧**另加角色硬门**：非 `USER_ROLE_ADMIN` 即使持有对应工具也拒绝。自身治理写同样要求非空 Bindings。完成定义：不存在「仅凭 `USER_ROLE_OPERATOR`、Bindings 为空、就能调用任意治理写 RPC」的路径。同一用户对同一 `release_id` 不得既 propose 又 promote_enforce。超过资产 `max_auto_tier` 的动作签不出来。
-- **初始管理员不靠公开注册产生**：服务端配置项 `auth.bootstrap_admin_username` / `auth.bootstrap_admin_password` 在首次启动时创建 `USER_ROLE_ADMIN` 账户。compose 用环境变量 `YUFENG_ADMIN_USER` / `YUFENG_ADMIN_PASS` **原样**注入这两项（缺省用户名 `admin` 允许；口令不得空、不得为 `admin` / `password` / `changeme`，否则 brain 拒绝启动，compose 启动机检失败，不是退出码 2）。**首次启动不写覆盖资产集合的授予**（当时还没有真实本机资产，禁止虚构 `bootstrap`）。引导未完成时，该管理员仅凭角色模板拥有 `user.admin`、`grant.write`、`console.read` 以及资产写工具（Bindings 为空），只许调用 §19.5 白名单——这是「空 Bindings 拒绝一切写」的唯一例外。覆盖本机真实资产的系统授予由 `CompleteOnboarding` 写入，Bindings **至少**含 [`local_asset_id`]，并含完成时已存在的其它资产。生产环境默认密码拒绝启动。
+- **初始管理员不靠公开注册产生**：服务端配置项 `auth.bootstrap_admin_username` / `auth.bootstrap_admin_password` 在首次启动时创建 `USER_ROLE_ADMIN` 账户。compose 用环境变量 `YUFENG_ADMIN_USER` / `YUFENG_ADMIN_PASS` **原样**注入这两项（缺省用户名 `admin` 允许；口令不得空、不得为 `admin` / `password` / `changeme`，否则 brain 拒绝启动，compose 启动机检失败，不是退出码 2）。首次启动没有资产，不得虚构 `bootstrap`。引导未完成时，该管理员只许调用 §19.5 白名单。`CompleteOnboarding` 写入可为空 Bindings 的系统授予；其 `asset.create` 是管理员全局工具，因此零资产状态也能在主控制台创建第一项资产，成功后自动把该资产加入创建者范围。生产环境默认密码拒绝启动。
 - **自注册默认关闭**：`AuthService.Register` 受 `auth.allow_self_registration` 控制，默认 `false`；开启后注册用户固定为 `USER_ROLE_VIEWER` 且 Bindings 为空，由 `USER_ROLE_ADMIN` 提升角色并补授予。
 - 控制台把令牌存 `sessionStorage`，收到 `unauthenticated` 清除并回登录页；登录接口返回的用户信息用于渲染当前身份和角色。
 - 单元凭证：`RegistryService.Register` 只做首次身份交换。成功响应同时返回 `token`（访问令牌，默认 30 分钟）与 `refresh_token`（默认 30 天，服务端只存哈希）。日常恢复调用 `RegistryService.Refresh`：校验刷新令牌哈希、立即轮换、签发新访问令牌。brain 重启后未到期的刷新令牌仍可续期；访问令牌全部失效。已认证调用收到 `unauthenticated` 时，单元客户端串行轮换当前刷新令牌并只重试原调用一次；并发调用发现令牌已被同伴更新时直接使用新令牌，不重复轮换。刷新令牌也失效时失败关闭并进入运维恢复，不得回退引导令牌。
@@ -93,9 +93,9 @@ signature = Ed25519.Sign(canonical)
 | 6 | `yufeng.user.v1.UserService` | 操作域（持 `user.admin`） | ✅ | CreateUser, ListUsers, GetUser, UpdateUser, DeleteUser, AdminResetPassword |
 | 6a | `yufeng.grant.v1.GrantService` | 操作域（持 `grant.write` 或查自己） | 定契约 | ListGrants, PutGrant, RevokeGrant |
 | 7 | 回放组件（进程内库接口，非网络） | brain 内部 | ✅ | `GateArtifact` 直接调用 `replay.Run`；外置算力阶段再升格为网络服务 |
-| 8 | `yufeng.asset.v1.AssetService` | 操作域 | ✅ | CreateAsset, UpdateAsset, DeleteAsset, ListAssets, GetAsset, AttachUnit, DetachUnit, GetTrafficReviewPolicy, UpdateTrafficReviewPolicy, GetModelIngressWindow, UpdateModelIngressWindow |
+| 8 | `yufeng.asset.v1.AssetService` | 操作域 | ✅ | CreateAsset, UpdateAsset, DeleteAsset, ListAssets, GetAsset, AttachUnit, DetachUnit, PutEdgeEnrollment, GetEdgeEnrollment, GetTrafficReviewPolicy, UpdateTrafficReviewPolicy, GetModelIngressWindow, UpdateModelIngressWindow |
 | 9 | `yufeng.console.v1.ConsoleService` | 控制台 | ✅ | Dashboard, ListEvents, GetEvent |
-| 9a | `yufeng.onboarding.v1.OnboardingService` | 控制台（引导） | 人机交付必交 | GetOnboarding, PutModelConfig, TestModelConnectivity, PutDeploymentSpecification, CompleteOnboarding（§19） |
+| 9a | `yufeng.onboarding.v1.OnboardingService` | 控制台（引导） | 人机交付必交 | GetOnboarding, PutModelConfig, TestModelConnectivity, CompleteOnboarding；PutDeploymentSpecification 只保留线缆并固定返回 `unimplemented`（§19） |
 | 9b | `yufeng.model.v1.ModelGatewayService` | Agent 生成；管理员读改槽 | 人机交付必交 + 座架目标契约 | CompleteChat（迁移/探测）；Generate（§18.10）；GetModelGateway / UpdateModelGateway / ProbeModelGateway（§19.4）；生产出口，不是 `agents/modelgateway` |
 | 10 | `yufeng.audit.v1.AuditService` | 控制台 | ✅ | ListAuditEntries, VerifyChain |
 | 11 | `yufeng.health.v1.HealthService` | 所有人 | ✅ | Livez, Readyz, Version |
@@ -141,6 +141,8 @@ signature = Ed25519.Sign(canonical)
 | POST | `{BASE}/yufeng.asset.v1.AssetService/GetAsset` | §9 |
 | POST | `{BASE}/yufeng.asset.v1.AssetService/AttachUnit` | §9 |
 | POST | `{BASE}/yufeng.asset.v1.AssetService/DetachUnit` | §9 |
+| POST | `{BASE}/yufeng.asset.v1.AssetService/PutEdgeEnrollment` | §9 |
+| POST | `{BASE}/yufeng.asset.v1.AssetService/GetEdgeEnrollment` | §9 |
 | POST | `{BASE}/yufeng.asset.v1.AssetService/GetModelIngressWindow` | §9 |
 | POST | `{BASE}/yufeng.asset.v1.AssetService/UpdateModelIngressWindow` | §9 |
 | POST | `{BASE}/yufeng.govern.v1.GovernService/ProposeArtifact` | §7.2 |
@@ -341,7 +343,7 @@ signature = Ed25519.Sign(canonical)
 | producer_health | ProducerHealth | 关键事件/普通样本缓冲与丢弃、模型输入窗口实际值、状态、排队/在途容量、按原因丢弃、投影失败及健康投影版本；不得携带请求原文 |
 | current_generation_id | string | Edge 已验签并原子装载的当前资产世代标识；未装载时为空 |
 | current_generation_seq | int64 | 与 `current_generation_id` 对应的世代序号；中台只用该心跳回执确认策略已真实生效 |
-| current_listen_plan_version | uint64 | Edge 已验签并应用的单元监听计划版本；未应用时为零。Brain 与部署规格的期望版本比较后确定 Edge 就绪，不主动探测 Edge 管理口 |
+| current_listen_plan_version | uint64 | Edge 已验签并应用的单元监听计划版本；未应用时为零。Brain 与人工接入配置的期望版本比较后确定逐项状态，不主动探测 Edge 管理口 |
 
 **`ReleaseCounter`**
 
@@ -435,7 +437,7 @@ brain 重启不删除 `refresh_token_hash`；只使尚未到期的访问令牌�
 1. 首次启动：`full_snapshot=true`，按返回快照重建本地 inventory；不在快照中的本地 release 卸载。
 2. 稳态：按 `cursor` 增量拉取，服务端只返回 shadow/canary/enforce 的状态变化与退休墓碑；draft/signed 不下发。
 3. 游标只有在整页条目全部“应用成功或隔离跳过”后才前进。单条验签失败/解不开的条目隔离并记录本地错误，不阻断同页其他条目。
-4. 单元绑定到已有在役治理发布时，必须把这些发布补写入该单元的增量 feed。管理员部署规格生成的基线检测器、规范化配置和模型档案属于完整资产世代，通过 `ListGenerations` 下发，不伪装成治理发布，也不写入 `ListReleases` feed。
+4. 单元绑定到已有在役治理发布时，必须把这些发布补写入该单元的增量 feed。管理员人工 Edge 接入配置生成的基线检测器、规范化配置和模型档案属于完整资产世代，通过 `ListGenerations` 下发，不伪装成治理发布，也不写入 `ListReleases` feed。
 4. 服务端保留每个 unit_asset 的发布日志至少 14 天（≥ 最大 TTL 7 天 + 余量）。cursor 过期时返回 `failed_precondition` + `reason=cursor_expired`，边缘改调 `full_snapshot=true` 重建。
 5. 边缘本地同时按 `artifact.created_at + ttl` 自行过期卸载。即使退休墓碑丢失，最长 TTL 后也会失效，不会永久残留。
 6. 拉取失败使用本地已验证世代继续工作（断网自治）；制品验签公钥来自启动配置，不从本接口获取。
@@ -510,7 +512,7 @@ brain 重启不删除 `refresh_token_hash`；只使尚未到期的访问令牌�
 | deduped | int32 | 按事件 id 去重数，边缘可安全丢弃 |
 | rejected | repeated RejectedEvent | 逐条拒因，边缘记日志后丢弃，不无限重投 |
 
-**`RejectedEvent`**：`event_id`、`code`（`invalid_event` / `unknown_unit` / `unknown_asset`）、`message`。
+**`RejectedEvent`**：`event_id`、`code`（`invalid_event` / `unknown_unit` / `unknown_asset`）、`message`。任何字符串字段含 PostgreSQL `jsonb` 无法表示的空字符时，该条必须在开启数据库事务前返回 `invalid_event`；不得让一条畸形事件把同批其它事件变成整批重试。
 
 **语义**：`accepted + deduped + rejected == len(events)`。令牌中的单元必须等于每条事件的 `unit_id`；`asset_id` 必须已绑定到该单元，否则该条 `rejected.code=permission_denied`（不要用 `unknown_asset` 区分「不存在」和「不是你的」）。服务端在同一数据库事务内写入事件账与事务发件箱后返回；内部流投递由发件箱消费者完成，失败时重试，不得出现“已接受但异步检测永久丢失”。当前实现使用事务发件箱与持久消费者，不采用“入账后尽力发布”的旁路。
 
@@ -672,7 +674,7 @@ Edge 到 ModelSide 的本地异步旁路只使用 §21.5 的 `NormalizedTraffic`
 | `govern.rollback` | RollbackRelease | | | |
 | `govern.retire` | RetireRelease | | | |
 | `govern.deny_feedback` | DenyFeedback | | | |
-| `asset.create` | CreateAsset | | | ✓ |
+| `asset.create` | CreateAsset；管理员全局工具，不要求预先存在资产 Binding | | | ✓ |
 | `asset.update` | UpdateAsset | | | ✓ |
 | `asset.delete` | DeleteAsset | | | ✓ |
 | `asset.attach` | AttachUnit | | | ✓ |
@@ -691,14 +693,14 @@ Edge 到 ModelSide 的本地异步旁路只使用 §21.5 的 `NormalizedTraffic`
 |---|---|
 | `grant_self` | `subject_user_id` 等于调用者 |
 | `grant_wildcard` | 任一 binding.id 为 `*` 或空 |
-| `grant_scope` | 被授资产/单元/发布不是调用者 Bindings 的子集。**例外**：`state != ONBOARDING_STATE_COMPLETED` 且调用者是引导管理员时，允许 Bindings ⊆ 当时已有资产 ID（必须能含 `local_asset_id`；调用者此时 Bindings 为空，见 §19.5）。完成后无此例外 |
+| `grant_scope` | 被授资产/单元/发布不是调用者 Bindings 的子集 |
 | `grant_unknown_tool` | tools 含未登记名 |
 
-系统引导授予的 `created_by=system`，Bindings **至少**含 [`local_asset_id`]，并含 `CompleteOnboarding` 当时已存在的其它资产 ID（禁止 `*`，禁止虚构 `bootstrap`）。完成后管理员 `CreateAsset` 成功则把新 ID **只**追加进该管理员自己的授予 Bindings，不写入他人授予。`DeleteAsset` 同步从所有授予 Bindings 剔除该 ID。`local_asset_id`（本机数据面登记的那一条）禁止删除。
+系统引导授予的 `created_by=system` 包含管理员全局账户工具与 `asset.create`；Bindings 为 `CompleteOnboarding` 当时已存在的全部资产 ID，允许零资产时为空，禁止 `*` 与虚构 `bootstrap`。`asset.create` 的授权只要求管理员角色和全局工具，不要求目标资产已存在或预先出现在 Bindings。创建成功后把新 ID **只**追加进创建者自己的系统授予 Bindings，不写入他人授予；`DeleteAsset` 同步从所有授予 Bindings 剔除该 ID。存在 Edge 人工接入配置的资产禁止删除，必须先完成技术人员退役流程并移除配置。
 
 ### 6.2 读路径裁剪
 
-`ListAssets` / `ListReleases` / `ListEvents` / `Dashboard` / `GetAsset` / `GetRelease` / `GetEvent` / `ListAuditEntries`：只返回调用者 Bindings 覆盖的对象。`console.read` 没有或 Bindings 为空（且不是纯账户工具）时列表为空。**例外**：`state != ONBOARDING_STATE_COMPLETED` 时，§19.5 的 `ListAssets` / `GetAsset` 忽略空 Bindings 裁剪：提交部署规格前仍为空列表，之后返回库中已有资产（本机一条加上引导期 `CreateAsset` 的旁路资产）。点开名单外 ID：`permission_denied`（与「不存在」相同对外文案，避免探测）。
+`ListAssets` / `ListReleases` / `ListEvents` / `Dashboard` / `GetAsset` / `GetRelease` / `GetEvent` / `ListAuditEntries`：只返回调用者 Bindings 覆盖的对象。`console.read` 没有或 Bindings 为空时列表为空。零资产管理员仍可调用全局 `asset.create` 创建第一项资产；该写权限不扩大任何读范围。点开名单外 ID：`permission_denied`（与「不存在」相同对外文案，避免探测）。
 
 **枚举**：
 
@@ -866,17 +868,21 @@ RELEASE_STATE_SHADOW ──PromoteCanary──▶ RELEASE_STATE_CANARY ──Pro
 |---|---|---|
 | CreateAsset | Asset | 手工登记防御资产（旁路设备或待绑定目标）。`id` 可由调用方指定或服务端生成。仅 `USER_ROLE_ADMIN`。成功后把新 ID 追加进调用者授予 Bindings |
 | UpdateAsset | asset_id + Asset 变更字段 + update_mask(FieldMask) + 可选 `expected_updated_at` | 仅管理员。只允许操作方修改 display_name、labels、criticality、max_auto_tier、access_mode；capabilities/last_probe_at 只能由单元探针上报。响应带回 `Asset.updated_at` |
-| DeleteAsset | asset_id | 仅管理员。硬删除资产行（`unit_assets` / `release_assets` 级联）。禁止删除 `local_asset_id`（`failed_precondition`）。从所有授予 Bindings 剔除该 ID |
+| DeleteAsset | asset_id | 仅管理员。硬删除没有 Edge 人工接入配置和活动单元绑定的资产行；存在接入配置返回 `failed_precondition`。成功后从所有授予 Bindings 剔除该 ID |
 | ListAssets | query、criticality 过滤、page_size/page_token | 详情含绑定单元只读投影、健康状态、在役 release 数。任意持 `console.read` 且 Bindings 覆盖的角色可读 |
 | GetAsset | asset_id | 单个资产详情（读路径，非管理员可查自己范围内的资产） |
 | AttachUnit | asset_id、unit_id + Idempotency-Key | 仅管理员。把旁路资产交给 edge 单元保护；v1 每单元只允许一个主资产 |
 | DetachUnit | asset_id、unit_id + Idempotency-Key | 仅管理员。解绑；正在受保护的资产解绑后边缘下次快照卸载 |
+| PutEdgeEnrollment | 既有 asset_id、稳定 unit_id、入口姿态、监听地址、反向代理上游、traffic_key、可信代理网段、ModelProfile、ModelIngressWindow + Idempotency-Key | 仅管理员且要求目标资产 `asset.update`。规范化配置并预声明 Edge 与 `${unit_id}-modelside` 身份，签发下一监听计划和保留既有非相关策略的下一资产世代；相同规范摘要直接返回原坐标，不重复签发。预声明单元不得改绑其它资产 |
+| GetEdgeEnrollment | asset_id、unit_id | 要求 `console.read` 与目标资产 Binding。返回规范化配置、模型档案摘要、ModelSide 身份、期望/实际监听计划和资产世代、最近心跳/结果以及状态 |
 | GetModelIngressWindow | asset_id、unit_id | 读取最新签名监听计划中的中央期望、最近心跳实际值、期望/已应用监听计划版本、状态和收窄原因。要求 `console.read` 与资产 Binding |
 | UpdateModelIngressWindow | asset_id、unit_id、desired、expected_listen_plan_version + Idempotency-Key | 仅管理员且要求 `asset.update`。校验单元属于该资产且广告模型输入窗口能力；克隆最新监听计划、只替换窗口、递增版本、重新签名并审计，不创建资产世代 |
 
 **写冲突语义**：不再整行后写胜。操作方字段与单元探针字段分区；同区冲突采用 `updated_at` 乐观锁，版本不匹配返回 `failed_precondition` + `version_mismatch`。
 
-`AssetDetail.units[]` 是只读单元投影：包含单元标识、种类、版本、健康、入口姿态、流量键、最近心跳、生产能力、生产健康以及已装载的资产世代标识和序号。`tap_silent` / `tap_skew` 保持逐单元可见。流量审查策略更新后，控制台必须等待绑定 Edge 的心跳世代序号全部达到目标序号，才能显示“已生效”。控制台不能修改能力或健康，也不能把广告字段转换成操作权限。
+`AssetDetail.units[]` 是只读单元投影：包含单元标识、种类、版本、健康、入口姿态、流量键、最近心跳、生产能力、生产健康以及已装载的资产世代标识和序号。`AssetDetail.edge_enrollments[]` 返回该资产全部人工 Edge 接入投影。接入状态枚举为 `EDGE_ENROLLMENT_STATUS_WAITING_FOR_REGISTRATION`、`EDGE_ENROLLMENT_STATUS_ONLINE`、`EDGE_ENROLLMENT_STATUS_OUT_OF_SYNC`、`EDGE_ENROLLMENT_STATUS_OFFLINE`：未注册为等待，最近心跳过期为离线，在线但实际制品坐标不同为未收敛，在线且坐标相同为在线。ModelSide 状态依据身份是否首次合法上报及最近结果时间单独计算，不用 Edge 状态冒充。`tap_silent` / `tap_skew` 保持逐单元可见。流量审查策略更新后，控制台必须等待绑定 Edge 的心跳世代序号全部达到目标序号，才能显示“已生效”。控制台不能修改能力或健康，也不能把广告字段转换成操作权限。
+
+任何签发新资产世代的治理或策略变更都在同一事务内把该资产全部 `EdgeEnrollment.expected_generation_id/seq` 推进到新坐标。`UpdateModelIngressWindow` 不创建资产世代，但会在同一事务内同步对应接入记录的规范窗口、摘要和期望监听计划版本；因此接入状态不会继续引用已被替代的坐标。
 
 `ModelIngressWindow` 同时要求正数 `max_items`、`max_retained_bytes` 与 `max_queue_age`；平台接受 1–65536 条、1–256 MiB、10 毫秒–5 分钟。Brain 初始签发默认 4096 条、128 MiB、2 秒。Edge 将中央期望逐项收窄到本机硬上限；字节上限优先，因此年龄是可达覆盖目标，不保证最坏正文负载一定装满整段时间。中央缩容不批量清空现有项：后台发送和过期清理自然收敛，新流量仍按新上限淘汰最旧可排队项；收敛前状态为 `MODEL_INGRESS_WINDOW_STATE_CONVERGING`。本机收窄后状态为 `MODEL_INGRESS_WINDOW_STATE_DEGRADED` 并返回条数、字节或年龄的闭集原因；旁路关闭为 `MODEL_INGRESS_WINDOW_STATE_DISABLED`。
 
@@ -899,6 +905,7 @@ RELEASE_STATE_SHADOW ──PromoteCanary──▶ RELEASE_STATE_CANARY ──Pro
 | releases_by_state | map<ReleaseState, int64> | 发布状态分布 |
 | events_24h_total | int64 | 24h 事件总数 |
 | events_24h_blocked | int64 | 24h 拦截数 |
+| model_alerts_24h | int64 | 24h 内 `KIND_MODEL_ALERT` 数 |
 | pending_retire_soon | int64 | 24h 内将到期的发布数 |
 
 **ListEvents**
@@ -906,7 +913,7 @@ RELEASE_STATE_SHADOW ──PromoteCanary──▶ RELEASE_STATE_CANARY ──Pro
 请求：`asset_id`、`release_id`、`verdict`、`kind`、`since`、`until`、`query`（路径/规则关键词）、`page_size/page_token`。
 响应：`events[] Event` + `next_page_token`。默认按 `occurred_at` 降序。每条 `Event` 含 `triage_reason`（proto 枚举全名，如 `TRIAGE_REASON_DETECTED_UNMITIGATED`）。人机交付活栈用本 RPC 判定未缓解入账，不另开查询。
 
-**GetEvent**：`event_id` → `Event`（含检测结论数组与 release_traces）。
+**GetEvent**：`event_id` → `event`（含检测结论数组与 release_traces）、`model_inferences[]` 和 `triage_deliveries[]`。模型推理返回模型组、类型、版本、分数、阈值、攻击分类、结果种类、档案摘要和记录时间。研判交付只返回关联案件、贾维斯指令、处理方、种类、状态、创建时间和确认时间；不得返回能力令牌、租约载荷、内部指令正文或原始请求。整个响应继续按事件所属资产做 Bindings 裁剪。
 
 ### 10.2 AuditService
 
@@ -1160,11 +1167,11 @@ const res = await console.dashboard({}, {
 
 | 页面 | 数据读取（服务端已按 Bindings 裁剪） | 写操作（按钮 ↔ 工具名） |
 |---|---|---|
-| 引导 `/app/setup` | GetOnboarding / ListAssets | PutModelConfig / TestModelConnectivity / PutDeploymentSpecification / CreateAsset / UpdateAsset / DeleteAsset / CreateUser / PutGrant / CompleteOnboarding（仅管理员）；部署规格可设置初始模型输入缓存窗口 |
+| 引导 `/app/setup` | GetOnboarding | PutModelConfig / TestModelConnectivity / CompleteOnboarding（仅管理员）；只确认模型网关与贾维斯，不登记或部署数据面 |
 | 登录 | Login / GetMe（含 `access`） | Logout、ChangePassword |
-| 资产 | ListAssets / GetAsset / GetModelIngressWindow | `asset.create` / `asset.update` / `asset.delete` / `asset.attach` / `asset.detach` / UpdateModelIngressWindow（仅管理员；前端按 `USER_ROLE_ADMIN` 隐藏写入口） |
+| 资产 | ListAssets / GetAsset / GetEdgeEnrollment / GetModelIngressWindow | `asset.create` / `asset.update` / `asset.delete` / `asset.attach` / `asset.detach` / PutEdgeEnrollment / UpdateModelIngressWindow（仅管理员；前端按生效 Tools 隐藏写入口） |
 | 防护策略（路由仍为 `/app/releases`） | ListReleases / GetRelease / Timeline / Stats | `govern.propose` / `gate` / `start_shadow` / `promote_canary` / `promote_enforce` / `rollback` / `retire` |
-| 事件 | ListEvents / GetEvent | `govern.deny_feedback` |
+| 事件 | ListEvents / GetEvent（含模型推理与贾维斯研判交付） | `govern.deny_feedback`；可跳转关联案件 |
 | 审计 | ListAuditEntries / VerifyChain | 无（只读，仍裁 Bindings） |
 | 用户 | ListUsers / GetUser（须 `user.admin`） | UserService 写 |
 | Agent 管理 `/app/agent` | ListAssets / ListAgentProfiles / SessionService | `agent.manage` 对档案增删改和批量覆盖；工具与资产在 Agent 编辑弹窗中设置 |
@@ -1238,10 +1245,10 @@ const res = await console.dashboard({}, {
 ### 17.9 引导未完成时的路由
 
 - 浏览器地址只许 `https://127.0.0.1:9050/app/setup`（SPA basename `/app`，路由 `/setup`）。禁止再写一套不带 `/app` 的交付 URL。
-- `state != ONBOARDING_STATE_COMPLETED` 时：管理员整站只渲染 `/app/setup`，**不进入主壳**（态势/事件/发布/用户管理页）。步骤 6 **内嵌**创建值守账户与 `PutGrant`，不是打开主壳授予页。
+- `state != ONBOARDING_STATE_COMPLETED` 时：管理员整站只渲染 `/app/setup`，**不进入主壳**（态势/事件/发布/用户管理页）。本页只配置模型网关、探测连通性、确认贾维斯在线并显式结束引导。
 - 其他角色只渲染「等待管理员完成初次配置」。
 - 未完成时除 §19.5 白名单外，`Dashboard` / `ListEvents` / `ListReleases` / `GetRelease` / `ListAuditEntries` 一律 `failed_precondition` + `reason=onboarding_incomplete`（不是只靠前端藏路由）。
-- `/app/setup` 只渲染 §19.0 的六步，禁止拆出第七步「单独点探针」。探测三次失败后的「跳过设置模型以及资产」见 §19.0。
+- `/app/setup` 不渲染 Edge、ModelSide、Host、防御资产、批准账户、Docker 命令或服务管理命令；这些能力只存在于完成引导后的主控制台与部署手册。
 - 密钥输入框不得回填明文。`GetOnboarding` 返回字段见 §19.2。
 
 ---
@@ -1250,13 +1257,13 @@ const res = await console.dashboard({}, {
 
 > **§19 专指本引导契约。** 字段级契约维护规则改称 §20。第 18 节仍是 Agent 控制面。阅读顺序：§17 → 本节 → §18。
 
-本节是人机交付闭环的网络契约。名词见 [glossary.md](glossary.md#onboarding)。实现顺序：先改本节与 proto，再迁移（恰好一行的 `deployment_onboarding`），再测试，再实现。
+本节是控制面初次配置的网络契约。名词见 [glossary.md](glossary.md#onboarding)。数据面的人工接入属于 §9 资产域常规流程，不得重新塞回本状态机。
 
 **库不变量**：全库恰好一行；主键固定为 `id = 1`。并发写 RPC 用行锁；失败写 `state=ONBOARDING_STATE_FAILED` 与 `last_error`，不删除已存密钥。
 
 线上状态与 JSON **只许 proto 枚举全名**（禁止用 `pending` / `completed` 短名当契约）。
 
-合法前进边：`ONBOARDING_STATE_PENDING` → `ONBOARDING_STATE_MODEL_CONFIGURED` → `ONBOARDING_STATE_MODEL_LIVE` → `ONBOARDING_STATE_EDGE_LIVE` → `ONBOARDING_STATE_COMPLETED`。`PutDeploymentSpecification` 只确定并签发部署制品，不宣称 Edge 已启动；Brain 收到目标单元心跳并确认其已装载期望监听计划与资产世代后，才把状态推进到 `ONBOARDING_STATE_EDGE_LIVE`。任一步写失败 → `ONBOARDING_STATE_FAILED`（密钥、部署规格与 `local_asset_id` 保留）。
+合法前进边：`ONBOARDING_STATE_PENDING` → `ONBOARDING_STATE_MODEL_CONFIGURED` → `ONBOARDING_STATE_MODEL_LIVE` → `ONBOARDING_STATE_COMPLETED`。任一步写失败 → `ONBOARDING_STATE_FAILED`，保留已经写入的凭据槽。历史 `ONBOARDING_STATE_EDGE_LIVE` 只保留线缆和旧库兼容；服务端读取时按 `ONBOARDING_STATE_MODEL_LIVE` 投影，禁止新写入。
 
 从 `ONBOARDING_STATE_FAILED` 出发的合法边（同页重试，不是重置）：
 
@@ -1264,38 +1271,29 @@ const res = await console.dashboard({}, {
 |---|---|---|
 | `PutModelConfig` | 无额外前置 | `ONBOARDING_STATE_MODEL_CONFIGURED` |
 | `TestModelConnectivity` | `has_secret=true` | `ONBOARDING_STATE_MODEL_LIVE` |
-| `PutDeploymentSpecification` | 最近一次 Test 成功且之后密钥未改 | `ONBOARDING_STATE_MODEL_LIVE`；Edge 之后以心跳推进到 `ONBOARDING_STATE_EDGE_LIVE` |
-| `CompleteOnboarding` | 仍只认 §19.1 四条 | `ONBOARDING_STATE_COMPLETED` |
+| `CompleteOnboarding` | 仍只认 §19.1 两条 | `ONBOARDING_STATE_COMPLETED` |
 
 禁止从 `ONBOARDING_STATE_COMPLETED` 退回（本档无重置 RPC）。
 
-### 19.0 界面六步（闭集）
+### 19.0 界面动作（闭集）
 
-浏览器只打开 `https://127.0.0.1:9050/app/setup`。设置防御资产不新增引导状态枚举：Edge 就绪后停在 `ONBOARDING_STATE_EDGE_LIVE`，由本页内「下一步」进入授权。
+浏览器只打开 `https://127.0.0.1:9050/app/setup`。界面按顺序完成四个动作：
 
-步骤 2 失败时：客户端合计最多调用 `TestModelConnectivity` **三次**，两次间隔 **1 秒**；三次皆失败则回到步骤 1（配置模型），并在表单下方显示文字按钮「跳过设置模型以及资产」。点过后界面进入步骤 6，不再渲染步骤 2–5。**跳过只改变界面步骤，不改变完成谓词**：`CompleteOnboarding` 仍只认 §19.1 四条；无 `local_asset_id` 时客户端禁止调用 `CreateUser` / `CompleteOnboarding`，避免留下孤立用户。未失败时禁止跳步。
+1. `PutModelConfig` 把端点、模型、方言和只写密钥保存到 brain 凭据槽；
+2. `TestModelConnectivity` 从 brain 发出最小补全并显示成功或可重试错误；
+3. 轮询 `GetOnboarding.jarvis_online`，等待技术人员已经安装的贾维斯主动注册或轮询；Brain 不反向连接，也不在本页启动进程；
+4. 管理员点击“进入控制台”，调用 `CompleteOnboarding`。成功后进入 `/app`，再在资产页登记第一项资产和 Edge 人工接入配置。
 
-| 步 | 管理员动作 | 成功后状态 |
-|---|---|---|
-| 1 | `PutModelConfig`（密钥写入凭据槽） | `ONBOARDING_STATE_MODEL_CONFIGURED` |
-| 2 | `TestModelConnectivity` | `ONBOARDING_STATE_MODEL_LIVE` |
-| 3 | 选择入口姿态、流量键、部署目标、可信代理网段和签名模型档案，调用 `PutDeploymentSpecification`。Brain 确定性创建资产、监听计划和基线世代；页面展示原生进程与 Docker Compose 两种人工安装命令 | 仍为 `ONBOARDING_STATE_MODEL_LIVE`，且 `local_asset_id`、期望监听计划版本和世代非空 |
-| 4 | 技术人员在目标主机手动安装并启动 `yufeng-edge`，按需同时或独立安装 `yufeng-modelside`；页面轮询 `GetOnboarding.edge_ready`，不发起部署、重启或管理口探针 | 心跳确认制品后 `ONBOARDING_STATE_EDGE_LIVE` |
-| 5 | 设置防御资产：`ListAssets` 展示本机资产；`UpdateAsset` 填写显示名 / 关键性 / 接入模式；可选 `CreateAsset` 登记更多旁路资产（不得删除 `local_asset_id`） | 仍为 `ONBOARDING_STATE_EDGE_LIVE` |
-| 6 | 授权值守账户：本页内 `CreateUser`（`USER_ROLE_OPERATOR`）→ `PutGrant`（Tools **必须**含 `govern.promote_enforce`，Bindings 仅 `local_asset_id`；单机禁止只授 `govern.promote_canary`）→ `CompleteOnboarding`。该账户只批准本机资产上已观察策略全量生效，不能提案、不能改模型、不能管用户或资产 | `ONBOARDING_STATE_COMPLETED` |
-
-步骤 6 的授予发生在 `CompleteOnboarding` **之前**，仍在 `/app/setup` 内，不进入主壳。
+模型探测失败不得提供绕过完成谓词的跳过按钮。资产、Edge、Host、ModelSide 和批准账户均可在主控制台开放后独立配置，任一项缺失都不阻止进入主控制台。
 
 ### 19.1 `ONBOARDING_STATE_COMPLETED` 谓词（唯一）
 
-`CompleteOnboarding` 必须同时满足下列四条，否则 `failed_precondition`，`details` 恰好一条 `type.googleapis.com/yufeng.onboarding.v1.OnboardingGate`（`missing_predicates` 列出未满足编号，1–4，升序去重），状态不变：
+`CompleteOnboarding` 必须同时满足下列两条，否则 `failed_precondition`，`details` 恰好一条 `type.googleapis.com/yufeng.onboarding.v1.OnboardingGate`（`missing_predicates` 列出未满足编号 1–2，升序去重），状态不变：
 
 1. 最近一次 `TestModelConnectivity` 成功，且之后密钥未改；
-2. 配置项 `-jarvis-agent-id`（默认 `jarvis-1`）已注册，且最近一次 `Heartbeat` **或** `PollInstructions` 落在 `JarvisOnlineWindow` 内（即 `jarvis_online=true`，与 §19.2 同一判定）；该谓词只证明安全研判能力在线，不参与部署规格提交或 Edge 生命周期；
-3. `edge_ready=true`：管理员已提交部署规格，目标单元已主动注册，且最近一次单元心跳落在 `EdgeOnlineWindow` 内；心跳中的 `current_generation_id`、`current_generation_seq` 与 `current_listen_plan_version` 必须和该部署规格确定性生成的期望资产世代与监听计划完全一致。Brain 不连接 Edge 管理口、不探测业务路由，也不创建、启动或重建 Edge；
-4. **已存在**一条主体不是引导管理员的授予：Tools **必须含** `govern.promote_enforce`（只授 `govern.promote_canary` 不算过），Bindings 含 `local_asset_id`（禁止 `*`，禁止虚构 `bootstrap`）。本条由步骤 6 的 `PutGrant` 在调用 `CompleteOnboarding` 之前写入，**不是**本 RPC 事后补写。单机一份 edge 禁止 canary，影子后只能 `PromoteEnforce`（§7.6）。
+2. 配置项 `-jarvis-agent-id`（默认 `jarvis-1`）已注册，且最近一次 `Heartbeat` **或** `PollInstructions` 落在 `JarvisOnlineWindow` 内（即 `jarvis_online=true`，与 §19.2 同一判定）。该谓词只证明研判编排进程在线，不授予部署能力。
 
-通过后服务端**只**给引导管理员写入系统授予：Tools = `grant.write`、`user.admin`、`catalog.manage`、`console.read`、`asset.create`、`asset.update`、`asset.delete`、`asset.attach`、`asset.detach`（**不含** `govern.propose` / `govern.promote_*`），Bindings = 完成时库中全部资产 ID（至少含 `local_asset_id`）。不得改写他人已有的 promote 授予。
+通过后服务端给引导管理员写入系统授予：Tools = `grant.write`、`user.admin`、`catalog.manage`、`console.read`、`asset.create`、`asset.update`、`asset.delete`、`asset.attach`、`asset.detach`（**不含** `govern.propose` / `govern.promote_*`），Bindings = 完成时库中全部资产 ID，零资产时允许为空。其后 `CreateAsset` 作为管理员全局工具创建第一项资产，并自动把新 ID 加入创建者范围。不得改写其它账户、资产、授予或历史检测数据。
 
 引导完成前贾维斯令牌不得含 `govern.propose` / `govern.promote_*`。贾维斯能力闭集只覆盖安全研判与治理建议；部署、进程管理、容器管理、Edge 安装、基线签发和 Edge 探测工具一律不得注册或签发。
 
@@ -1303,11 +1301,11 @@ const res = await console.dashboard({}, {
 
 | RPC | 认证 | 写 | 行为 |
 |---|---|---|---|
-| `GetOnboarding` | 任意登录用户 | 否 | 返回 `state`（枚举全名）、`base_url`、`model`、`dialect`（枚举全名，缺省 `MODEL_DIALECT_OPENAI_CHAT`）、`has_secret`、`secret_hint`、`jarvis_online`、`edge_ready`、`local_unit_id`、`local_asset_id`、`deployment_spec_digest`、`expected_generation_id`、`expected_generation_seq`、`expected_listen_plan_version`、`last_error`、`updated_at`。无密钥明文。`jarvis_online` 只用于 §19.1 第 2 条；`edge_ready` 只由 Brain 对注册和心跳回执计算。提交部署规格前单元、资产和期望版本字段为空或为零 |
+| `GetOnboarding` | 任意登录用户 | 否 | 返回 `state`（枚举全名）、`base_url`、`model`、`dialect`（枚举全名，缺省 `MODEL_DIALECT_OPENAI_CHAT`）、`has_secret`、`secret_hint`、`jarvis_online`、`last_error`、`updated_at`。无密钥明文。旧 Edge 引导字段继续保留线缆编号但标记退役，服务端返回空值或零，控制台不得读取 |
 | `PutModelConfig` | 仅 `USER_ROLE_ADMIN` | 是，`Idempotency-Key` | `base_url` 必须是绝对 HTTPS URL。`dialect` 省略或 `MODEL_DIALECT_UNSPECIFIED` 则写入 `MODEL_DIALECT_OPENAI_CHAT`；只许 §19.4 三种方言。密钥**只**写入凭据槽。`YUFENG_MODEL_API_KEY` 不是第二份权威密钥：仅供人机交付活栈 / CI **脚本**读出后填进本 RPC 的 `secret` 字段；brain 补全路径只读槽，不读该环境变量。成功 → `ONBOARDING_STATE_MODEL_CONFIGURED`（覆盖旧密钥必须重新探测） |
 | `TestModelConnectivity` | 仅管理员 | 是，`Idempotency-Key` | **brain 模型网关**用凭据槽密钥按槽方言发一次最小补全。模型 HTTP **不得**握着引导行 `FOR UPDATE`：锁内取槽快照 → 锁外出网 → 重新加锁核对槽未变再提交。HTTP 成功且非空文本 → `ONBOARDING_STATE_MODEL_LIVE`。失败 → `ONBOARDING_STATE_FAILED` + `last_error`（英文小写）+ Connect `unavailable` 或 `failed_precondition`。探测期间槽被改写 → `aborted`，不把过期结果写成 `MODEL_LIVE`。本档不跑评测集。可重试本 RPC，不必重新 `PutModelConfig`（除非改密钥或方言） |
-| `PutDeploymentSpecification` | 仅管理员 | 是，`Idempotency-Key` | 请求必填稳定 `unit_id`、`asset_id`、入口姿态、`traffic_key`、与姿态匹配的目标、可选可信代理网段、`ModelProfileSpecification` 和可选 `ModelIngressWindow`。反向代理目标与网段规范化同 §21.1。模型规格必须包含模型组、类型、版本、告警阈值、复核下限、窗口秒数、每单元和每路由上限、允许进入模型的请求头及最大正文；告警阈值必须大于复核下限。模型输入缓存窗口省略时由 Brain 写入 4096 条、128 MiB、2 秒的默认值，签名监听计划不得保留空窗口。Brain 在单一数据库事务中规范化并持久化规格，确定性创建或复用资产，预声明 `${unit_id}-modelside` 工作负载身份，签发下一单调监听计划，并签发含冻结核心检测制品与 `ModelProfile` 的基线资产世代。相同规范规格不重签制品；相同幂等键不同摘要返回 `failed_precondition`。本远程过程调用不等待 Jarvis、Edge、ModelSide、容器运行时或探针，返回期望单元、资产、规格摘要、监听计划版本和世代标识，状态仍为 `ONBOARDING_STATE_MODEL_LIVE` |
-| `CompleteOnboarding` | 仅管理员 | 是，`Idempotency-Key` | 只检查 §19.1 四条（第 4 条必须**已经**存在）。Edge 就绪只读取数据库中的注册与最近心跳，不发网络探针。通过 → `ONBOARDING_STATE_COMPLETED` 并写入管理员系统授予（见 §19.1 末段）；失败 `failed_precondition`，`details` **恰好一条** `type.googleapis.com/yufeng.onboarding.v1.OnboardingGate`，字段 `missing_predicates` 为 `repeated int32`（取值 1–4，升序去重），状态不变，不写系统授予 |
+| `PutDeploymentSpecification` | 兼容线缆 | 否 | 方法和旧消息编号保留并标记退役；服务端固定返回 `unimplemented`。控制台、正式脚本和新客户端不得调用；等价的新行为只存在于资产域 `PutEdgeEnrollment` |
+| `CompleteOnboarding` | 仅管理员 | 是，`Idempotency-Key` | 只检查 §19.1 两条。通过 → `ONBOARDING_STATE_COMPLETED` 并写入管理员系统授予（见 §19.1 末段）；失败 `failed_precondition`，`details` **恰好一条** `type.googleapis.com/yufeng.onboarding.v1.OnboardingGate`，字段 `missing_predicates` 为 `repeated int32`（取值 1–2，升序去重），状态不变，不写系统授予 |
 
 `base_url` 指向公网模型端点**仅允许从 brain 模型网关出网**。贾维斯、edge、浏览器不得持该密钥。Edge 邻近 ModelSide 只装载签名模型档案和本地权重，不读取聊天凭据槽；其跨主机入口必须位于受控防御网络并使用相互传输层安全协议，禁止默认公网。
 
@@ -1316,15 +1314,13 @@ const res = await console.dashboard({}, {
 `state != ONBOARDING_STATE_COMPLETED` 时，操作域只许：
 
 - 公开/会话：`Login`、`Logout`、`GetMe`、`GetLoginConfig`、`ChangePassword`
-- 引导：`GetOnboarding`、`PutModelConfig`、`TestModelConnectivity`、`PutDeploymentSpecification`、`CompleteOnboarding`
-- 步骤 5：`ListAssets`、`GetAsset`、`CreateAsset`、`UpdateAsset`、`DeleteAsset`（仅管理员；`DeleteAsset` 仍禁止删 `local_asset_id`）。`ListAssets` / `GetAsset` 忽略空 Bindings 裁剪，返回数据面就绪后库中已有资产
-- 步骤 6 内嵌：`CreateUser`、`ListUsers`、`PutGrant`（Bindings 必须 ⊆ 当时已有资产 ID 且必须能含 `local_asset_id`，Tools 必须是 §6.1 已登记名，否则 `failed_precondition`。**不**在本 RPC 强制 `govern.promote_enforce`：只授 `govern.promote_canary` 必须写入成功，谓词 4 只在 `CompleteOnboarding` 检查。引导管理员此时 Bindings 为空，**不得**按 `grant_scope` 拒绝本条范围内的授予）
+- 引导：`GetOnboarding`、`PutModelConfig`、`TestModelConnectivity`、`CompleteOnboarding`
 
 其它操作域 RPC（含 `Dashboard`、`ListEvents`、`ListReleases`、`GetRelease`、`ListAuditEntries`、`ProposeArtifact`）→ `failed_precondition` + `reason=onboarding_incomplete`。
 
-### 19.3 部署规格与人工生命周期
+### 19.3 数据面人工生命周期
 
-`PutDeploymentSpecification` 只完成控制面确定性工作：规范化管理员提交的部署规格，创建真实资产标识，签名单元监听计划，并签名第一份资产世代与模型档案。它不调用工具网关，不创建 Agent 指令，不访问 Docker 套接字、进程管理器、Edge 管理口或 ModelSide。
+数据面只能在主控制台中先 `CreateAsset`，再调用 §9 的 `PutEdgeEnrollment`。该资产域远程过程调用完成规范化、预声明绑定、监听计划签发和资产世代签发；它不调用工具网关，不创建 Agent 指令，不访问 Docker 套接字、进程管理器、Edge 管理口或 ModelSide。
 
 技术人员从受信任交付物中选择一种方式安装：
 
@@ -1332,11 +1328,11 @@ const res = await console.dashboard({}, {
 - 容器部署：使用仓库提供的 Compose 配置，可以将 Brain、Edge 与 ModelSide 同置，也可以只部署连接远端 Brain 的 Edge 与 ModelSide；容器的创建、重建和删除仍由技术人员执行；
 - 分离部署：Edge 与 ModelSide 可以作为独立进程、独立容器或独立主机运行。同机优先使用 Unix 域套接字；跨主机必须使用相互传输层安全协议认证，并限制在同一受控防御网络。
 
-Edge 首次启动后主动调用 `Register`，随后拉取已签名监听计划、资产世代和检测策略，并通过 `Heartbeat` 回执已装载版本。Brain 只根据这些主动请求与回执确定 `edge_ready`。升级与卸载不会触发 Brain 或 Jarvis 的进程动作；短暂离线仅使就绪状态失效，签名制品和审计记录保留。
+Edge 首次启动后主动调用 `Register`，随后拉取已签名监听计划、资产世代和检测策略，并通过 `Heartbeat` 回执已装载版本。Brain 只根据这些主动请求与回执计算每项 `EdgeEnrollment.status`；不存在全局 `onboarding.edge_ready`。升级与卸载不会触发 Brain 或 Jarvis 的进程动作；短暂离线仅使该接入状态变为离线，签名制品和审计记录保留。
 
 贾维斯只负责安全研判和治理建议。正式工具注册表不得出现 Edge 安装、容器部署、进程启动、基线发布或 Edge 探测能力，也不得为部署创建 Agent 指令。
 
-旧 `DeployDataplane` 远程过程调用及其消息只为保持已经发布的 Protocol Buffers 线缆编号兼容而标记退役；服务端固定返回 `unimplemented`，控制台、脚本和正式客户端不得调用。它不构成部署能力。
+旧 `DeployDataplane` 与 `PutDeploymentSpecification` 远程过程调用及其消息只为保持已经发布的 Protocol Buffers 线缆编号兼容而标记退役；服务端固定返回 `unimplemented`，控制台、脚本和正式客户端不得调用。它们不构成部署能力。历史 `deployment_onboarding` 中存在的有效 Edge 规格由数据库迁移无损复制到 `edge_enrollments`，旧行保留但不再作为注册或控制台状态权威。
 
 ### 19.4 与模型网关的关系
 
@@ -1365,7 +1361,7 @@ Edge 首次启动后主动调用 `Register`，随后拉取已签名监听计划�
 
 `status` 线上只许 proto 枚举全名：`MODEL_GATEWAY_STATUS_UNCONFIGURED`（无钥或无 `base_url`）、`MODEL_GATEWAY_STATUS_READY`（已配置、窗内无调用）、`MODEL_GATEWAY_STATUS_LIVE`（窗内有调用且全部成功）、`MODEL_GATEWAY_STATUS_DEGRADED`（窗内有成功也有失败）、`MODEL_GATEWAY_STATUS_DOWN`（窗内有调用且全部失败）。
 
-控制台页面 `/app/model` 只给管理员：展示接入主机数、窗内成功率与各主机状态，并允许改端点/模型/密钥与探测。值守账户不得改模型（与 §19.0 步骤 6 一致）。
+控制台页面 `/app/model` 只给管理员：展示接入主机数、窗内成功率与各主机状态，并允许改端点、模型、密钥与探测。非管理员不得改模型。
 
 - `agents/modelgateway` 的确定性剧本只存在于测试编译单元，不进入任何交付二进制。`-dev-insecure` 只放宽本地传输；未配置 `-model-url` 时仍调用中台持久 `Generate`，不得回退到固定答案。
 - 贾维斯提交 `Generate` 时不携带或覆盖模型名；实际模型只取当前中台模型槽。运行时不得用 `fake`、测试模型名或本地默认值污染正式请求。
@@ -2148,7 +2144,7 @@ Envoy 的授权服务超时必须大于 `ExtAuthzTimeout`，参考配置为 100m
 
 Edge 用一个后台批次组装器按相同模型档案聚合最多 32 条或 4 MiB，首项最多等待 10 毫秒；两个发送器并发调用 `ModelSideIngressService.SubmitTraffic`，单次调用超时 2 秒且不重试。批次编码后的请求必须低于 ModelSide 10 MiB 接收上限。`accepted + dropped == len(items)`；传输失败或 ModelSide 拒绝均视为至多一次丢失并分项计数。
 
-ModelSide 输入端只保留不少于两个、默认不超过推理线程数两倍的浅层批次交接槽；一次提交的批次直接交给一个推理线程，不再拆成逐条业务队列。ModelSide 满载立即返回批次丢弃而不是拖住连接。Edge 的模型输入缓存窗口与 ModelSide 的结果队列彼此独立，任何一端满载都只丢旁路并计数，不改变当前请求裁决。旁路关闭、ModelSide 空闲或满载、Brain 断连、Brain 磁盘变慢时，同步请求路径均不得出现同步模型或存储依赖。
+ModelSide 输入端只保留不少于两个、默认等于推理线程数两倍且不超过 64 的浅层批次交接槽；技术人员可用本机启动参数把交接槽扩大到 64，以吸收跨主机传输和图形处理器调度抖动，但它仍是易失批次交接而不是可持久业务窗口。一次提交的批次直接交给一个推理线程，不再拆成逐条业务队列。ModelSide 满载立即返回批次丢弃而不是拖住连接。Edge 的模型输入缓存窗口与 ModelSide 的结果队列彼此独立，任何一端满载都只丢旁路并计数，不改变当前请求裁决。旁路关闭、ModelSide 空闲或满载、Brain 断连、Brain 磁盘变慢时，同步请求路径均不得出现同步模型或存储依赖。
 
 #### 21.5.3 ModelSide 推理、采样与结果队列
 
@@ -2168,7 +2164,7 @@ ModelSide 将结果写入独立有界内存队列，由后台批量调用 `Model
 
 `ModelResult` 只允许：`result_id`、`request_id`、`unit_id`、`asset_id`、`generation_id`、`generation_seq`、`kind`（`MODEL_ALERT` / `REVIEW_SAMPLE`）、`score`、模型档案标识与摘要、模型组/类型/版本、方法、路由、覆盖度、复核原因、`occurred_at`。它不得包含正文、查询参数值、请求头值、Cookie、Authorization 或任意原始流量。单批最多 100 条；响应满足 `accepted + deduped + rejected == len(results)`，并按 `result_id` 幂等。
 
-ModelSide 以独立 `aud=modelside` 工作负载身份主动连接 Brain。部署规格事务预声明确定性的 `${unit_id}-modelside`，并把它绑定到精确单元与资产；首次合法结果批次把该身份钉到相互传输层安全协议客户端证书的 SHA-256 指纹，后续指纹不一致失败关闭。服务端逐条验证身份绑定、历史世代签名、模型档案摘要、模型版本、分数范围、分类阈值、采样窗和去重键；客户端自报的身份或类型不能产生新 Binding，也不能绕过阈值。生产跨主机连接必须相互传输层安全协议认证。
+ModelSide 以独立 `aud=modelside` 工作负载身份主动连接 Brain。`PutEdgeEnrollment` 事务预声明确定性的 `${unit_id}-modelside`，并把它绑定到精确单元与资产；首次合法结果批次把该身份钉到相互传输层安全协议客户端证书的 SHA-256 指纹，后续指纹不一致失败关闭。服务端逐条验证身份绑定、历史世代签名、模型档案摘要、模型版本、分数范围、分类阈值、采样窗和去重键；客户端自报的身份或类型不能产生新 Binding，也不能绕过阈值。生产跨主机连接必须相互传输层安全协议认证。
 
 Brain 接受 `MODEL_ALERT` 时必须在同一 PostgreSQL 事务内：
 

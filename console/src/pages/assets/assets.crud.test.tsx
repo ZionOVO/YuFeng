@@ -83,6 +83,35 @@ describe('资产增删改查角色', () => {
     expect(screen.queryByText('Edge 已生效')).toBeNull()
   })
 
+  it('管理员在资产详情签发人工 Edge 接入配置并只看到非敏感安装材料', async () => {
+    const user = userEvent.setup()
+    const client = new ConsoleClientFixture()
+    const put = vi.spyOn(client, 'putEdgeEnrollment')
+    await loginAs(client)
+    renderApp({ route: '/assets/asset-01', client })
+
+    await user.click(await screen.findByRole('button', { name: '接入 Edge' }))
+    await user.type(screen.getByLabelText('流量键'), 'payments-entry')
+    await user.type(screen.getByLabelText('真实上游地址'), 'http://payments:8080')
+    await user.click(screen.getByRole('button', { name: '签发接入配置' }))
+
+    await waitFor(() => expect(put).toHaveBeenCalledWith(expect.objectContaining({
+      assetId: 'asset-01',
+      unitId: 'edge-1',
+      posture: 'INGRESS_POSTURE_REVERSE_PROXY',
+      listenAddress: ':18080',
+      upstreamUrl: 'http://payments:8080',
+      trafficKey: 'payments-entry',
+      modelProfile: expect.objectContaining({ profileId: 'http-threat/PVM/gpvm-e9eceef3' }),
+    })))
+    const enrollment = await screen.findByRole('region', { name: '人工 Edge 接入' })
+    expect(enrollment).toHaveTextContent('Edge 等待注册')
+    expect(enrollment).toHaveTextContent('ModelSide 等待注册')
+    expect(enrollment).toHaveTextContent('技术人员所需文件')
+    expect(enrollment).toHaveTextContent('systemctl enable --now yufeng-edge')
+    expect(enrollment).not.toHaveTextContent('sk-fixture-test')
+  })
+
   it('管理员可登记并删除非本机资产', async () => {
     const user = userEvent.setup()
     const client = new ConsoleClientFixture()

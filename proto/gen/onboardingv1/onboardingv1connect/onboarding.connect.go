@@ -2,7 +2,7 @@
 //
 // Source: yufeng/onboarding/v1/onboarding.proto
 
-// 初次配置引导：部署一行状态机、模型凭据与人工 Edge 部署规格。
+// 初次配置引导：部署一行状态机、模型凭据与贾维斯在线确认。
 package onboardingv1connect
 
 import (
@@ -66,9 +66,11 @@ type OnboardingServiceClient interface {
 	//
 	// Deprecated: do not use.
 	DeployDataplane(context.Context, *connect.Request[onboardingv1.DeployDataplaneRequest]) (*connect.Response[onboardingv1.DeployDataplaneResponse], error)
-	// PutDeploymentSpecification 确定性签发监听计划、基线世代与模型档案。
+	// 兼容保留；人工 Edge 接入已迁移到 AssetService.PutEdgeEnrollment。
+	//
+	// Deprecated: do not use.
 	PutDeploymentSpecification(context.Context, *connect.Request[onboardingv1.PutDeploymentSpecificationRequest]) (*connect.Response[onboardingv1.PutDeploymentSpecificationResponse], error)
-	// CompleteOnboarding 只检查四条谓词后写入系统授予。
+	// CompleteOnboarding 只检查模型网关与贾维斯在线两条谓词。
 	CompleteOnboarding(context.Context, *connect.Request[onboardingv1.CompleteOnboardingRequest]) (*connect.Response[onboardingv1.CompleteOnboardingResponse], error)
 }
 
@@ -156,6 +158,8 @@ func (c *onboardingServiceClient) DeployDataplane(ctx context.Context, req *conn
 
 // PutDeploymentSpecification calls
 // yufeng.onboarding.v1.OnboardingService.PutDeploymentSpecification.
+//
+// Deprecated: do not use.
 func (c *onboardingServiceClient) PutDeploymentSpecification(ctx context.Context, req *connect.Request[onboardingv1.PutDeploymentSpecificationRequest]) (*connect.Response[onboardingv1.PutDeploymentSpecificationResponse], error) {
 	return c.putDeploymentSpecification.CallUnary(ctx, req)
 }
@@ -178,9 +182,11 @@ type OnboardingServiceHandler interface {
 	//
 	// Deprecated: do not use.
 	DeployDataplane(context.Context, *connect.Request[onboardingv1.DeployDataplaneRequest]) (*connect.Response[onboardingv1.DeployDataplaneResponse], error)
-	// PutDeploymentSpecification 确定性签发监听计划、基线世代与模型档案。
+	// 兼容保留；人工 Edge 接入已迁移到 AssetService.PutEdgeEnrollment。
+	//
+	// Deprecated: do not use.
 	PutDeploymentSpecification(context.Context, *connect.Request[onboardingv1.PutDeploymentSpecificationRequest]) (*connect.Response[onboardingv1.PutDeploymentSpecificationResponse], error)
-	// CompleteOnboarding 只检查四条谓词后写入系统授予。
+	// CompleteOnboarding 只检查模型网关与贾维斯在线两条谓词。
 	CompleteOnboarding(context.Context, *connect.Request[onboardingv1.CompleteOnboardingRequest]) (*connect.Response[onboardingv1.CompleteOnboardingResponse], error)
 }
 

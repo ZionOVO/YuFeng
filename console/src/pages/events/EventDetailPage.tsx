@@ -32,6 +32,8 @@ const KIND_LABEL: Record<EventKind, string> = {
   KIND_SENSOR: '传感',
   KIND_INTEL: '情报',
   KIND_AGENT: 'Agent',
+  KIND_MODEL_ALERT: '模型告警',
+  KIND_MODEL_REVIEW_SAMPLE: '模型复核样本',
 }
 
 /** 检测层级 → 中文（修复连续谱 L0–L3，docs/glossary.md#repair-continuum）。 */
@@ -240,7 +242,7 @@ export function EventDetailPage() {
   const { client, canOnAsset } = useAuth()
   const { eventId } = useParams<{ eventId: string }>()
   const reportModal = useDisclosure()
-  const { data: event, status, error, reload } = useAsyncData(() => client.getEvent(eventId ?? ''), [eventId], false)
+  const { data: detail, status, error, reload } = useAsyncData(() => client.getEvent(eventId ?? ''), [eventId], false)
 
   if (status === 'error' && error !== null) {
     if (hasCode(error, 'permission_denied')) return <StateView kind="denied" />
@@ -249,7 +251,9 @@ export function EventDetailPage() {
     }
     return <StateView kind="error" message={error.message} onRetry={reload} />
   }
-  if (status !== 'ok' || event === null) return <StateView kind="loading" />
+  if (status !== 'ok' || detail === null) return <StateView kind="loading" />
+
+  const event = detail.event
 
   // 与服务端校验一致的前置条件（§7.8），不满足时连按钮都不渲染
   const canReport =
@@ -350,6 +354,61 @@ export function EventDetailPage() {
 				{d.inspectionCoverageRef && <span className="fs-mono text-[11px] text-[#8b98a1]">coverage={d.inspectionCoverageRef}</span>}
 				{(d.rawTags?.length ?? 0) > 0 && <span className="fs-mono text-[11px] text-[#8b98a1]">tags={d.rawTags?.join(',')}</span>}
               </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="模型推理" sub="MODEL INFERENCES">
+        {detail.modelInferences.length === 0 ? (
+          <StateView kind="empty" title="无模型推理" message="该事件没有关联的 ModelSide 推理记录" />
+        ) : (
+          <div>
+            {detail.modelInferences.map((inference) => (
+              <article key={inference.inferenceId} className="border-b border-[#1d252a] px-[18px] py-4 last:border-b-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="fs-mono text-sm">{inference.modelGroup} / {inference.modelType} / {inference.modelVersion}</span>
+                  <Badge label={inference.resultKind || 'MODEL_RESULT_KIND_UNSPECIFIED'} tone={inference.score >= inference.threshold ? 'red' : 'amber'} />
+                </div>
+                <dl className="yf-kv mt-3">
+                  <dt>分数 / 阈值</dt><dd className="fs-mono">{inference.score.toFixed(4)} / {inference.threshold.toFixed(4)}</dd>
+                  <dt>攻击分类</dt><dd className="fs-mono">{inference.attackClass}</dd>
+                  <dt>分类版本</dt><dd className="fs-mono">{inference.taxonomyVersion || '—'}</dd>
+                  <dt>档案摘要</dt><dd className="fs-mono break-all">{inference.modelProfileDigest}</dd>
+                  <dt>推理标识</dt><dd className="fs-mono">{inference.inferenceId}</dd>
+                  <dt>记录时间</dt><dd className="fs-mono">{formatTime(inference.recordedAt)}</dd>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="研判交付" sub="TRIAGE DELIVERIES">
+        {detail.triageDeliveries.length === 0 ? (
+          <StateView kind="empty" title="尚未交付研判" message="该事件没有关联的贾维斯研判指令" />
+        ) : (
+          <div>
+            {detail.triageDeliveries.map((delivery) => (
+              <article key={`${delivery.caseId}:${delivery.instructionId}`} className="border-b border-[#1d252a] px-[18px] py-4 last:border-b-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  {delivery.caseId === '' ? (
+                    <span className="fs-mono">无关联案件</span>
+                  ) : (
+                    <Link to={`/cases?caseId=${encodeURIComponent(delivery.caseId)}`} className="fs-mono text-[#62e6a7] hover:underline">
+                      {delivery.caseId}
+                    </Link>
+                  )}
+                  <Badge label={delivery.status || 'INSTRUCTION_STATUS_UNSPECIFIED'} tone={delivery.acknowledgedAt === undefined ? 'amber' : 'green'} />
+                </div>
+                <dl className="yf-kv mt-3">
+                  <dt>贾维斯指令</dt><dd className="fs-mono">{delivery.instructionId}</dd>
+                  <dt>指令类型</dt><dd className="fs-mono">{delivery.kind || '—'}</dd>
+                  <dt>处理方</dt><dd className="fs-mono">{delivery.handlerId || '—'}</dd>
+                  <dt>创建时间</dt><dd className="fs-mono">{formatTime(delivery.createdAt)}</dd>
+                  <dt>确认时间</dt><dd className="fs-mono">{formatTime(delivery.acknowledgedAt)}</dd>
+                </dl>
+              </article>
             ))}
           </div>
         )}

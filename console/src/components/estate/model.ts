@@ -1,5 +1,5 @@
 // 资产拓扑：资产与单元来自 ListAssets；中台/贾维斯/监督/执行的位置是架构岗位。
-// 在线态只认 GetOnboarding.jarvis_online 与 edge_ready。
+// 贾维斯在线态来自 GetOnboarding.jarvis_online；数据面逐项状态来自资产详情中的注册心跳、制品收敛与模型结果。
 // 贾维斯与其它 Agent 只连中台，不连资产；单元→中台是注册契约，不是发明的路由。
 //
 // [贾维斯]: ../../../../docs/glossary.md#jarvis
@@ -76,7 +76,6 @@ export interface EstateEdge {
 /** 来自 GetOnboarding 的中台侧实况；缺省按未探测处理。 */
 export interface EstatePlaneInput {
   jarvisOnline?: boolean
-  edgeReady?: boolean
   managedAgents?: Array<{ agentId: string; displayName: string; enabled: boolean }>
   workers?: WorkerRecord[]
 }

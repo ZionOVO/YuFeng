@@ -97,13 +97,6 @@ export interface Onboarding {
   hasSecret: boolean
   secretHint: string
   jarvisOnline: boolean
-  edgeReady: boolean
-  localAssetId: string
-  localUnitId: string
-  deploymentSpecDigest: string
-  expectedGenerationId: string
-  expectedGenerationSeq: string
-  expectedListenPlanVersion: string
   lastError: string
   updatedAt?: string
 }
@@ -242,8 +235,58 @@ export interface AssetDetail {
   asset: Asset
   unitIds: string[]
   units: UnitProjection[]
+  edgeEnrollments: EdgeEnrollment[]
   health: string
   activeReleaseCount: number
+}
+
+export interface ModelProfile {
+  profileId: string
+  modelGroup: string
+  modelType: string
+  modelVersion: string
+  alertThreshold: number
+  reviewFloor: number
+  reviewWindowSeconds: number
+  maxReviewPerUnit: number
+  maxReviewPerRoute: number
+  dedupeRule: 'MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE'
+  allowedHeaders: string[]
+  maxBodyBytes: number
+  reviewNewRoutes: boolean
+  reviewInsufficientCoverage: boolean
+}
+
+export type EdgeEnrollmentStatus =
+  | 'EDGE_ENROLLMENT_STATUS_UNSPECIFIED'
+  | 'EDGE_ENROLLMENT_STATUS_WAITING_FOR_REGISTRATION'
+  | 'EDGE_ENROLLMENT_STATUS_ONLINE'
+  | 'EDGE_ENROLLMENT_STATUS_OUT_OF_SYNC'
+  | 'EDGE_ENROLLMENT_STATUS_OFFLINE'
+
+export interface EdgeEnrollment {
+  assetId: string
+  unitId: string
+  posture: IngressPosture
+  listenAddress: string
+  upstreamUrl: string
+  trafficKey: string
+  trustedProxyCidrs: string[]
+  modelProfile: ModelProfile
+  modelIngressWindow: ModelIngressWindow
+  modelsideId: string
+  specificationDigest: string
+  expectedListenPlanVersion: string
+  expectedGenerationId: string
+  expectedGenerationSeq: string
+  status: EdgeEnrollmentStatus
+  lastHeartbeatAt?: string
+  currentListenPlanVersion: string
+  currentGenerationId: string
+  currentGenerationSeq: string
+  modelsideStatus: EdgeEnrollmentStatus
+  modelsideLastResultAt?: string
+  modelProfileDigest: string
 }
 
 export type ProducerOutput =
@@ -380,7 +423,14 @@ export interface AssetPatch {
 
 /* ---------- 事件（yufeng.event.v1） ---------- */
 
-export type EventKind = 'KIND_UNSPECIFIED' | 'KIND_TRAFFIC' | 'KIND_SENSOR' | 'KIND_INTEL' | 'KIND_AGENT'
+export type EventKind =
+  | 'KIND_UNSPECIFIED'
+  | 'KIND_TRAFFIC'
+  | 'KIND_SENSOR'
+  | 'KIND_INTEL'
+  | 'KIND_AGENT'
+  | 'KIND_MODEL_ALERT'
+  | 'KIND_MODEL_REVIEW_SAMPLE'
 
 export type Verdict =
   | 'VERDICT_UNSPECIFIED'
@@ -512,6 +562,38 @@ export interface Event {
   wouldHaveBlocked: boolean
   ingressPosture: IngressPosture
   trafficKey: string
+}
+
+export interface ModelInference {
+  inferenceId: string
+  eventId: string
+  modelGroup: string
+  modelType: string
+  modelVersion: string
+  threshold: number
+  score: number
+  attackClass: AttackClass
+  taxonomyVersion: string
+  recordedAt?: string
+  modelProfileDigest: string
+  requestId: string
+  resultKind: string
+}
+
+export interface TriageDelivery {
+  caseId: string
+  instructionId: string
+  handlerId: string
+  kind: string
+  status: string
+  createdAt?: string
+  acknowledgedAt?: string
+}
+
+export interface EventDetail {
+  event: Event
+  modelInferences: ModelInference[]
+  triageDeliveries: TriageDelivery[]
 }
 
 /* ---------- 制品与发布（yufeng.artifact.v1 / yufeng.govern.v1） ---------- */
@@ -943,4 +1025,5 @@ export interface DashboardSummary {
   events24hTotal: string
   events24hBlocked: string
   pendingRetireSoon: string
+  modelAlerts24h: string
 }

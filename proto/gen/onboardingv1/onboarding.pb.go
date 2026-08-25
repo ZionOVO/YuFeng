@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: yufeng/onboarding/v1/onboarding.proto
 
-// 初次配置引导：部署一行状态机、模型凭据与人工 Edge 部署规格。
+// 初次配置引导：部署一行状态机、模型凭据与贾维斯在线确认。
 
 package onboardingv1
 
@@ -44,7 +44,9 @@ const (
 	OnboardingState_ONBOARDING_STATE_COMPLETED OnboardingState = 5
 	// 最近一步失败，保留原因与已配密钥。
 	OnboardingState_ONBOARDING_STATE_FAILED OnboardingState = 6
-	// 人工部署的 Edge 已主动注册并确认装载期望制品。
+	// 旧 Edge 引导状态只保留线缆编码，不再写入。
+	//
+	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 	OnboardingState_ONBOARDING_STATE_EDGE_LIVE OnboardingState = 7
 )
 
@@ -150,7 +152,7 @@ func (ModelDedupeRule) EnumDescriptor() ([]byte, []int) {
 // OnboardingGate 是 CompleteOnboarding 失败时 Connect details 的唯一条目。
 type OnboardingGate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// missing_predicates 是未满足的 §19.1 谓词编号，取值 1–4，升序去重。
+	// missing_predicates 是未满足的 §19.1 谓词编号，取值 1–2，升序去重。
 	MissingPredicates []int32 `protobuf:"varint,1,rep,packed,name=missing_predicates,json=missingPredicates,proto3" json:"missing_predicates,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
@@ -240,17 +242,24 @@ type GetOnboardingResponse struct {
 	SecretHint   string                 `protobuf:"bytes,5,opt,name=secret_hint,json=secretHint,proto3" json:"secret_hint,omitempty"`
 	JarvisOnline bool                   `protobuf:"varint,6,opt,name=jarvis_online,json=jarvisOnline,proto3" json:"jarvis_online,omitempty"`
 	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
-	DataplaneReady            bool                   `protobuf:"varint,7,opt,name=dataplane_ready,json=dataplaneReady,proto3" json:"dataplane_ready,omitempty"`
-	LocalAssetId              string                 `protobuf:"bytes,8,opt,name=local_asset_id,json=localAssetId,proto3" json:"local_asset_id,omitempty"`
-	LastError                 string                 `protobuf:"bytes,9,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
-	UpdatedAt                 *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	Dialect                   modelv1.ModelDialect   `protobuf:"varint,11,opt,name=dialect,proto3,enum=yufeng.model.v1.ModelDialect" json:"dialect,omitempty"`
-	EdgeReady                 bool                   `protobuf:"varint,12,opt,name=edge_ready,json=edgeReady,proto3" json:"edge_ready,omitempty"`
-	LocalUnitId               string                 `protobuf:"bytes,13,opt,name=local_unit_id,json=localUnitId,proto3" json:"local_unit_id,omitempty"`
-	DeploymentSpecDigest      string                 `protobuf:"bytes,14,opt,name=deployment_spec_digest,json=deploymentSpecDigest,proto3" json:"deployment_spec_digest,omitempty"`
-	ExpectedGenerationId      string                 `protobuf:"bytes,15,opt,name=expected_generation_id,json=expectedGenerationId,proto3" json:"expected_generation_id,omitempty"`
-	ExpectedGenerationSeq     int64                  `protobuf:"varint,16,opt,name=expected_generation_seq,json=expectedGenerationSeq,proto3" json:"expected_generation_seq,omitempty"`
-	ExpectedListenPlanVersion uint64                 `protobuf:"varint,17,opt,name=expected_listen_plan_version,json=expectedListenPlanVersion,proto3" json:"expected_listen_plan_version,omitempty"`
+	DataplaneReady bool `protobuf:"varint,7,opt,name=dataplane_ready,json=dataplaneReady,proto3" json:"dataplane_ready,omitempty"`
+	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
+	LocalAssetId string                 `protobuf:"bytes,8,opt,name=local_asset_id,json=localAssetId,proto3" json:"local_asset_id,omitempty"`
+	LastError    string                 `protobuf:"bytes,9,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	UpdatedAt    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Dialect      modelv1.ModelDialect   `protobuf:"varint,11,opt,name=dialect,proto3,enum=yufeng.model.v1.ModelDialect" json:"dialect,omitempty"`
+	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
+	EdgeReady bool `protobuf:"varint,12,opt,name=edge_ready,json=edgeReady,proto3" json:"edge_ready,omitempty"`
+	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
+	LocalUnitId string `protobuf:"bytes,13,opt,name=local_unit_id,json=localUnitId,proto3" json:"local_unit_id,omitempty"`
+	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
+	DeploymentSpecDigest string `protobuf:"bytes,14,opt,name=deployment_spec_digest,json=deploymentSpecDigest,proto3" json:"deployment_spec_digest,omitempty"`
+	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
+	ExpectedGenerationId string `protobuf:"bytes,15,opt,name=expected_generation_id,json=expectedGenerationId,proto3" json:"expected_generation_id,omitempty"`
+	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
+	ExpectedGenerationSeq int64 `protobuf:"varint,16,opt,name=expected_generation_seq,json=expectedGenerationSeq,proto3" json:"expected_generation_seq,omitempty"`
+	// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
+	ExpectedListenPlanVersion uint64 `protobuf:"varint,17,opt,name=expected_listen_plan_version,json=expectedListenPlanVersion,proto3" json:"expected_listen_plan_version,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -335,6 +344,7 @@ func (x *GetOnboardingResponse) GetDataplaneReady() bool {
 	return false
 }
 
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 func (x *GetOnboardingResponse) GetLocalAssetId() string {
 	if x != nil {
 		return x.LocalAssetId
@@ -363,6 +373,7 @@ func (x *GetOnboardingResponse) GetDialect() modelv1.ModelDialect {
 	return modelv1.ModelDialect(0)
 }
 
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 func (x *GetOnboardingResponse) GetEdgeReady() bool {
 	if x != nil {
 		return x.EdgeReady
@@ -370,6 +381,7 @@ func (x *GetOnboardingResponse) GetEdgeReady() bool {
 	return false
 }
 
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 func (x *GetOnboardingResponse) GetLocalUnitId() string {
 	if x != nil {
 		return x.LocalUnitId
@@ -377,6 +389,7 @@ func (x *GetOnboardingResponse) GetLocalUnitId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 func (x *GetOnboardingResponse) GetDeploymentSpecDigest() string {
 	if x != nil {
 		return x.DeploymentSpecDigest
@@ -384,6 +397,7 @@ func (x *GetOnboardingResponse) GetDeploymentSpecDigest() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 func (x *GetOnboardingResponse) GetExpectedGenerationId() string {
 	if x != nil {
 		return x.ExpectedGenerationId
@@ -391,6 +405,7 @@ func (x *GetOnboardingResponse) GetExpectedGenerationId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 func (x *GetOnboardingResponse) GetExpectedGenerationSeq() int64 {
 	if x != nil {
 		return x.ExpectedGenerationSeq
@@ -398,6 +413,7 @@ func (x *GetOnboardingResponse) GetExpectedGenerationSeq() int64 {
 	return 0
 }
 
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 func (x *GetOnboardingResponse) GetExpectedListenPlanVersion() uint64 {
 	if x != nil {
 		return x.ExpectedListenPlanVersion
@@ -841,6 +857,8 @@ func (*DeployDataplaneResponse) Descriptor() ([]byte, []int) {
 }
 
 // ModelProfileSpecification 是管理员提交、由 Brain 编进签名制品的模型策略。
+//
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 type ModelProfileSpecification struct {
 	state                      protoimpl.MessageState `protogen:"open.v1"`
 	ProfileId                  string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
@@ -990,6 +1008,8 @@ func (x *ModelProfileSpecification) GetReviewInsufficientCoverage() bool {
 }
 
 // PutDeploymentSpecificationRequest 提交人工部署所需的确定性规格。
+//
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 type PutDeploymentSpecificationRequest struct {
 	state      protoimpl.MessageState  `protogen:"open.v1"`
 	UnitId     string                  `protobuf:"bytes,1,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
@@ -1130,6 +1150,8 @@ func (*PutDeploymentSpecificationRequest_ReverseProxy) isPutDeploymentSpecificat
 func (*PutDeploymentSpecificationRequest_ExtAuthz) isPutDeploymentSpecificationRequest_Target() {}
 
 // PutDeploymentSpecificationResponse 返回人工安装后 Edge 应装载的版本坐标。
+//
+// Deprecated: Marked as deprecated in yufeng/onboarding/v1/onboarding.proto.
 type PutDeploymentSpecificationResponse struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	UnitId               string                 `protobuf:"bytes,1,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
@@ -1295,7 +1317,7 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"%yufeng/onboarding/v1/onboarding.proto\x12\x14yufeng.onboarding.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1byufeng/artifact/v1/v1.proto\x1a\x19yufeng/common/v1/v1.proto\x1a\x1byufeng/model/v1/model.proto\"?\n" +
 	"\x0eOnboardingGate\x12-\n" +
 	"\x12missing_predicates\x18\x01 \x03(\x05R\x11missingPredicates\"\x16\n" +
-	"\x14GetOnboardingRequest\"\xf8\x05\n" +
+	"\x14GetOnboardingRequest\"\x94\x06\n" +
 	"\x15GetOnboardingResponse\x12;\n" +
 	"\x05state\x18\x01 \x01(\x0e2%.yufeng.onboarding.v1.OnboardingStateR\x05state\x12\x19\n" +
 	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\x12\x14\n" +
@@ -1305,21 +1327,21 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\vsecret_hint\x18\x05 \x01(\tR\n" +
 	"secretHint\x12#\n" +
 	"\rjarvis_online\x18\x06 \x01(\bR\fjarvisOnline\x12+\n" +
-	"\x0fdataplane_ready\x18\a \x01(\bB\x02\x18\x01R\x0edataplaneReady\x12$\n" +
-	"\x0elocal_asset_id\x18\b \x01(\tR\flocalAssetId\x12\x1d\n" +
+	"\x0fdataplane_ready\x18\a \x01(\bB\x02\x18\x01R\x0edataplaneReady\x12(\n" +
+	"\x0elocal_asset_id\x18\b \x01(\tB\x02\x18\x01R\flocalAssetId\x12\x1d\n" +
 	"\n" +
 	"last_error\x18\t \x01(\tR\tlastError\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x127\n" +
-	"\adialect\x18\v \x01(\x0e2\x1d.yufeng.model.v1.ModelDialectR\adialect\x12\x1d\n" +
+	"\adialect\x18\v \x01(\x0e2\x1d.yufeng.model.v1.ModelDialectR\adialect\x12!\n" +
 	"\n" +
-	"edge_ready\x18\f \x01(\bR\tedgeReady\x12\"\n" +
-	"\rlocal_unit_id\x18\r \x01(\tR\vlocalUnitId\x124\n" +
-	"\x16deployment_spec_digest\x18\x0e \x01(\tR\x14deploymentSpecDigest\x124\n" +
-	"\x16expected_generation_id\x18\x0f \x01(\tR\x14expectedGenerationId\x126\n" +
-	"\x17expected_generation_seq\x18\x10 \x01(\x03R\x15expectedGenerationSeq\x12?\n" +
-	"\x1cexpected_listen_plan_version\x18\x11 \x01(\x04R\x19expectedListenPlanVersion\"\x99\x01\n" +
+	"edge_ready\x18\f \x01(\bB\x02\x18\x01R\tedgeReady\x12&\n" +
+	"\rlocal_unit_id\x18\r \x01(\tB\x02\x18\x01R\vlocalUnitId\x128\n" +
+	"\x16deployment_spec_digest\x18\x0e \x01(\tB\x02\x18\x01R\x14deploymentSpecDigest\x128\n" +
+	"\x16expected_generation_id\x18\x0f \x01(\tB\x02\x18\x01R\x14expectedGenerationId\x12:\n" +
+	"\x17expected_generation_seq\x18\x10 \x01(\x03B\x02\x18\x01R\x15expectedGenerationSeq\x12C\n" +
+	"\x1cexpected_listen_plan_version\x18\x11 \x01(\x04B\x02\x18\x01R\x19expectedListenPlanVersion\"\x99\x01\n" +
 	"\x15PutModelConfigRequest\x12\x19\n" +
 	"\bbase_url\x18\x01 \x01(\tR\abaseUrl\x12\x16\n" +
 	"\x06secret\x18\x02 \x01(\tR\x06secret\x12\x14\n" +
@@ -1341,7 +1363,7 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\fupstream_url\x18\x02 \x01(\tR\vupstreamUrl\"7\n" +
 	"\x0eExtAuthzTarget\x12%\n" +
 	"\x0elisten_address\x18\x01 \x01(\tR\rlistenAddress\"\x1d\n" +
-	"\x17DeployDataplaneResponse:\x02\x18\x01\"\x84\x05\n" +
+	"\x17DeployDataplaneResponse:\x02\x18\x01\"\x88\x05\n" +
 	"\x19ModelProfileSpecification\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\x12\x1f\n" +
@@ -1361,7 +1383,7 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\x0fallowed_headers\x18\v \x03(\tR\x0eallowedHeaders\x12$\n" +
 	"\x0emax_body_bytes\x18\f \x01(\x05R\fmaxBodyBytes\x12*\n" +
 	"\x11review_new_routes\x18\r \x01(\bR\x0freviewNewRoutes\x12@\n" +
-	"\x1creview_insufficient_coverage\x18\x0e \x01(\bR\x1areviewInsufficientCoverage\"\xb4\x04\n" +
+	"\x1creview_insufficient_coverage\x18\x0e \x01(\bR\x1areviewInsufficientCoverage:\x02\x18\x01\"\xb8\x04\n" +
 	"!PutDeploymentSpecificationRequest\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x19\n" +
 	"\basset_id\x18\x02 \x01(\tR\aassetId\x12:\n" +
@@ -1372,17 +1394,17 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\text_authz\x18\x06 \x01(\v2$.yufeng.onboarding.v1.ExtAuthzTargetH\x00R\bextAuthz\x12.\n" +
 	"\x13trusted_proxy_cidrs\x18\a \x03(\tR\x11trustedProxyCidrs\x12T\n" +
 	"\rmodel_profile\x18\b \x01(\v2/.yufeng.onboarding.v1.ModelProfileSpecificationR\fmodelProfile\x12X\n" +
-	"\x14model_ingress_window\x18\t \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\x12modelIngressWindowB\b\n" +
-	"\x06target\"\x8a\x02\n" +
+	"\x14model_ingress_window\x18\t \x01(\v2&.yufeng.artifact.v1.ModelIngressWindowR\x12modelIngressWindow:\x02\x18\x01B\b\n" +
+	"\x06target\"\x8e\x02\n" +
 	"\"PutDeploymentSpecificationResponse\x12\x17\n" +
 	"\aunit_id\x18\x01 \x01(\tR\x06unitId\x12\x19\n" +
 	"\basset_id\x18\x02 \x01(\tR\aassetId\x124\n" +
 	"\x16deployment_spec_digest\x18\x03 \x01(\tR\x14deploymentSpecDigest\x12.\n" +
 	"\x13listen_plan_version\x18\x04 \x01(\x04R\x11listenPlanVersion\x12#\n" +
 	"\rgeneration_id\x18\x05 \x01(\tR\fgenerationId\x12%\n" +
-	"\x0egeneration_seq\x18\x06 \x01(\x03R\rgenerationSeq\"\x1b\n" +
+	"\x0egeneration_seq\x18\x06 \x01(\x03R\rgenerationSeq:\x02\x18\x01\"\x1b\n" +
 	"\x19CompleteOnboardingRequest\"\x1c\n" +
-	"\x1aCompleteOnboardingResponse*\x9f\x02\n" +
+	"\x1aCompleteOnboardingResponse*\xa3\x02\n" +
 	"\x0fOnboardingState\x12 \n" +
 	"\x1cONBOARDING_STATE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18ONBOARDING_STATE_PENDING\x10\x01\x12%\n" +
@@ -1390,17 +1412,17 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\x1bONBOARDING_STATE_MODEL_LIVE\x10\x03\x12'\n" +
 	"\x1fONBOARDING_STATE_DATAPLANE_LIVE\x10\x04\x1a\x02\b\x01\x12\x1e\n" +
 	"\x1aONBOARDING_STATE_COMPLETED\x10\x05\x12\x1b\n" +
-	"\x17ONBOARDING_STATE_FAILED\x10\x06\x12\x1e\n" +
-	"\x1aONBOARDING_STATE_EDGE_LIVE\x10\a*f\n" +
+	"\x17ONBOARDING_STATE_FAILED\x10\x06\x12\"\n" +
+	"\x1aONBOARDING_STATE_EDGE_LIVE\x10\a\x1a\x02\b\x01*f\n" +
 	"\x0fModelDedupeRule\x12!\n" +
 	"\x1dMODEL_DEDUPE_RULE_UNSPECIFIED\x10\x00\x120\n" +
-	",MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE\x10\x012\xed\x05\n" +
+	",MODEL_DEDUPE_RULE_METHOD_ROUTE_HIGHEST_SCORE\x10\x012\xf2\x05\n" +
 	"\x11OnboardingService\x12h\n" +
 	"\rGetOnboarding\x12*.yufeng.onboarding.v1.GetOnboardingRequest\x1a+.yufeng.onboarding.v1.GetOnboardingResponse\x12k\n" +
 	"\x0ePutModelConfig\x12+.yufeng.onboarding.v1.PutModelConfigRequest\x1a,.yufeng.onboarding.v1.PutModelConfigResponse\x12\x80\x01\n" +
 	"\x15TestModelConnectivity\x122.yufeng.onboarding.v1.TestModelConnectivityRequest\x1a3.yufeng.onboarding.v1.TestModelConnectivityResponse\x12s\n" +
-	"\x0fDeployDataplane\x12,.yufeng.onboarding.v1.DeployDataplaneRequest\x1a-.yufeng.onboarding.v1.DeployDataplaneResponse\"\x03\x88\x02\x01\x12\x8f\x01\n" +
-	"\x1aPutDeploymentSpecification\x127.yufeng.onboarding.v1.PutDeploymentSpecificationRequest\x1a8.yufeng.onboarding.v1.PutDeploymentSpecificationResponse\x12w\n" +
+	"\x0fDeployDataplane\x12,.yufeng.onboarding.v1.DeployDataplaneRequest\x1a-.yufeng.onboarding.v1.DeployDataplaneResponse\"\x03\x88\x02\x01\x12\x94\x01\n" +
+	"\x1aPutDeploymentSpecification\x127.yufeng.onboarding.v1.PutDeploymentSpecificationRequest\x1a8.yufeng.onboarding.v1.PutDeploymentSpecificationResponse\"\x03\x88\x02\x01\x12w\n" +
 	"\x12CompleteOnboarding\x12/.yufeng.onboarding.v1.CompleteOnboardingRequest\x1a0.yufeng.onboarding.v1.CompleteOnboardingResponseB\x1fZ\x1dyufeng/proto/gen/onboardingv1b\x06proto3"
 
 var (

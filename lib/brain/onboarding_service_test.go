@@ -15,20 +15,15 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"yufeng/lib/kernel"
 	"yufeng/lib/store"
 
 	agentv1 "yufeng/proto/gen/agentv1"
-	artifactv1 "yufeng/proto/gen/artifactv1"
 	authv1 "yufeng/proto/gen/authv1"
-	commonv1 "yufeng/proto/gen/commonv1"
-	grantv1 "yufeng/proto/gen/grantv1"
 	modelv1 "yufeng/proto/gen/modelv1"
 	onboardingv1 "yufeng/proto/gen/onboardingv1"
 	"yufeng/proto/gen/onboardingv1/onboardingv1connect"
-	userv1 "yufeng/proto/gen/userv1"
 )
 
 func TestCheckRequiredServicesRefuseStart(t *testing.T) {
@@ -417,16 +412,11 @@ func TestCompleteChatFromSlot(t *testing.T) {
 	}
 }
 
-func TestDeploymentSpecificationAndManualEdgeReadinessCompleteOnboarding(t *testing.T) {
+func TestRetiredDeploymentSpecificationAndTwoPredicateCompletion(t *testing.T) {
 	st, ctx := openTestStore(t)
 	defer st.Close()
 	h := newOnboardHarness(t, st)
 	ob := NewOnboardingServer(st.Pool(), h.jarvisID)
-	_, signingKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ob.signingKey = signingKey
 	ob.completeFn = func(context.Context, string, string, string, []chatMessage) (string, error) {
 		return "ok", nil
 	}
@@ -438,115 +428,17 @@ func TestDeploymentSpecificationAndManualEdgeReadinessCompleteOnboarding(t *test
 	if _, err := ob.TestModelConnectivity(ctx, bearerReq(h.adminTok, &onboardingv1.TestModelConnectivityRequest{})); err != nil {
 		t.Fatal(err)
 	}
-	unitID := "edge-manual-" + newTestSuffix()
-	specification := &onboardingv1.PutDeploymentSpecificationRequest{
-		UnitId: unitID, AssetId: h.local,
-		Posture:    commonv1.IngressPosture_INGRESS_POSTURE_REVERSE_PROXY,
-		TrafficKey: "manual-edge", ModelProfile: modelProfileSpecification(kernel.DefaultModelProfile()),
-		Target: &onboardingv1.PutDeploymentSpecificationRequest_ReverseProxy{ReverseProxy: &onboardingv1.ReverseProxyTarget{
-			ListenAddress: ":18080", UpstreamUrl: "http://app:8080",
-		}},
+	if _, err := ob.PutDeploymentSpecification(ctx, bearerReq(h.adminTok, &onboardingv1.PutDeploymentSpecificationRequest{})); connect.CodeOf(err) != connect.CodeUnimplemented {
+		t.Fatalf("retired deployment specification want unimplemented, got %v", err)
 	}
-	firstSpecification, err := ob.PutDeploymentSpecification(ctx, bearerReq(h.adminTok, specification))
-	if err != nil {
-		t.Fatal(err)
+	_, err := ob.CompleteOnboarding(ctx, bearerReq(h.adminTok, &onboardingv1.CompleteOnboardingRequest{}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("offline Jarvis must block completion: %v", err)
 	}
-	secondSpecification, err := ob.PutDeploymentSpecification(ctx, bearerReq(h.adminTok, specification))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if firstSpecification.Msg.GetGenerationId() == "" || firstSpecification.Msg.GetGenerationSeq() <= 0 ||
-		firstSpecification.Msg.GetListenPlanVersion() == 0 ||
-		firstSpecification.Msg.GetGenerationId() != secondSpecification.Msg.GetGenerationId() ||
-		firstSpecification.Msg.GetListenPlanVersion() != secondSpecification.Msg.GetListenPlanVersion() {
-		t.Fatalf("deterministic specification coordinates first=%v second=%v", firstSpecification.Msg, secondSpecification.Msg)
-	}
-	var listenPlanRaw []byte
-	if err := st.Pool().QueryRow(ctx, `SELECT envelope FROM unit_listen_plans WHERE unit_id=$1 AND version=$2`,
-		unitID, firstSpecification.Msg.GetListenPlanVersion()).Scan(&listenPlanRaw); err != nil {
-		t.Fatal(err)
-	}
-	var listenPlan artifactv1.UnitListenPlan
-	if err := protojson.Unmarshal(listenPlanRaw, &listenPlan); err != nil {
-		t.Fatal(err)
-	}
-	if !listenPlan.GetModelIngressWindow().GetMaxQueueAge().IsValid() ||
-		listenPlan.GetModelIngressWindow().GetMaxItems() != kernel.ModelIngressDefaultItems ||
-		listenPlan.GetModelIngressWindow().GetMaxRetainedBytes() != kernel.ModelIngressDefaultBytes {
-		t.Fatalf("default model ingress window was not frozen into listen plan: %v", listenPlan.GetModelIngressWindow())
-	}
-	var deploymentInstructions int
-	if err := st.Pool().QueryRow(ctx, `SELECT count(*) FROM agent_instructions WHERE kind LIKE 'ONBOARDING%'`).Scan(&deploymentInstructions); err != nil {
-		t.Fatal(err)
-	}
-	if deploymentInstructions != 0 {
-		t.Fatal("deployment specification must not create a Jarvis instruction")
-	}
-	var modelSideUnitID, modelSideAssetID, modelSideCertificate string
-	if err := st.Pool().QueryRow(ctx, `SELECT unit_id,asset_id,client_cert_sha256 FROM modelside_identities WHERE modelside_id=$1`, modelSideIDForUnit(unitID)).
-		Scan(&modelSideUnitID, &modelSideAssetID, &modelSideCertificate); err != nil {
-		t.Fatal(err)
-	}
-	if modelSideUnitID != unitID || modelSideAssetID != h.local || modelSideCertificate != "" {
-		t.Fatalf("predeclared ModelSide identity unit=%q asset=%q certificate=%q", modelSideUnitID, modelSideAssetID, modelSideCertificate)
+	if gate := onboardingGateOf(t, err); len(gate.MissingPredicates) != 1 || gate.MissingPredicates[0] != 2 {
+		t.Fatalf("missing=%v want only Jarvis", gate.MissingPredicates)
 	}
 	if err := touchJarvis(ctx, st, h.jarvisID); err != nil {
-		t.Fatal(err)
-	}
-	extraAsset := "asset-x-" + newTestSuffix()
-	if _, err := st.Pool().Exec(ctx, `INSERT INTO assets(asset_id, display_name, max_auto_tier) VALUES($1,$1,'L1')`, extraAsset); err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = ob.CompleteOnboarding(ctx, bearerReq(h.adminTok, &onboardingv1.CompleteOnboardingRequest{}))
-	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("offline manual Edge must block completion: %v", err)
-	}
-	if !containsInt(onboardingGateOf(t, err).MissingPredicates, 3) {
-		t.Fatalf("missing=%v want edge readiness", onboardingGateOf(t, err).MissingPredicates)
-	}
-	if _, err := st.Pool().Exec(ctx, `UPDATE units SET last_heartbeat_at=now(), current_generation_id=$2,
-		current_generation_seq=$3,current_listen_plan_version=$4 WHERE unit_id=$1`, unitID,
-		firstSpecification.Msg.GetGenerationId(), firstSpecification.Msg.GetGenerationSeq(), firstSpecification.Msg.GetListenPlanVersion()); err != nil {
-		t.Fatal(err)
-	}
-	if got := mustGetOnboarding(t, ctx, ob, h.adminTok); got.GetState() != onboardingv1.OnboardingState_ONBOARDING_STATE_EDGE_LIVE || !got.GetEdgeReady() {
-		t.Fatalf("manual edge readiness projection=%v", got)
-	}
-
-	users := NewUserServer(st.Pool(), 8)
-	opName := "g2op-" + newTestSuffix()
-	op, err := users.CreateUser(ctx, bearerReq(h.adminTok, &userv1.CreateUserRequest{
-		Username: opName, Password: "Operator123", Role: commonv1.UserRole_USER_ROLE_OPERATOR,
-	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	grants := NewGrantServer(st.Pool())
-	if _, err := grants.PutGrant(ctx, bearerReq(h.adminTok, &grantv1.PutGrantRequest{
-		SubjectUserId: op.Msg.User.UserId,
-		Tools:         []string{"govern.promote_canary"},
-		Bindings:      []*grantv1.BindingRef{{Kind: "asset", Id: h.local}},
-	})); err != nil {
-		t.Fatal(err)
-	}
-	_, err = ob.CompleteOnboarding(ctx, bearerReq(h.adminTok, &onboardingv1.CompleteOnboardingRequest{}))
-	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("canary-only want failed_precondition, got %v", err)
-	}
-	if !containsInt(onboardingGateOf(t, err).MissingPredicates, 4) {
-		t.Fatalf("canary-only missing=%v", onboardingGateOf(t, err).MissingPredicates)
-	}
-
-	if _, err := grants.PutGrant(ctx, bearerReq(h.adminTok, &grantv1.PutGrantRequest{
-		SubjectUserId: op.Msg.User.UserId,
-		Tools:         []string{"govern.promote_enforce"},
-		Bindings:      []*grantv1.BindingRef{{Kind: "asset", Id: h.local}},
-	})); err != nil {
-		t.Fatal(err)
-	}
-	var grantsBefore int
-	if err := st.Pool().QueryRow(ctx, `SELECT count(*) FROM grants WHERE subject_id=$1`, op.Msg.User.UserId).Scan(&grantsBefore); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ob.CompleteOnboarding(ctx, bearerReq(h.adminTok, &onboardingv1.CompleteOnboardingRequest{})); err != nil {
@@ -555,14 +447,6 @@ func TestDeploymentSpecificationAndManualEdgeReadinessCompleteOnboarding(t *test
 	if mustOnboardingState(t, ctx, st) != OnboardingStateCompleted {
 		t.Fatal("want COMPLETED")
 	}
-	var grantsAfter int
-	if err := st.Pool().QueryRow(ctx, `SELECT count(*) FROM grants WHERE subject_id=$1`, op.Msg.User.UserId).Scan(&grantsAfter); err != nil {
-		t.Fatal(err)
-	}
-	if grantsAfter != grantsBefore {
-		t.Fatalf("CompleteOnboarding must not rewrite other grants: before=%d after=%d", grantsBefore, grantsAfter)
-	}
-
 	auth := NewAuthServer(st.Pool(), time.Hour, false, 8)
 	adminMe, err := auth.GetMe(ctx, bearerReq(h.adminTok, &authv1.GetMeRequest{}))
 	if err != nil {
@@ -577,18 +461,9 @@ func TestDeploymentSpecificationAndManualEdgeReadinessCompleteOnboarding(t *test
 	if !bindingHas(adminMe.Msg.Access.GetBindings(), "asset", h.local) {
 		t.Fatalf("admin bindings=%v want %s", adminMe.Msg.Access.GetBindings(), h.local)
 	}
-	if !bindingHas(adminMe.Msg.Access.GetBindings(), "asset", extraAsset) {
-		t.Fatalf("admin bindings=%v want extra %s", adminMe.Msg.Access.GetBindings(), extraAsset)
-	}
-	opLogin, err := auth.Login(ctx, connect.NewRequest(&authv1.LoginRequest{Username: opName, Password: "Operator123"}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !containsAll(opLogin.Msg.Access.GetTools(), "govern.promote_enforce") {
-		t.Fatalf("operator tools=%v", opLogin.Msg.Access.GetTools())
-	}
-	if !bindingHas(opLogin.Msg.Access.GetBindings(), "asset", h.local) {
-		t.Fatalf("operator bindings=%v", opLogin.Msg.Access.GetBindings())
+	view := mustGetOnboarding(t, ctx, ob, h.adminTok)
+	if view.GetEdgeReady() || view.GetLocalUnitId() != "" || view.GetDeploymentSpecDigest() != "" {
+		t.Fatalf("retired Edge onboarding fields must be empty: %v", view)
 	}
 }
 
@@ -679,7 +554,7 @@ func onboardingGateOf(t *testing.T, err error) *onboardingv1.OnboardingGate {
 	}
 	prev := int32(-1)
 	for _, n := range gate.MissingPredicates {
-		if n < 1 || n > 4 || n <= prev {
+		if n < 1 || n > 2 || n <= prev {
 			t.Fatalf("missing_predicates=%v", gate.MissingPredicates)
 		}
 		prev = n

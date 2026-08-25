@@ -151,12 +151,8 @@ func TestListCutsByBindingsAndOnboarding(t *testing.T) {
 	}
 	listA := connect.NewRequest(&assetv1.ListAssetsRequest{})
 	listA.Header().Set("Authorization", "Bearer "+login.Msg.Token)
-	got, err := assets.ListAssets(ctx, listA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got.Msg.Assets) != 2 {
-		t.Fatalf("dataplane-live onboarding must expose all existing assets, got %v", got.Msg.Assets)
+	if _, err := assets.ListAssets(ctx, listA); !isReason(err, connect.CodeFailedPrecondition, "onboarding_incomplete") {
+		t.Fatalf("asset list before completed onboarding want onboarding_incomplete, got %v", err)
 	}
 
 	users := NewUserServer(st.Pool(), 8)
@@ -447,14 +443,14 @@ func TestBootNoBootstrapAssetGrant(t *testing.T) {
 	}
 	check := completeCheck{
 		AdminUserID: login.Msg.User.UserId, JarvisAgentID: "jarvis-access-" + newTestSuffix(),
-		LocalAssetID: local, ModelLive: true, EdgeReady: true,
+		LocalAssetID: local, ModelLive: true,
 	}
 	missing := missingCompletePredicates(ctx, st.Pool(), check)
-	if !containsInt(missing, 2) || !containsInt(missing, 4) {
-		t.Fatalf("missing predicates=%v want 2 and 4", missing)
+	if len(missing) != 1 || !containsInt(missing, 2) {
+		t.Fatalf("missing predicates=%v want only 2", missing)
 	}
 	if _, err := completeOnboarding(ctx, st.Pool(), check); err == nil {
-		t.Fatal("complete without four predicates must fail")
+		t.Fatal("complete without both predicates must fail")
 	}
 	var state string
 	_ = st.Pool().QueryRow(ctx, `SELECT state FROM deployment_onboarding WHERE id=1`).Scan(&state)
@@ -466,16 +462,8 @@ func TestBootNoBootstrapAssetGrant(t *testing.T) {
 		VALUES($1,'x','orchestrator',now())`, check.JarvisAgentID); err != nil {
 		t.Fatal(err)
 	}
-	other := "usr-other-" + newTestSuffix()
-	if _, err := st.Pool().Exec(ctx, `INSERT INTO users(user_id, username, display_name, role, state, password_hash)
-		VALUES($1,$1,$1,'operator','active','x')`, other); err != nil {
-		t.Fatal(err)
-	}
-	if err := insertUserGrant(ctx, st.Pool(), other, []string{"govern.promote_enforce"}, local); err != nil {
-		t.Fatal(err)
-	}
 	if missing = missingCompletePredicates(ctx, st.Pool(), check); len(missing) != 0 {
-		t.Fatalf("all four should pass, missing=%v", missing)
+		t.Fatalf("both predicates should pass, missing=%v", missing)
 	}
 	if _, err := completeOnboarding(ctx, st.Pool(), check); err != nil {
 		t.Fatal(err)

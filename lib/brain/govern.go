@@ -1072,6 +1072,11 @@ func publishAssetGeneration(ctx context.Context, db dbTX, assetID string, key ed
 	}
 	_, err = db.Exec(ctx, `INSERT INTO asset_generations(generation_id, asset_id, generation_seq, envelope, signed)
 		VALUES($1,$2,$3,$4::jsonb,true)`, gen.GenerationId, assetID, gen.GenerationSeq, env)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(ctx, `UPDATE edge_enrollments SET expected_generation_id=$2,
+		expected_generation_seq=$3,updated_at=now() WHERE asset_id=$1`, assetID, gen.GenerationId, gen.GenerationSeq)
 	return err
 }
 

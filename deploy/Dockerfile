@@ -36,7 +36,7 @@ RUN CGO_ENABLED=0 go build -trimpath \
 FROM alpine:3.20
 RUN addgroup -S yufeng && adduser -S yufeng -G yufeng \
     && apk add --no-cache wget \
-    && mkdir -p /var/lib/yufeng/cache /var/lib/yufeng/telemetry /var/lib/yufeng/jarvis /usr/share/yufeng/console \
+    && mkdir -p /var/lib/yufeng/cache /var/lib/yufeng/telemetry /var/lib/yufeng/jarvis /var/lib/yufeng/agentd /usr/share/yufeng/console \
     && chown -R yufeng:yufeng /var/lib/yufeng /usr/share/yufeng
 COPY --from=build /out/yufeng-brain /out/yufeng-jarvis /out/yufeng-agentd /out/yufeng-host /out/yufeng-run /out/yfctl /usr/local/bin/
 COPY --from=console /console/dist /usr/share/yufeng/console

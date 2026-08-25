@@ -1,6 +1,6 @@
 # 控制台
 
-御锋 2.0 控制台前端采用 Vite、React 19、TypeScript、HeroUI 与 Tailwind 层叠样式表。交付时由 `yufeng-brain` 托管在 `/app`（[`docs/api.md`](../docs/api.md) 第 17.1 节）；开发期仍可使用 Vite 服务器。六步初次配置页、权限授予页、提案意图、会话与幂等键复用均已实现。
+御锋 2.0 控制台前端采用 Vite、React 19、TypeScript、HeroUI 与 Tailwind 层叠样式表。交付时由 `yufeng-brain` 托管在 `/app`（[`docs/api.md`](../docs/api.md) 第 17.1 节）；开发期仍可使用 Vite 服务器。四步初次配置、资产与 Edge 人工接入、检测事件的模型推理与研判交付、权限授予、提案意图、会话与幂等键复用均已实现。
 
 协议与实现名词见[术语表](../docs/glossary.md#protocol-and-implementation-terms)。
 

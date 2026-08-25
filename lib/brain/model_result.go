@@ -235,10 +235,11 @@ func (s *ModelResultServer) ingestResult(ctx context.Context, principal modelSid
 		threshold = profile.GetAlertThreshold()
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO model_inferences(inference_id,event_id,model_group,model_type,model_version,
-		threshold,score,model_profile_digest,request_id,result_kind)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, inferenceID, event.GetId(), result.GetModelGroup(),
-		result.GetModelType(), result.GetModelVersion(), threshold, result.GetScore(), result.GetModelProfileDigest(),
-		result.GetRequestId(), modelResultKindName(result.GetKind())); err != nil {
+		threshold,score,attack_class,model_profile_digest,request_id,result_kind)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, inferenceID, event.GetId(), result.GetModelGroup(),
+		result.GetModelType(), result.GetModelVersion(), threshold, result.GetScore(),
+		commonv1.AttackClass_ATTACK_CLASS_UNMAPPED.String(), result.GetModelProfileDigest(), result.GetRequestId(),
+		modelResultKindName(result.GetKind())); err != nil {
 		return "", err
 	}
 	caseID, err := attachModelResultToCase(ctx, tx, result)

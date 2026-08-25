@@ -60,6 +60,12 @@ func TestWriteRPCRoleAndBindingsTable(t *testing.T) {
 	if _, err := st.Pool().Exec(ctx, `INSERT INTO assets(asset_id, display_name, max_auto_tier) VALUES($1,$1,'L1')`, assetID); err != nil {
 		t.Fatal(err)
 	}
+	if err := writeAdminSystemGrant(ctx, st.Pool(), adminLogin.Msg.GetUser().GetUserId(), assetID); err != nil {
+		t.Fatal(err)
+	}
+	if err := SeedOnboardingState(ctx, st.Pool(), OnboardingStateCompleted, assetID); err != nil {
+		t.Fatal(err)
+	}
 	seedTaxonomyGeneration(t, ctx, st.Pool(), assetID)
 	relID := "wa-rel-" + newTestSuffix()
 	if _, err := st.Pool().Exec(ctx, `INSERT INTO releases(release_id, state, artifact, ttl_seconds, created_by)
