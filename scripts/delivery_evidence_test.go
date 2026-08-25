@@ -47,7 +47,7 @@ func TestDeploymentEvidenceRemainsDiagnostic(t *testing.T) {
 	}
 }
 
-func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
+func TestContinuousIntegrationUsesOneRequiredResult(t *testing.T) {
 	body, err := os.ReadFile("../.github/workflows/ci.yml")
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
 			t.Errorf("continuous integration workflow missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"branches: [develop]", "release-gate.yml", "pull-request.yml", "bufbuild/buf-setup-action"} {
+	for _, forbidden := range []string{"branches: [develop]", "release-gate.yml", "pull-request.yml", "bufbuild/buf-setup-action", "timeout-minutes:"} {
 		if strings.Contains(workflow, forbidden) {
 			t.Errorf("continuous integration retains retired topology %q", forbidden)
 		}
@@ -106,6 +106,7 @@ func TestDevelopmentPlatformCompatibilityRemainsAdvisory(t *testing.T) {
 		"pull_request:",
 		"push:",
 		"schedule:",
+		"timeout-minutes:",
 		"needs:",
 		"actions/setup-node@",
 		"npm ci",
@@ -114,6 +115,22 @@ func TestDevelopmentPlatformCompatibilityRemainsAdvisory(t *testing.T) {
 	} {
 		if strings.Contains(workflow, forbidden) {
 			t.Errorf("advisory compatibility workflow must not become a merge gate through %q", forbidden)
+		}
+	}
+}
+
+func TestBuildWorkflowsDoNotGateOnElapsedTime(t *testing.T) {
+	for _, path := range []string{
+		"../.github/workflows/ci.yml",
+		"../.github/workflows/compatibility.yml",
+		"../.github/workflows/release.yml",
+	} {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(body), "timeout-minutes:") {
+			t.Errorf("%s gates build success on elapsed time", path)
 		}
 	}
 }

@@ -306,7 +306,7 @@ AgentThread
 | 控制台 API 客户端 | Connect-ES 生成客户端（后接） | `@connectrpc/connect` + `@connectrpc/connect-web` | **本档不强制**。手写 `ConnectClient` 可交付；生成客户端落地后只替换适配层内部 |
 | 基础配置 | 命令行 flag + 环境变量 | Go 标准库 | 已落地 |
 | 文件配置 | 单 YAML 文件 | `yaml.v3` | 已选定未引入 |
-| 基础测试与持续集成 | build、test、vet、gofmt、golangci-lint、govulncheck、buf 检查、控制台、零 cgo 交叉编译 | Go、Node.js、Python 与 buf 工具链 | 所有工作分支通过拉取请求进入 `main`；必需清单固定在 Ubuntu 24.04，并编译 Windows 与 Intel/ARM macOS 的全部测试；需要排查平台差异时才人工触发较旧 Ubuntu、Windows 和 Intel macOS 的低并发 Go 运行，不重复控制台检查，也不因托管运行器抖动阻断合入；`main` 推送复验必需清单并留下精确提交结论，发布任务只接受该结论成功的最新 `main` |
+| 基础测试与持续集成 | build、test、vet、gofmt、golangci-lint、govulncheck、buf 检查、控制台、零 cgo 交叉编译 | Go、Node.js、Python 与 buf 工具链 | 所有工作分支通过拉取请求进入 `main`；必需清单固定在 Ubuntu 24.04，并编译 Windows 与 Intel/ARM macOS 的全部测试；需要排查平台差异时才人工触发较旧 Ubuntu、Windows 和 Intel macOS 的低并发 Go 运行，不重复控制台检查，也不因托管运行器抖动阻断合入；构建与检查耗时只供观察，仓库工作流不以运行时长判定通过；`main` 推送复验必需清单并留下精确提交结论，发布任务只接受该结论成功的最新 `main` |
 | 生产测试工具 | 完整竞态、热路径基准、Docker Compose 活路径、故障脚本 | 测试与静态分析工具链 | golangci-lint 在持续集成中统一承载 errcheck、govet、ineffassign 与 staticcheck；完整竞态、热路径基准和 Docker Compose 活路径是可重复的部署验收与定向诊断入口，不参与 Git 分支合并谱系。`scripts/onboarding-live.sh`、`production-end-to-end.sh`、`fault-injection-end-to-end.sh` 和其它 `*-live.sh` 保留定向诊断职责 |
 | 制品与能力令牌签名 | Ed25519 | Go 标准库 | 已落地 |
 | JSON Web Token 编解码库 | `golang-jwt/jwt/v5` | 第三方令牌库 | 已选定未引入；当前能力令牌由标准库手写编解码 |
