@@ -1,17 +1,21 @@
 .PHONY: build test test-development vet tidy generate demo-init run up compose-up compose-down compose-live compose-live-reset resilience-live security-live traffic-review-live performance-live backup-restore-live envoy-live delivery-evidence release-assets verify-release-assets
 
+# 显式限定平台包，避免本机安装控制台依赖后把 node_modules 中的 Go 源码纳入平台门禁。
+GO_PACKAGES := ./agents/... ./cmd/... ./components/... ./console ./deploy ./docs ./lib/... ./procedures/... ./proto/... ./scripts/...
+GO_TEST_FLAGS ?=
+
 build:
-	go build ./...
+	go build $(GO_PACKAGES)
 
 test:
-	go test ./...
+	go test $(GO_TEST_FLAGS) $(GO_PACKAGES)
 	$(MAKE) test-development
 
 test-development:
-	go test -tags yufeng_dev ./cmd/yufeng-brain ./cmd/yufeng-edge ./cmd/yfctl
+	go test $(GO_TEST_FLAGS) -tags yufeng_dev ./cmd/yufeng-brain ./cmd/yufeng-edge ./cmd/yfctl
 
 vet:
-	go vet ./...
+	go vet $(GO_PACKAGES)
 
 tidy:
 	go mod tidy

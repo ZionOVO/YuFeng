@@ -20,6 +20,9 @@ func onboardingLiveScript(t *testing.T) string {
 
 func onboardingStaticCommand(t *testing.T) *exec.Cmd {
 	t.Helper()
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("POSIX shell checks run in the canonical Linux continuous integration job")
+	}
 	cmd := exec.Command("sh", onboardingLiveScript(t), "static")
 	cmd.Dir = filepath.Dir(filepath.Dir(onboardingLiveScript(t)))
 	// 外层 go test 已单独执行 deploy 包，这里只验证脚本扫描，避免嵌套重复编译。

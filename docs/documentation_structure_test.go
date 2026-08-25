@@ -1,9 +1,12 @@
 package docs
 
 import (
+	"bytes"
+	"errors"
 	"io/fs"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -75,23 +78,14 @@ func TestCentralDocumentsUseAudienceDirectories(t *testing.T) {
 
 func TestRepositoryMarkdownRelativeLinksResolve(t *testing.T) {
 	root := repositoryRoot(t)
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			switch entry.Name() {
-			case ".git", "node_modules", ".venv", "__pycache__", "dist":
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	for _, relative := range trackedRepositoryFiles(t, root) {
+		path := filepath.Join(root, filepath.FromSlash(relative))
 		if filepath.Ext(path) != ".md" {
-			return nil
+			continue
 		}
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
 		for _, match := range markdownLinkPattern.FindAllSubmatch(raw, -1) {
 			target := strings.Trim(string(match[1]), "<>")
@@ -119,15 +113,16 @@ func TestRepositoryMarkdownRelativeLinksResolve(t *testing.T) {
 				t.Errorf("%s links missing path %q", relativePath(root, path), target)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
 func TestRetiredDocumentationDoesNotReturn(t *testing.T) {
 	root := repositoryRoot(t)
+	trackedFiles := trackedRepositoryFiles(t, root)
+	trackedPaths := make(map[string]bool, len(trackedFiles))
+	for _, relative := range trackedFiles {
+		trackedPaths[filepath.ToSlash(relative)] = true
+	}
 	retiredPaths := []string{
 		filepath.Join("docs", "de"+"sign.md"),
 		filepath.Join("docs", "yufeng-edge-"+"upgrade.md"),
@@ -138,7 +133,7 @@ func TestRetiredDocumentationDoesNotReturn(t *testing.T) {
 	}
 	retiredNames := make([]string, 0, len(retiredPaths)+4)
 	for _, relative := range retiredPaths {
-		if _, err := os.Stat(filepath.Join(root, relative)); !os.IsNotExist(err) {
+		if trackedPaths[filepath.ToSlash(relative)] {
 			t.Errorf("retired documentation path exists: %s", relative)
 		}
 		retiredNames = append(retiredNames, filepath.Base(relative))
@@ -155,35 +150,45 @@ func TestRetiredDocumentationDoesNotReturn(t *testing.T) {
 		".yaml": true, ".yml": true, ".toml": true,
 	}
 
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			switch entry.Name() {
-			case ".git", "node_modules", ".venv", "__pycache__", "dist":
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	for _, relative := range trackedFiles {
+		path := filepath.Join(root, filepath.FromSlash(relative))
 		extension := filepath.Ext(path)
-		if !textExtensions[extension] && entry.Name() != ".gitignore" {
-			return nil
+		if !textExtensions[extension] && filepath.Base(path) != ".gitignore" {
+			continue
 		}
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
 		for _, retired := range retiredNames {
 			if strings.Contains(string(raw), retired) {
 				t.Errorf("%s still references retired documentation %q", relativePath(root, path), retired)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
+}
+
+func trackedRepositoryFiles(t *testing.T, root string) []string {
+	t.Helper()
+	if _, err := os.Stat(filepath.Join(root, ".git")); errors.Is(err, os.ErrNotExist) {
+		t.Skip("tracked-file documentation checks require a Git worktree")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("tracked-file documentation checks require Git")
+	}
+	cmd := exec.Command("git", "-C", root, "ls-files", "-z")
+	raw, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("list tracked repository files: %v", err)
+	}
+	fields := bytes.Split(raw, []byte{0})
+	files := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if len(field) > 0 {
+			files = append(files, string(field))
+		}
+	}
+	return files
 }
 
 func repositoryRoot(t *testing.T) string {

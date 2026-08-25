@@ -26,6 +26,9 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.ts',
     css: false,
+    // 页面测试包含异步渲染；给低性能开发机保留调度余量，工作流级超时仍负责识别真正挂起。
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],

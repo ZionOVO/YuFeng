@@ -3,10 +3,12 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,7 +18,10 @@ import (
 const runtimeProcessHelperPrefix = "yufeng-runtime-test-helper"
 
 type runtimeProcessHelperConfig struct {
-	PIDFile string `json:"pid_file"`
+	Mode      string `json:"mode,omitempty"`
+	PIDFile   string `json:"pid_file,omitempty"`
+	ReadyPath string `json:"ready_path,omitempty"`
+	ExitPath  string `json:"exit_path,omitempty"`
 }
 
 func TestKilledSupervisorReapsRunProcessTree(t *testing.T) {
@@ -70,6 +75,9 @@ func newRuntimeProcessTestHelper(t *testing.T, config runtimeProcessHelperConfig
 	t.Helper()
 	dir := t.TempDir()
 	out := filepath.Join(dir, runtimeProcessHelperPrefix)
+	if goruntime.GOOS == "windows" {
+		out += ".exe"
+	}
 	testBinary, err := filepath.Abs(os.Args[0])
 	if err != nil {
 		t.Fatal(err)
@@ -105,6 +113,41 @@ func runRuntimeProcessHelper() error {
 	if err := LimitProcess(); err != nil {
 		return err
 	}
+	switch config.Mode {
+	case "block":
+		if err := writeRuntimeProcessHelperReady(config.ReadyPath); err != nil {
+			return err
+		}
+		for {
+			time.Sleep(time.Hour)
+		}
+	case "wait-file":
+		if err := writeRuntimeProcessHelperReady(config.ReadyPath); err != nil {
+			return err
+		}
+		for {
+			if _, err := os.Stat(config.ExitPath); err == nil {
+				return nil
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	case "check-limits":
+		for key, want := range map[string]string{
+			"YUFENG_RLIMIT_NOFILE": "128",
+			"YUFENG_MEMORY_LIMIT":  "67108864",
+			"YUFENG_RLIMIT_CPU":    "7",
+		} {
+			if got := os.Getenv(key); got != want {
+				return fmt.Errorf("%s=%q want %q", key, got, want)
+			}
+		}
+		return nil
+	case "", "process-tree":
+	default:
+		return fmt.Errorf("unknown runtime process helper mode %q", config.Mode)
+	}
 	if err := WatchSupervisor(4); err != nil {
 		return err
 	}
@@ -116,6 +159,27 @@ func runRuntimeProcessHelper() error {
 		return err
 	}
 	return child.Wait()
+}
+
+func writeRuntimeProcessHelperReady(path string) error {
+	if path == "" {
+		return nil
+	}
+	return os.WriteFile(path, []byte("ready"), 0o600)
+}
+
+func waitRuntimeProcessHelperReady(t *testing.T, path string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return
+		} else if !errors.Is(err, os.ErrNotExist) {
+			t.Fatal(err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("runtime process helper did not become ready at %s", path)
 }
 
 func waitProcessTreePIDs(t *testing.T, path string) (int, int) {

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   go:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       postgres:
@@ -33,21 +33,25 @@ jobs:
     env:
       YUFENG_TEST_DSN: postgres://postgres@localhost:5432/yufeng_test?sslmode=disable
       YUFENG_TRAFFIC_TEST_DSN: postgres://yufeng_traffic:integration-only@localhost:5432/yufeng_test?sslmode=disable
+      PYTHON: python
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.0"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.9"
       - name: Create restricted traffic writer role
         run: psql "$YUFENG_TEST_DSN" -v ON_ERROR_STOP=1 -c "CREATE ROLE yufeng_traffic LOGIN PASSWORD 'integration-only'"
       - run: make build test vet
 
   quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.0"
       - name: Check Go formatting
@@ -58,17 +62,18 @@ jobs:
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
 
   proto:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.0"
-      - uses: bufbuild/buf-setup-action@v1
+      - uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
         with:
+          version: "1.72.0"
           github_token: ${{ github.token }}
       - run: go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
       - run: go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.20.0
@@ -93,11 +98,11 @@ jobs:
       - run: git diff --exit-code -- proto/gen
 
   console:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           cache: npm
@@ -114,11 +119,11 @@ jobs:
         working-directory: console
 
   cross-compile:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.0"
       - run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./cmd/yufeng-edge ./cmd/yufeng-host
@@ -130,11 +135,19 @@ jobs:
             target_arch="${target#*/}"
             CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" go build ./cmd/yufeng-jarvis ./cmd/yufeng-agentd ./cmd/yufeng-run
           done
+      - name: Compile tests for Windows and both macOS architectures
+        run: |
+          packages=(./agents/... ./cmd/... ./components/... ./console ./deploy ./docs ./lib/... ./procedures/... ./proto/... ./scripts/...)
+          for target in windows/amd64 darwin/amd64 darwin/arm64; do
+            target_os="${target%/*}"
+            target_arch="${target#*/}"
+            CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" go test -run '^$' -exec=/usr/bin/true "${packages[@]}"
+          done
 
   required:
     name: required
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: [go, quality, proto, console, cross-compile]
     steps:

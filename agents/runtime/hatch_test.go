@@ -2,42 +2,51 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"testing"
 	"time"
 )
 
 func TestHatchTTLKillsChild(t *testing.T) {
-	if _, err := exec.LookPath("sleep"); err != nil {
-		t.Skip("sleep not available")
-	}
+	ready := filepath.Join(t.TempDir(), "ready")
+	child := newRuntimeProcessTestHelper(t, runtimeProcessHelperConfig{Mode: "block", ReadyPath: ready})
 	res := Hatch(context.Background(), HatchConfig{
-		Bin: "sleep", Args: []string{"30"}, TTL: 200 * time.Millisecond,
+		Bin: child, TTL: 2 * time.Second,
 	})
-	if res.Err == nil {
-		t.Fatal("ttl must fail the run")
+	if !errors.Is(res.Err, context.DeadlineExceeded) {
+		t.Fatalf("ttl must fail the run with deadline exceeded: %v", res.Err)
 	}
-	time.Sleep(50 * time.Millisecond)
+	if res.PID == 0 {
+		t.Fatal("ttl test child was not started")
+	}
+	if _, err := os.Stat(ready); err != nil {
+		t.Fatalf("ttl test child did not become ready: %v", err)
+	}
 	if ProcessAlive(res.PID) {
 		t.Fatalf("child pid %d still alive after ttl", res.PID)
 	}
 }
 
 func TestHatchSupervisorCancelKillsChild(t *testing.T) {
-	if _, err := exec.LookPath("sleep"); err != nil {
-		t.Skip("sleep not available")
-	}
+	ready := filepath.Join(t.TempDir(), "ready")
+	child := newRuntimeProcessTestHelper(t, runtimeProcessHelperConfig{Mode: "block", ReadyPath: ready})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan HatchResult, 1)
 	go func() {
-		done <- Hatch(ctx, HatchConfig{Bin: "sleep", Args: []string{"30"}, TTL: time.Minute})
+		done <- Hatch(ctx, HatchConfig{Bin: child, TTL: time.Minute})
 	}()
-	time.Sleep(80 * time.Millisecond)
+	waitRuntimeProcessHelperReady(t, ready)
 	cancel()
-	res := <-done
-	time.Sleep(50 * time.Millisecond)
+	var res HatchResult
+	select {
+	case res = <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("hatch did not return after supervisor cancellation")
+	}
 	if ProcessAlive(res.PID) {
 		_ = KillProcessGroup(res.PID)
 		t.Fatalf("child pid %d remained after supervisor cancel", res.PID)
@@ -46,7 +55,7 @@ func TestHatchSupervisorCancelKillsChild(t *testing.T) {
 
 func TestHatchRejectsCapabilityEnv(t *testing.T) {
 	res := Hatch(context.Background(), HatchConfig{
-		Bin: "sleep", Args: []string{"1"},
+		Bin: "must-not-start",
 		Env: []string{"YUFENG_CAPABILITY=stolen"},
 	})
 	if res.Err == nil {
@@ -59,7 +68,7 @@ func TestHatchRejectsCapabilityEnv(t *testing.T) {
 
 func TestHatchBudgetExhausted(t *testing.T) {
 	b := &CallBudget{Remaining: 0}
-	res := Hatch(context.Background(), HatchConfig{Bin: "sleep", Args: []string{"1"}, Budget: b})
+	res := Hatch(context.Background(), HatchConfig{Bin: "must-not-start", Budget: b})
 	if res.Err == nil || res.Err.Error() != "resource_exhausted" {
 		t.Fatalf("got %v", res.Err)
 	}
@@ -77,15 +86,11 @@ func TestExecuteFailsWhenMemoryExceedsLimit(t *testing.T) {
 }
 
 func TestHatchPassesResourceLimits(t *testing.T) {
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh not available")
-	}
+	child := newRuntimeProcessTestHelper(t, runtimeProcessHelperConfig{Mode: "check-limits"})
 	res := Hatch(context.Background(), HatchConfig{
-		Bin:    "sh",
-		Args:   []string{"-c", `test "$YUFENG_RLIMIT_NOFILE" = "128" && test "$YUFENG_MEMORY_LIMIT" = "67108864" && test "$YUFENG_RLIMIT_CPU" = "7"`},
-		Env:    []string{"PATH=/bin:/usr/bin"},
+		Bin:    child,
 		Limits: ResourceLimit{Files: 128, MemoryBytes: 64 << 20, CPUSeconds: 7},
-		TTL:    time.Second,
+		TTL:    10 * time.Second,
 	})
 	if res.Err != nil {
 		t.Fatalf("child must see injected resource limits: %v", res.Err)

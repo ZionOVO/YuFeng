@@ -58,14 +58,17 @@ func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
 		"pull_request:\n    branches: [main]",
 		"push:\n    branches: [main]",
 		`go-version: "1.27.0"`,
+		"runs-on: ubuntu-24.04",
 		"make build test vet",
 		"golangci-lint@v2.13.1",
 		"govulncheck@v1.7.0",
 		"protoc-gen-go@v1.36.12",
 		"protoc-gen-connect-go@v1.20.0",
+		`version: "1.72.0"`,
 		"buf breaking",
 		"npm run build",
 		"GOARCH=mips",
+		"Compile tests for Windows and both macOS architectures",
 		"name: required",
 		"needs: [go, quality, proto, console, cross-compile]",
 	} {
@@ -77,6 +80,73 @@ func TestContinuousIntegrationUsesOneFiniteRequiredResult(t *testing.T) {
 		if strings.Contains(workflow, forbidden) {
 			t.Errorf("continuous integration retains retired topology %q", forbidden)
 		}
+	}
+}
+
+func TestDevelopmentPlatformCompatibilityRemainsAdvisory(t *testing.T) {
+	body, err := os.ReadFile("../.github/workflows/compatibility.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(body)
+	for _, want := range []string{
+		"name: development-platform-compatibility",
+		"workflow_dispatch:",
+		"schedule:",
+		"ubuntu-22.04-low-resource",
+		"windows-2022-low-resource",
+		"macos-15-intel-low-resource",
+		"GO_TEST_FLAGS='-p=1'",
+		"development-check.ps1 -Parallelism 1",
+		"npm test -- --maxWorkers=1",
+	} {
+		if !strings.Contains(workflow, want) {
+			t.Errorf("development compatibility workflow missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{"pull_request:", "push:", "needs:"} {
+		if strings.Contains(workflow, forbidden) {
+			t.Errorf("advisory compatibility workflow must not become a merge gate through %q", forbidden)
+		}
+	}
+}
+
+func TestDevelopmentChecksAreStableAcrossLocalWorkspaces(t *testing.T) {
+	makefile, err := os.ReadFile("../Makefile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeText := string(makefile)
+	for _, want := range []string{
+		"GO_PACKAGES := ./agents/...",
+		"./console ./deploy ./docs",
+		"GO_TEST_FLAGS ?=",
+		"go test $(GO_TEST_FLAGS) $(GO_PACKAGES)",
+	} {
+		if !strings.Contains(makeText, want) {
+			t.Errorf("Makefile cross-device check missing %q", want)
+		}
+	}
+	if strings.Contains(makeText, "go test ./...") {
+		t.Fatal("development checks must not scan ignored node_modules packages")
+	}
+
+	powershell, err := os.ReadFile("development-check.ps1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"[int]$Parallelism = 1", "'./console'", "go test -p $Parallelism @packagePatterns"} {
+		if !strings.Contains(string(powershell), want) {
+			t.Errorf("Windows development check missing %q", want)
+		}
+	}
+
+	attributes, err := os.ReadFile("../.gitattributes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(attributes), "* text=auto eol=lf") || !strings.Contains(string(attributes), "*.ps1 text eol=crlf") {
+		t.Fatal("cross-device line endings are not fixed")
 	}
 }
 
