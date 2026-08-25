@@ -92,19 +92,26 @@ func TestDevelopmentPlatformCompatibilityRemainsAdvisory(t *testing.T) {
 	for _, want := range []string{
 		"name: development-platform-compatibility",
 		"workflow_dispatch:",
-		"schedule:",
-		"ubuntu-22.04-low-resource",
-		"windows-2022-low-resource",
-		"macos-15-intel-low-resource",
+		"os: ubuntu-22.04",
+		"os: windows-2022",
+		"os: macos-15-intel",
 		"GO_TEST_FLAGS='-p=1'",
 		"development-check.ps1 -Parallelism 1",
-		"npm test -- --maxWorkers=1",
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("development compatibility workflow missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"pull_request:", "push:", "needs:"} {
+	for _, forbidden := range []string{
+		"pull_request:",
+		"push:",
+		"schedule:",
+		"needs:",
+		"actions/setup-node@",
+		"npm ci",
+		"npm test",
+		"npm run",
+	} {
 		if strings.Contains(workflow, forbidden) {
 			t.Errorf("advisory compatibility workflow must not become a merge gate through %q", forbidden)
 		}
