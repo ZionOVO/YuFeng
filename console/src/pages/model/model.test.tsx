@@ -80,6 +80,27 @@ describe('模型网关页', () => {
     expect(Number(after.callsTotal)).toBe(Number(before.callsTotal) + 1)
     expect(screen.getByLabelText('模型密钥')).toHaveValue('')
   })
+
+  it('可显式清除旧钥并保持 HTTP 无 Key 端点可探测', async () => {
+    const user = userEvent.setup()
+    const client = new ConsoleClientFixture()
+    await loginAs(client)
+    renderApp({ route: '/model', client })
+
+    const endpoint = await screen.findByLabelText('模型端点')
+    await user.clear(endpoint)
+    await user.type(endpoint, 'http://model.internal:8000/v1')
+    await user.click(screen.getByRole('checkbox', { name: '清除已保存密钥' }))
+    await user.click(screen.getByRole('button', { name: '保存配置' }))
+
+    await waitFor(async () => {
+      const after = await client.getModelGateway()
+      expect(after.baseUrl).toBe('http://model.internal:8000/v1')
+      expect(after.hasSecret).toBe(false)
+      expect(after.status).not.toBe('MODEL_GATEWAY_STATUS_UNCONFIGURED')
+    })
+    expect(screen.getByRole('button', { name: '探测连通' })).toBeEnabled()
+  })
 })
 
 describe('模型网关 接口夹具契约', () => {

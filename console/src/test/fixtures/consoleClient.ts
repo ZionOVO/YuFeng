@@ -144,6 +144,15 @@ function modelHostOf(url: string): string {
   }
 }
 
+function validModelBaseURL(raw: string): boolean {
+  try {
+    const url = new URL(raw)
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.host !== ''
+  } catch {
+    return false
+  }
+}
+
 function validProxyCIDR(value: string): boolean {
   const slash = value.lastIndexOf('/')
   if (slash <= 0 || slash === value.length - 1) return false
@@ -163,7 +172,7 @@ function validProxyCIDR(value: string): boolean {
 }
 
 function seedGatewayCalls(onboarding: FixtureOnboarding): FixtureGatewayCall[] {
-  if (!onboarding.hasSecret || onboarding.baseUrl === '') return []
+  if (onboarding.baseUrl === '') return []
   const host = modelHostOf(onboarding.baseUrl)
   const at = new Date().toISOString()
   return Array.from({ length: 24 }, () => ({
@@ -198,7 +207,7 @@ function projectModelGateway(o: FixtureOnboarding, calls: FixtureGatewayCall[]):
   const total = windowed.length
   const ok = windowed.filter((c) => c.ok).length
   const last = [...windowed].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0]
-  const configured = o.hasSecret && o.baseUrl !== ''
+  const configured = o.baseUrl !== ''
   let status: ModelGatewayStatus = 'MODEL_GATEWAY_STATUS_UNCONFIGURED'
   if (configured) {
     if (total === 0) status = 'MODEL_GATEWAY_STATUS_READY'
@@ -1343,20 +1352,26 @@ export class ConsoleClientFixture implements ConsoleClient {
     return this.projectOnboarding()
   }
 
-  async putModelConfig(req: { baseUrl: string; secret: string; model?: string; dialect?: ModelDialect }): Promise<void> {
+  async putModelConfig(req: { baseUrl: string; secret?: string; clearSecret?: boolean; model?: string; dialect?: ModelDialect }): Promise<void> {
     const actor = this.me()
     if (actor.role !== 'USER_ROLE_ADMIN') throw err('permission_denied', 'only admin may put model config')
     if (this.onboardingCompleted()) throw err('failed_precondition', 'onboarding already completed')
-    if (!req.baseUrl.startsWith('https://')) {
-      throw err('invalid_argument', 'base_url must be an absolute https url')
+    if (!validModelBaseURL(req.baseUrl)) {
+      throw err('invalid_argument', 'base_url must be an absolute http or https url')
     }
-    if (req.secret.trim() === '') throw err('invalid_argument', 'secret is required')
+    const secret = req.secret ?? ''
+    if (req.clearSecret === true && secret.trim() !== '') throw err('invalid_argument', 'secret and clear_secret cannot be combined')
     const model = req.model !== undefined && req.model !== '' ? req.model : 'grok-4-1-fast-non-reasoning'
-    const hint = `****${req.secret.slice(-4)}`
     this.state.onboarding.baseUrl = req.baseUrl
-    this.state.onboarding.secret = req.secret
-    this.state.onboarding.hasSecret = true
-    this.state.onboarding.secretHint = hint
+    if (req.clearSecret === true) {
+      this.state.onboarding.secret = ''
+      this.state.onboarding.hasSecret = false
+      this.state.onboarding.secretHint = ''
+    } else if (secret.trim() !== '') {
+      this.state.onboarding.secret = secret
+      this.state.onboarding.hasSecret = true
+      this.state.onboarding.secretHint = `****${secret.slice(-4)}`
+    }
     this.state.onboarding.model = model
     this.state.onboarding.dialect = req.dialect ?? 'MODEL_DIALECT_OPENAI_CHAT'
     this.state.onboarding.modelLiveOk = false
@@ -1368,10 +1383,10 @@ export class ConsoleClientFixture implements ConsoleClient {
   async testModelConnectivity(): Promise<void> {
     const actor = this.me()
     if (actor.role !== 'USER_ROLE_ADMIN') throw err('permission_denied', 'only admin may test model')
-    if (!this.state.onboarding.hasSecret) {
+    if (this.state.onboarding.baseUrl === '') {
       this.state.onboarding.state = 'ONBOARDING_STATE_FAILED'
-      this.state.onboarding.lastError = 'model secret is missing'
-      throw err('failed_precondition', 'model secret is missing')
+      this.state.onboarding.lastError = 'model endpoint is missing'
+      throw err('failed_precondition', 'model endpoint is missing')
     }
     if (this.modelTestFailsLeft > 0) {
       this.modelTestFailsLeft -= 1
@@ -1390,7 +1405,7 @@ export class ConsoleClientFixture implements ConsoleClient {
     if (actor.role !== 'USER_ROLE_ADMIN') throw err('permission_denied', 'only admin may complete onboarding')
     const o = this.state.onboarding
     const missing: number[] = []
-    if (!o.modelLiveOk || !o.hasSecret) missing.push(1)
+    if (!o.modelLiveOk) missing.push(1)
     if (!o.jarvisOnline) missing.push(2)
     if (missing.length > 0) {
       throw new ApiError({
@@ -1429,16 +1444,21 @@ export class ConsoleClientFixture implements ConsoleClient {
     return projectModelGateway(this.state.onboarding, this.state.gatewayCalls)
   }
 
-  async updateModelGateway(req: { baseUrl: string; secret?: string; model?: string; dialect?: ModelDialect }): Promise<ModelGateway> {
+  async updateModelGateway(req: { baseUrl: string; secret?: string; clearSecret?: boolean; model?: string; dialect?: ModelDialect }): Promise<ModelGateway> {
     const actor = this.me()
     if (actor.role !== 'USER_ROLE_ADMIN') throw err('permission_denied', 'admin role required')
     this.requireOnboardingComplete()
-    if (!req.baseUrl.startsWith('https://')) {
-      throw err('invalid_argument', 'base_url must be an absolute https url')
+    if (!validModelBaseURL(req.baseUrl)) {
+      throw err('invalid_argument', 'base_url must be an absolute http or https url')
     }
     const o = this.state.onboarding
     const secret = req.secret ?? ''
-    if (secret.trim() !== '') {
+    if (req.clearSecret === true && secret.trim() !== '') throw err('invalid_argument', 'secret and clear_secret cannot be combined')
+    if (req.clearSecret === true) {
+      o.secret = ''
+      o.hasSecret = false
+      o.secretHint = ''
+    } else if (secret.trim() !== '') {
       o.secret = secret
       o.hasSecret = true
       o.secretHint = `****${secret.slice(-4)}`
@@ -1456,7 +1476,7 @@ export class ConsoleClientFixture implements ConsoleClient {
     if (actor.role !== 'USER_ROLE_ADMIN') throw err('permission_denied', 'admin role required')
     this.requireOnboardingComplete()
     const o = this.state.onboarding
-    if (!o.hasSecret) throw err('failed_precondition', 'model secret is missing')
+    if (o.baseUrl === '') throw err('failed_precondition', 'model endpoint is missing')
     this.state.gatewayCalls.push({
       at: new Date().toISOString(),
       kind: 'probe',

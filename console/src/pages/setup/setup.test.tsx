@@ -43,7 +43,7 @@ describe('初次配置页', () => {
     await loginAs(client)
     renderApp({ route: '/setup', client })
 
-    await user.type(await screen.findByLabelText('模型密钥'), 'sk-bad-key')
+    await user.type(await screen.findByLabelText('模型密钥（可选）'), 'sk-bad-key')
     await user.click(screen.getByRole('button', { name: '保存模型网关' }))
     await user.click(await screen.findByRole('button', { name: '探测模型网关' }))
 
@@ -54,6 +54,27 @@ describe('初次配置页', () => {
     expect(screen.queryByRole('button', { name: '进入主控制台' })).toBeNull()
   })
 
+  it('允许 HTTP 无 Key 配置并进入真实连通性探测', async () => {
+    const user = userEvent.setup()
+    const client = new ConsoleClientFixture({ onboardingState: 'ONBOARDING_STATE_PENDING' })
+    await loginAs(client)
+    renderApp({ route: '/setup', client })
+
+    const endpoint = await screen.findByLabelText('模型端点')
+    await user.clear(endpoint)
+    await user.type(endpoint, 'http://model.internal:8000/v1')
+    expect(screen.getByLabelText('模型密钥（可选）')).toHaveValue('')
+    const save = screen.getByRole('button', { name: '保存模型网关' })
+    expect(save).toBeEnabled()
+    await user.click(save)
+
+    const configured = await client.getOnboarding()
+    expect(configured.baseUrl).toBe('http://model.internal:8000/v1')
+    expect(configured.hasSecret).toBe(false)
+    await user.click(await screen.findByRole('button', { name: '探测模型网关' }))
+    expect(await screen.findByRole('region', { name: '确认贾维斯在线' })).toBeInTheDocument()
+  })
+
   it('模型探测成功后等待贾维斯主动在线，不调用任何数据面接入接口', async () => {
     const user = userEvent.setup()
     const client = new ConsoleClientFixture({ onboardingState: 'ONBOARDING_STATE_PENDING' })
@@ -61,7 +82,7 @@ describe('初次配置页', () => {
     await loginAs(client)
     renderApp({ route: '/setup', client })
 
-    await user.type(await screen.findByLabelText('模型密钥'), 'sk-test-key')
+    await user.type(await screen.findByLabelText('模型密钥（可选）'), 'sk-test-key')
     await user.click(screen.getByRole('button', { name: '保存模型网关' }))
     await user.click(await screen.findByRole('button', { name: '探测模型网关' }))
 

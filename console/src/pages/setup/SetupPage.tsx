@@ -1,7 +1,7 @@
 // 初次配置只建立模型网关与贾维斯控制面；数据面在主控制台按资产人工接入。
 
 import { useEffect, useState } from 'react'
-import { Button, Input, Select, SelectItem } from '@heroui/react'
+import { Button, Checkbox, Input, Select, SelectItem } from '@heroui/react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { DefaultChatModel, DefaultModelBaseURL } from '../../api/limits'
 import { isApiError } from '../../api/errors'
@@ -20,8 +20,8 @@ const STEPS = [
 
 type StepKey = (typeof STEPS)[number]['key']
 
-function currentStep(state: string, hasSecret: boolean, jarvisOnline: boolean): StepKey {
-  if (!hasSecret || state === 'ONBOARDING_STATE_PENDING') return 'model'
+function currentStep(state: string, configured: boolean, jarvisOnline: boolean): StepKey {
+  if (!configured || state === 'ONBOARDING_STATE_PENDING') return 'model'
   if (state === 'ONBOARDING_STATE_MODEL_CONFIGURED' || state === 'ONBOARDING_STATE_FAILED') return 'probe'
   if (!jarvisOnline) return 'jarvis'
   return 'complete'
@@ -42,6 +42,7 @@ export function SetupPage() {
   const [model, setModel] = useState(DefaultChatModel)
   const [dialect, setDialect] = useState<ModelDialect>('MODEL_DIALECT_OPENAI_CHAT')
   const [secret, setSecret] = useState('')
+  const [clearSecret, setClearSecret] = useState(false)
   const [busy, setBusy] = useState<'save' | 'probe' | 'complete' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -63,15 +64,12 @@ export function SetupPage() {
   }
 
   const saveModelGateway = async () => {
-    if (secret === '') {
-      setError('保存模型网关时必须输入密钥；Brain 不会把已有密钥回填到浏览器。')
-      return
-    }
     setBusy('save')
     setError(null)
     try {
-      await client.putModelConfig({ baseUrl: baseUrl.trim(), model: model.trim(), dialect, secret })
+      await client.putModelConfig({ baseUrl: baseUrl.trim(), model: model.trim(), dialect, secret, clearSecret })
       setSecret('')
+      setClearSecret(false)
       await refreshOnboarding()
     } catch (cause) {
       showError(cause)
@@ -127,7 +125,8 @@ export function SetupPage() {
     )
   }
 
-  const current = currentStep(onboarding.state, onboarding.hasSecret, onboarding.jarvisOnline)
+  const configured = onboarding.baseUrl !== ''
+  const current = currentStep(onboarding.state, configured, onboarding.jarvisOnline)
   const savedCoordinatesChanged =
     onboarding.baseUrl !== '' &&
     (baseUrl.trim() !== onboarding.baseUrl || model.trim() !== onboarding.model || dialect !== normalizeDialect(onboarding.dialect))
@@ -169,7 +168,7 @@ export function SetupPage() {
               <p className="fs-panel-title">配置模型网关</p>
               <p className="fs-panel-sub">只配置 Brain 的智能出口；不在这里部署 Edge、ModelSide 或防御资产</p>
             </div>
-            <SetupMark ok={onboarding.hasSecret && !savedCoordinatesChanged} label={onboarding.hasSecret ? '已保存' : '待配置'} />
+            <SetupMark ok={configured && !savedCoordinatesChanged} label={configured ? '已保存' : '待配置'} />
           </div>
           <div className="flex flex-col gap-3 px-4 py-4">
             <Input label="模型端点" radius="md" value={baseUrl} onValueChange={setBaseUrl} />
@@ -185,32 +184,48 @@ export function SetupPage() {
               ))}
             </Select>
             <Input
-              label="模型密钥"
+              label="模型密钥（可选）"
               type="password"
               radius="md"
               value={secret}
-              onValueChange={setSecret}
+              onValueChange={(value) => {
+                setSecret(value)
+                if (value !== '') setClearSecret(false)
+              }}
+              isDisabled={clearSecret}
               autoComplete="off"
-              description={onboarding.hasSecret ? `已保存 ${onboarding.secretHint}；只有覆盖时才重新输入` : '只写不回读'}
+              description={onboarding.hasSecret ? `已保存 ${onboarding.secretHint}；留空则保留，或显式清除` : '可留空；无 Key 时 Brain 不发送供应商认证头'}
             />
+            {onboarding.hasSecret && (
+              <Checkbox
+                isSelected={clearSecret}
+                onValueChange={(selected) => {
+                  setClearSecret(selected)
+                  if (selected) setSecret('')
+                }}
+              >
+                清除已保存密钥
+              </Checkbox>
+            )}
+            <p className="text-xs leading-5 text-[#8b98a1]">允许受控网络使用 HTTP；公网和任何敏感证据生成应使用 HTTPS。</p>
             <Button
               color="primary"
               radius="md"
               isLoading={busy === 'save'}
-              isDisabled={busy !== null || secret === '' || baseUrl.trim() === '' || model.trim() === ''}
+              isDisabled={busy !== null || baseUrl.trim() === '' || model.trim() === ''}
               onPress={() => void saveModelGateway()}
             >
-              {onboarding.hasSecret ? '更新模型网关' : '保存模型网关'}
+              {configured ? '更新模型网关' : '保存模型网关'}
             </Button>
           </div>
         </section>
 
-        {onboarding.hasSecret && !savedCoordinatesChanged && (
+        {configured && !savedCoordinatesChanged && (
           <section className="fs-panel" aria-label="探测模型网关">
             <div className="fs-panel-head">
               <div>
                 <p className="fs-panel-title">探测连通性</p>
-                <p className="fs-panel-sub">由 Brain 使用已保存密钥执行一次真实模型请求</p>
+                <p className="fs-panel-sub">由 Brain 直接请求当前真实模型端点；无 Key 时不发送认证头</p>
               </div>
               <SetupMark ok={modelLive} label={modelLive ? '探测成功' : '尚未通过'} />
             </div>
