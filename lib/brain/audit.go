@@ -129,17 +129,10 @@ func (s *AuditServer) ListAuditEntries(ctx context.Context, req *connect.Request
 		until = &t
 	}
 	resp := &auditv1.ListAuditEntriesResponse{}
-	batchSize := limit * 2
-	if batchSize < kernel.PageSizeDefault {
-		batchSize = kernel.PageSizeDefault
-	}
-	scanOffset := offset
-	nextOffset := -1
-	hasMoreVisible := false
-	for !hasMoreVisible {
-		rows, err := s.pool.Query(ctx, `SELECT a.sequence, a.occurred_at, a.actor_type, a.actor_id, a.action, a.object_type, a.object_id,
+	rows, err := s.pool.Query(ctx, `WITH visible_entries AS (
+		SELECT a.sequence, a.occurred_at, a.actor_type, a.actor_id, a.action, a.object_type, a.object_id,
 			a.details::text, a.previous_hash, a.entry_hash, a.run_id, a.turn_id, a.lease_epoch, a.budget_id, a.payload_digest, a.schema_version,
-			COALESCE((
+			COALESCE(
 			  (a.object_type='asset' AND a.object_id=ANY($10)) OR
 			  (a.object_type='release' AND (a.object_id=ANY($12) OR EXISTS(
 				SELECT 1 FROM release_assets ra WHERE ra.release_id=a.object_id AND ra.asset_id=ANY($10)))) OR
@@ -163,56 +156,41 @@ func (s *AuditServer) ListAuditEntries(ctx context.Context, req *connect.Request
 				AND (th.source_ref=ANY($10) OR th.source_ref=ANY($11) OR th.source_ref=ANY($12)))) OR
 			  a.object_id=ANY($10) OR a.object_id=ANY($11) OR a.object_id=ANY($12) OR
 			  a.details->>'asset_id'=ANY($10) OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(COALESCE(a.details->'asset_ids','[]'::jsonb)) AS detail_asset(value) WHERE value=ANY($10))
-			),false) AS visible
+			,false) AS visible
 		FROM audit_entries a WHERE ($1='' OR a.object_type=$1) AND ($2='' OR a.object_id=$2)
 		  AND ($5='' OR actor_id=$5)
 		  AND ($6::timestamptz IS NULL OR occurred_at >= $6)
 		  AND ($7::timestamptz IS NULL OR occurred_at <= $7)
 		  AND ($8='' OR run_id=$8)
 		  AND ($9='' OR turn_id=$9)
-		ORDER BY sequence DESC LIMIT $3 OFFSET $4`, req.Msg.ObjectType, req.Msg.ObjectId, batchSize, scanOffset,
-			actor, since, until, req.Msg.GetRunId(), req.Msg.GetTurnId(), scope.assetIDs(), mapKeys(scope.units), mapKeys(scope.releases),
-			scope.hasTool("worker.enroll"), scope.hasTool("worker.capacity.approve"))
-		if err != nil {
+	)
+	SELECT sequence,occurred_at,actor_type,actor_id,action,object_type,object_id,details,previous_hash,entry_hash,
+		run_id,turn_id,lease_epoch,budget_id,payload_digest,schema_version
+	FROM visible_entries WHERE visible ORDER BY sequence DESC LIMIT $3 OFFSET $4`,
+		req.Msg.ObjectType, req.Msg.ObjectId, limit+1, offset, actor, since, until, req.Msg.GetRunId(), req.Msg.GetTurnId(),
+		scope.assetIDs(), mapKeys(scope.units), mapKeys(scope.releases), scope.hasTool("worker.enroll"),
+		scope.hasTool("worker.capacity.approve"))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e auditv1.AuditEntry
+		var at time.Time
+		if err := rows.Scan(&e.Sequence, &at, &e.ActorType, &e.ActorId, &e.Action, &e.ObjectType, &e.ObjectId,
+			&e.Details, &e.PreviousHash, &e.EntryHash, &e.RunId, &e.TurnId, &e.LeaseEpoch, &e.BudgetId,
+			&e.PayloadDigest, &e.SchemaVersion); err != nil {
 			return nil, err
 		}
-		fetched := 0
-		for rows.Next() {
-			var e auditv1.AuditEntry
-			var at time.Time
-			var visible bool
-			if err := rows.Scan(&e.Sequence, &at, &e.ActorType, &e.ActorId, &e.Action, &e.ObjectType, &e.ObjectId,
-				&e.Details, &e.PreviousHash, &e.EntryHash, &e.RunId, &e.TurnId, &e.LeaseEpoch, &e.BudgetId,
-				&e.PayloadDigest, &e.SchemaVersion, &visible); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			fetched++
-			scanOffset++
-			if !visible {
-				continue
-			}
-			if len(resp.Entries) == limit {
-				hasMoreVisible = true
-				break
-			}
-			e.OccurredAt = timestamppb.New(at)
-			resp.Entries = append(resp.Entries, &e)
-			if len(resp.Entries) == limit {
-				nextOffset = scanOffset
-			}
-		}
-		rowErr := rows.Err()
-		rows.Close()
-		if rowErr != nil {
-			return nil, rowErr
-		}
-		if hasMoreVisible || fetched < batchSize {
-			break
-		}
+		e.OccurredAt = timestamppb.New(at)
+		resp.Entries = append(resp.Entries, &e)
 	}
-	if hasMoreVisible {
-		resp.NextPageToken = encodePageOffset(nextOffset)
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(resp.Entries) > limit {
+		resp.Entries = resp.Entries[:limit]
+		resp.NextPageToken = encodePageOffset(offset + limit)
 	}
 	return connect.NewResponse(resp), nil
 }
