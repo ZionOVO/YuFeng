@@ -449,7 +449,7 @@ Git 提交中由根树对象摘要标识的完整文件内容，不包含提交�
 
 <a id="modelgateway"></a>
 ### 模型网关（modelgateway）
-大语言模型聊天补全的**唯一出网口**：生产生成与连通性探测都从 `yufeng-brain` 发起，一条槽持 `base_url` + `model` + [模型方言](#model-dialect) + 服务端保存的密钥。不是多供应商并行代理。贾维斯、run 与浏览器都不持密钥、不直连模型端点；现有人机交付纯文本走 `CompleteChat`，统一 Agent 座架走带 Turn、租约、ContextManifest、工具项和预算的 `Generate`。引导完成前改槽走 `PutModelConfig`；完成后管理员走 `GetModelGateway` / `UpdateModelGateway` / `ProbeModelGateway`（`docs/api.md` 第 19.4 节），不退引导状态。`agents/modelgateway` 只提供客户端协议适配，确定性模型提供者仅存在于 `_test.go` 测试编译单元，不进入交付二进制。流量深度学习走 Edge 邻近的独立 ModelSide，只读取已签名模型档案与本地权重，不使用聊天凭据槽，也不把原始流量送入 Brain。Google Agent Development Kit 只借“模型 + 工具 + 会话 + 运行器”的形状，**禁止**作为平台进程内运行时（ADR-003）。
+大语言模型聊天补全的**唯一出网口**：生产生成与连通性探测都从 `yufeng-brain` 发起，一条槽持 `base_url` + `model` + [模型方言](#model-dialect) + 服务端保存的可选密钥。不是多供应商并行代理。贾维斯、run 与浏览器都不持密钥、不直连模型端点；现有人机交付纯文本走 `CompleteChat`，统一 Agent 座架走带 Turn、租约、ContextManifest、工具项和预算的 `Generate`。引导完成前改槽走 `PutModelConfig`；完成后管理员走 `GetModelGateway` / `UpdateModelGateway` / `ProbeModelGateway`（`docs/api.md` 第 19.4 节），不退引导状态。`agents/modelgateway` 只提供客户端协议适配，确定性模型提供者仅存在于 `_test.go` 测试编译单元，不进入交付二进制、活栈或交付报告。流量深度学习走 Edge 邻近的独立 ModelSide，只读取已签名模型档案与本地权重，不使用聊天凭据槽，也不把原始流量送入 Brain。Google Agent Development Kit 只借“模型 + 工具 + 会话 + 运行器”的形状，**禁止**作为平台进程内运行时（ADR-003）。
 
 <a id="model-dialect"></a>
 ### 模型方言（model dialect）

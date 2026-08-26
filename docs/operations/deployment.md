@@ -38,7 +38,7 @@ curl --fail --silent --show-error http://127.0.0.1:19090/readyz
 docker compose -f deploy/compose.yaml ps brain jarvis agentd
 ```
 
-浏览器打开 `https://127.0.0.1:9050/app/setup`。模型密钥只写入 Brain 凭据槽，不回填浏览器；模型连通性必须由 Brain 发起真实探测。贾维斯主动注册并保持心跳后，管理员才可选择“进入主控制台”。初次配置不登记或部署数据面。
+浏览器打开 `https://127.0.0.1:9050/app/setup`。模型端点允许绝对 HTTP 或 HTTPS 地址；HTTP 只用于操作方明确接受明文风险的受控网络，敏感证据生成仍要求 HTTPS。模型密钥可选；配置时只写入 Brain 凭据槽且不回填浏览器，无 Key 时 Brain 不发送供应商认证头。模型连通性必须由 Brain 向真实端点发起探测；上游失败、响应非法或文本为空时明确失败，禁止用固定回答或 Compose 模型替身冒充成功。贾维斯主动注册并保持心跳后，管理员才可选择“进入主控制台”。初次配置不登记或部署数据面。
 
 ### 3.1 同一物理节点
 

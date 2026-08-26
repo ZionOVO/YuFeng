@@ -1259,7 +1259,7 @@ const res = await console.dashboard({}, {
 
 本节是控制面初次配置的网络契约。名词见 [glossary.md](glossary.md#onboarding)。数据面的人工接入属于 §9 资产域常规流程，不得重新塞回本状态机。
 
-**库不变量**：全库恰好一行；主键固定为 `id = 1`。并发写 RPC 用行锁；失败写 `state=ONBOARDING_STATE_FAILED` 与 `last_error`，不删除已存密钥。
+**库不变量**：全库恰好一行；主键固定为 `id = 1`。并发写 RPC 用行锁；失败写 `state=ONBOARDING_STATE_FAILED` 与 `last_error`，不删除已存的可选密钥。
 
 线上状态与 JSON **只许 proto 枚举全名**（禁止用 `pending` / `completed` 短名当契约）。
 
@@ -1270,7 +1270,7 @@ const res = await console.dashboard({}, {
 | RPC | 前置 | 成功后状态 |
 |---|---|---|
 | `PutModelConfig` | 无额外前置 | `ONBOARDING_STATE_MODEL_CONFIGURED` |
-| `TestModelConnectivity` | `has_secret=true` | `ONBOARDING_STATE_MODEL_LIVE` |
+| `TestModelConnectivity` | 已配置非空 `base_url` | `ONBOARDING_STATE_MODEL_LIVE` |
 | `CompleteOnboarding` | 仍只认 §19.1 两条 | `ONBOARDING_STATE_COMPLETED` |
 
 禁止从 `ONBOARDING_STATE_COMPLETED` 退回（本档无重置 RPC）。
@@ -1279,7 +1279,7 @@ const res = await console.dashboard({}, {
 
 浏览器只打开 `https://127.0.0.1:9050/app/setup`。界面按顺序完成四个动作：
 
-1. `PutModelConfig` 把端点、模型、方言和只写密钥保存到 brain 凭据槽；
+1. `PutModelConfig` 把端点、模型、方言和可选的只写密钥保存到 brain；
 2. `TestModelConnectivity` 从 brain 发出最小补全并显示成功或可重试错误；
 3. 轮询 `GetOnboarding.jarvis_online`，等待技术人员已经安装的贾维斯主动注册或轮询；Brain 不反向连接，也不在本页启动进程；
 4. 管理员点击“进入控制台”，调用 `CompleteOnboarding`。成功后进入 `/app`，再在资产页登记第一项资产和 Edge 人工接入配置。
@@ -1290,7 +1290,7 @@ const res = await console.dashboard({}, {
 
 `CompleteOnboarding` 必须同时满足下列两条，否则 `failed_precondition`，`details` 恰好一条 `type.googleapis.com/yufeng.onboarding.v1.OnboardingGate`（`missing_predicates` 列出未满足编号 1–2，升序去重），状态不变：
 
-1. 最近一次 `TestModelConnectivity` 成功，且之后密钥未改；
+1. 最近一次 `TestModelConnectivity` 成功，且之后端点、模型、方言和可选密钥均未改；
 2. 配置项 `-jarvis-agent-id`（默认 `jarvis-1`）已注册，且最近一次 `Heartbeat` **或** `PollInstructions` 落在 `JarvisOnlineWindow` 内（即 `jarvis_online=true`，与 §19.2 同一判定）。该谓词只证明研判编排进程在线，不授予部署能力。
 
 通过后服务端给引导管理员写入系统授予：Tools = `grant.write`、`user.admin`、`catalog.manage`、`console.read`、`asset.create`、`asset.update`、`asset.delete`、`asset.attach`、`asset.detach`（**不含** `govern.propose` / `govern.promote_*`），Bindings = 完成时库中全部资产 ID，零资产时允许为空。其后 `CreateAsset` 作为管理员全局工具创建第一项资产，并自动把新 ID 加入创建者范围。不得改写其它账户、资产、授予或历史检测数据。
@@ -1302,12 +1302,12 @@ const res = await console.dashboard({}, {
 | RPC | 认证 | 写 | 行为 |
 |---|---|---|---|
 | `GetOnboarding` | 任意登录用户 | 否 | 返回 `state`（枚举全名）、`base_url`、`model`、`dialect`（枚举全名，缺省 `MODEL_DIALECT_OPENAI_CHAT`）、`has_secret`、`secret_hint`、`jarvis_online`、`last_error`、`updated_at`。无密钥明文。旧 Edge 引导字段继续保留线缆编号但标记退役，服务端返回空值或零，控制台不得读取 |
-| `PutModelConfig` | 仅 `USER_ROLE_ADMIN` | 是，`Idempotency-Key` | `base_url` 必须是绝对 HTTPS URL。`dialect` 省略或 `MODEL_DIALECT_UNSPECIFIED` 则写入 `MODEL_DIALECT_OPENAI_CHAT`；只许 §19.4 三种方言。密钥**只**写入凭据槽。`YUFENG_MODEL_API_KEY` 不是第二份权威密钥：仅供人机交付活栈 / CI **脚本**读出后填进本 RPC 的 `secret` 字段；brain 补全路径只读槽，不读该环境变量。成功 → `ONBOARDING_STATE_MODEL_CONFIGURED`（覆盖旧密钥必须重新探测） |
-| `TestModelConnectivity` | 仅管理员 | 是，`Idempotency-Key` | **brain 模型网关**用凭据槽密钥按槽方言发一次最小补全。模型 HTTP **不得**握着引导行 `FOR UPDATE`：锁内取槽快照 → 锁外出网 → 重新加锁核对槽未变再提交。HTTP 成功且非空文本 → `ONBOARDING_STATE_MODEL_LIVE`。失败 → `ONBOARDING_STATE_FAILED` + `last_error`（英文小写）+ Connect `unavailable` 或 `failed_precondition`。探测期间槽被改写 → `aborted`，不把过期结果写成 `MODEL_LIVE`。本档不跑评测集。可重试本 RPC，不必重新 `PutModelConfig`（除非改密钥或方言） |
+| `PutModelConfig` | 仅 `USER_ROLE_ADMIN` | 是，`Idempotency-Key` | `base_url` 必须是绝对 HTTP 或 HTTPS URL。`dialect` 省略或 `MODEL_DIALECT_UNSPECIFIED` 则写入 `MODEL_DIALECT_OPENAI_CHAT`；只许 §19.4 三种方言。`secret` 可为空：非空时只写入凭据槽；`clear_secret=true` 时删除旧钥；两者同时出现 → `invalid_argument`；二者都未给出时保留已有槽，无旧槽即按无 Key 配置。`YUFENG_MODEL_API_KEY` 不是第二份权威密钥：仅供人机交付活栈 / 持续集成脚本读出后填进本 RPC 的 `secret` 字段；brain 补全路径只读槽，不读该环境变量。成功 → `ONBOARDING_STATE_MODEL_CONFIGURED`（任一坐标或可选密钥变化都必须重新探测） |
+| `TestModelConnectivity` | 仅管理员 | 是，`Idempotency-Key` | **brain 模型网关**按槽方言发一次最小真实补全；无 Key 槽不发送供应商认证头。模型 HTTP **不得**握着引导行 `FOR UPDATE`：锁内取槽快照 → 锁外出网 → 重新加锁核对槽未变再提交。HTTP 成功、响应符合方言且文本非空 → `ONBOARDING_STATE_MODEL_LIVE`。上游不可达、非成功状态、非法响应或空文本 → `ONBOARDING_STATE_FAILED` + `last_error`（英文小写）+ Connect `unavailable` 或 `failed_precondition`。探测期间槽被改写 → `aborted`，不把过期结果写成 `MODEL_LIVE`。本档不跑评测集。可重试本 RPC，不必重新 `PutModelConfig`（除非改坐标或可选密钥） |
 | `PutDeploymentSpecification` | 兼容线缆 | 否 | 方法和旧消息编号保留并标记退役；服务端固定返回 `unimplemented`。控制台、正式脚本和新客户端不得调用；等价的新行为只存在于资产域 `PutEdgeEnrollment` |
 | `CompleteOnboarding` | 仅管理员 | 是，`Idempotency-Key` | 只检查 §19.1 两条。通过 → `ONBOARDING_STATE_COMPLETED` 并写入管理员系统授予（见 §19.1 末段）；失败 `failed_precondition`，`details` **恰好一条** `type.googleapis.com/yufeng.onboarding.v1.OnboardingGate`，字段 `missing_predicates` 为 `repeated int32`（取值 1–2，升序去重），状态不变，不写系统授予 |
 
-`base_url` 指向公网模型端点**仅允许从 brain 模型网关出网**。贾维斯、edge、浏览器不得持该密钥。Edge 邻近 ModelSide 只装载签名模型档案和本地权重，不读取聊天凭据槽；其跨主机入口必须位于受控防御网络并使用相互传输层安全协议，禁止默认公网。
+`base_url` 指向模型端点时**仅允许从 brain 模型网关出网**。贾维斯、edge、浏览器不得持可选密钥。HTTP 仅用于操作方明确接受明文链路风险的受控网络；携带敏感证据的 `Generate` 仍要求 HTTPS。Edge 邻近 ModelSide 只装载签名模型档案和本地权重，不读取聊天凭据槽；其跨主机入口必须位于受控防御网络并使用相互传输层安全协议，禁止默认公网。
 
 ### 19.5 引导期白名单 RPC
 
@@ -1336,37 +1336,37 @@ Edge 首次启动后主动调用 `Register`，随后拉取已签名监听计划�
 
 ### 19.4 与模型网关的关系
 
-模型出网仍是**一条**引导凭据槽：同时只接入一个 `base_url` + `model` + `dialect` + 密钥。本档不提供多供应商并行路由或负载均衡。生产贾维斯只调 §18.10 的 `Generate`；`CompleteChat` 仅保留迁移兼容与槽连通性探测。两者都只连 brain，供应商 HTTP 方言只在 brain 出网时展开。
+模型出网仍是**一条**引导配置槽：同时只接入一个 `base_url` + `model` + `dialect` + 可选密钥。本档不提供多供应商并行路由或负载均衡。生产贾维斯只调 §18.10 的 `Generate`；`CompleteChat` 仅保留迁移兼容与槽连通性探测。两者都只连 brain，供应商 HTTP 方言只在 brain 出网时展开。
 
 `dialect` 线上只许 proto 枚举全名：
 
 | 方言 | 出网 | 鉴权 | 文本抽取 |
 |---|---|---|---|
-| `MODEL_DIALECT_OPENAI_CHAT`（缺省） | `POST {base_url}/chat/completions` | `Authorization: Bearer` | `choices[0].message.content` |
-| `MODEL_DIALECT_OPENAI_RESPONSES` | `POST {base_url}/responses` | `Authorization: Bearer` | `output_text`，否则拼接 `output[].content[].text` |
-| `MODEL_DIALECT_CLAUDE_MESSAGES` | `POST {base_url}/messages` | `x-api-key` + `anthropic-version: 2023-06-01` | 拼接 `content[].text`（`type=text`） |
+| `MODEL_DIALECT_OPENAI_CHAT`（缺省） | `POST {base_url}/chat/completions` | 有 Key 时 `Authorization: Bearer`；无 Key 时不发送 | `choices[0].message.content` |
+| `MODEL_DIALECT_OPENAI_RESPONSES` | `POST {base_url}/responses` | 有 Key 时 `Authorization: Bearer`；无 Key 时不发送 | `output_text`，否则拼接 `output[].content[].text` |
+| `MODEL_DIALECT_CLAUDE_MESSAGES` | `POST {base_url}/messages` | 始终发送 `anthropic-version: 2023-06-01`；有 Key 时才发送 `x-api-key` | 拼接 `content[].text`（`type=text`） |
 
-`base_url` 含版本前缀（如 `https://api.x.ai/v1`、`https://api.anthropic.com/v1`），brain 只再追加上表路径。`MODEL_DIALECT_UNSPECIFIED` 与空列按 `MODEL_DIALECT_OPENAI_CHAT` 解释。未知方言 → `invalid_argument`（写入）或 `failed_precondition`（出网）。Claude 方言把 `role=system` 的消息合并进请求体 `system`，`messages` 只含 `user`/`assistant`；若合并后没有 `user` 消息 → `failed_precondition`。现有 `CompleteChat` 只回收非空文本，不把供应商 `tool_calls` / `tool_use` 回写给贾维斯；因此它**不能**充当统一座架 Generate。`Generate` 的方言适配器必须把文本与供应商工具调用归一为有序 `output_items[]`，保存供应商调用标识但由 brain 另发平台 `call_id`。
+`base_url` 含版本前缀（如 `https://api.x.ai/v1`、`http://model.internal:8000/v1`），brain 只再追加上表路径。只接受带主机的绝对 `http` / `https` 地址；HTTP 不改变上游真实性要求，也不允许任何固定回答或伪造成功。`MODEL_DIALECT_UNSPECIFIED` 与空列按 `MODEL_DIALECT_OPENAI_CHAT` 解释。未知方言 → `invalid_argument`（写入）或 `failed_precondition`（出网）。Claude 方言把 `role=system` 的消息合并进请求体 `system`，`messages` 只含 `user`/`assistant`；若合并后没有 `user` 消息 → `failed_precondition`。现有 `CompleteChat` 只回收非空文本，不把供应商 `tool_calls` / `tool_use` 回写给贾维斯；因此它**不能**充当统一座架 Generate。`Generate` 的方言适配器必须把文本与供应商工具调用归一为有序 `output_items[]`，保存供应商调用标识但由 brain 另发平台 `call_id`。
 
 - 生产 `yufeng-jarvis` **禁止** `-model-url` 旗标（含指向 brain、内网或公网）。贾维斯连 brain 只用它已有的控制面地址（与 `PollInstructions` 同一 `{BASE}`）。
-- 迁移补全 RPC：`POST {BASE}/yufeng.model.v1.ModelGatewayService/CompleteChat`。认证：贾维斯 **Agent 域** `access_token`（与 `PollInstructions` 同一张）。请求：`messages[]`（`role` + `content`）。响应：`text`（非空才算成功）。它没有 Turn、租约、ContextManifest、工具调用或权威预算语义，新座架禁止调用。brain 用引导凭据槽按 `dialect` 出网；**不**读 `YUFENG_MODEL_API_KEY`。未完成引导或槽空 → `failed_precondition`。`CompleteChat` 与每个 `Generate` attempt 都追加调用记录（主机、模型名、是否成功、耗时、usage/成本可得值、小写英文错误；**无密钥**）。
+- 迁移补全 RPC：`POST {BASE}/yufeng.model.v1.ModelGatewayService/CompleteChat`。认证：贾维斯 **Agent 域** `access_token`（与 `PollInstructions` 同一张）。请求：`messages[]`（`role` + `content`）。响应：`text`（非空才算成功）。它没有 Turn、租约、ContextManifest、工具调用或权威预算语义，新座架禁止调用。brain 用引导配置槽按 `dialect` 出网；**不**读 `YUFENG_MODEL_API_KEY`。未完成引导或 `base_url` 为空 → `failed_precondition`。`CompleteChat` 与每个 `Generate` attempt 都追加调用记录（主机、模型名、是否成功、耗时、usage/成本可得值、小写英文错误；**无密钥**）。
 - 引导未完成时改槽仍走 `PutModelConfig` / `TestModelConnectivity`（§19.2），成功会推进引导状态。
 - 引导完成后改槽**不得**退回 `ONBOARDING_STATE_*`，也不得再走 `PutModelConfig`（仍是非法边）。管理员改槽与看状态用下列 RPC（均仅 `USER_ROLE_ADMIN`，不查授予表）：
 
 | RPC | 写 | 行为 |
 |---|---|---|
 | `GetModelGateway` | 否 | 返回当前槽投影（`base_url`、`model`、`dialect`、`has_secret`、`secret_hint`，无密钥明文）、`status`（枚举全名）、`provider_count`（统计窗内出现过的不同主机数，当前槽主机若已配置则计入）、窗长 `window_seconds`（实现引用 `ModelGatewayStatsWindow`）、窗内 `calls_total` / `calls_ok`、`last_call_at`、`last_error`、`providers[]`（`host`、`calls_total`、`calls_ok`、`last_at`）。未完成引导 → `failed_precondition` |
-| `UpdateModelGateway` | 是，`Idempotency-Key` | 仅 `ONBOARDING_STATE_COMPLETED`。`base_url` 必须是绝对 HTTPS URL。`secret` 为空则保留旧钥，非空则覆盖槽。`model` 空则保留旧名（旧名也空则用 `DefaultChatModel`）。`dialect` 为 `MODEL_DIALECT_UNSPECIFIED` 则保留旧方言（旧列空则 `MODEL_DIALECT_OPENAI_CHAT`）。**不**改引导状态。未完成引导 → `failed_precondition`（去 `/app/setup`） |
-| `ProbeModelGateway` | 是 | 仅已完成引导且 `has_secret=true`。brain 用槽钥按槽方言发一次最小补全，记入调用记录。成功/失败都**不**改 `deployment_onboarding.state`。失败回 `last_error`（英文小写）与 Connect `unavailable` 或 `failed_precondition` |
+| `UpdateModelGateway` | 是，`Idempotency-Key` | 仅 `ONBOARDING_STATE_COMPLETED`。`base_url` 必须是绝对 HTTP 或 HTTPS URL。`secret` 非空则覆盖槽；`clear_secret=true` 则删除旧钥；两者同时出现 → `invalid_argument`；二者都未给出则保留旧槽，无旧槽即继续无 Key。`model` 空则保留旧名（旧名也空则用 `DefaultChatModel`）。`dialect` 为 `MODEL_DIALECT_UNSPECIFIED` 则保留旧方言（旧列空则 `MODEL_DIALECT_OPENAI_CHAT`）。**不**改引导状态。未完成引导 → `failed_precondition`（去 `/app/setup`） |
+| `ProbeModelGateway` | 是 | 仅已完成引导且 `base_url` 非空。brain 按槽方言发一次最小真实补全；无 Key 时不发送认证头。成功/失败都**不**改 `deployment_onboarding.state`。失败回 `last_error`（英文小写）与 Connect `unavailable` 或 `failed_precondition` |
 
-`status` 线上只许 proto 枚举全名：`MODEL_GATEWAY_STATUS_UNCONFIGURED`（无钥或无 `base_url`）、`MODEL_GATEWAY_STATUS_READY`（已配置、窗内无调用）、`MODEL_GATEWAY_STATUS_LIVE`（窗内有调用且全部成功）、`MODEL_GATEWAY_STATUS_DEGRADED`（窗内有成功也有失败）、`MODEL_GATEWAY_STATUS_DOWN`（窗内有调用且全部失败）。
+`status` 线上只许 proto 枚举全名：`MODEL_GATEWAY_STATUS_UNCONFIGURED`（无 `base_url`）、`MODEL_GATEWAY_STATUS_READY`（已配置、窗内无调用）、`MODEL_GATEWAY_STATUS_LIVE`（窗内有调用且全部成功）、`MODEL_GATEWAY_STATUS_DEGRADED`（窗内有成功也有失败）、`MODEL_GATEWAY_STATUS_DOWN`（窗内有调用且全部失败）。`has_secret` 只投影是否保存了可选密钥，不参与状态就绪判定。
 
 控制台页面 `/app/model` 只给管理员：展示接入主机数、窗内成功率与各主机状态，并允许改端点、模型、密钥与探测。非管理员不得改模型。
 
-- `agents/modelgateway` 的确定性剧本只存在于测试编译单元，不进入任何交付二进制。`-dev-insecure` 只放宽本地传输；未配置 `-model-url` 时仍调用中台持久 `Generate`，不得回退到固定答案。
+- `agents/modelgateway` 的确定性剧本只存在于测试编译单元，不进入任何交付二进制、Compose 服务、活栈数据库或交付报告。`-dev-insecure` 只放宽本地传输；未配置 `-model-url` 时仍调用中台持久 `Generate`，不得回退到固定答案。真实端点不可用、响应非法或文本为空时必须原样失败并记账，禁止合成成功结果。
 - 贾维斯提交 `Generate` 时不携带或覆盖模型名；实际模型只取当前中台模型槽。运行时不得用 `fake`、测试模型名或本地默认值污染正式请求。
 - 默认 `base_url=https://api.x.ai/v1`，默认方言 `MODEL_DIALECT_OPENAI_CHAT`。`model` 未填时服务端使用 `lib/kernel.DefaultChatModel`（当前冻结值 `grok-4-1-fast-non-reasoning`）。引导页与模型网关页可改成该方言接受的模型名。人机交付活栈脚本必须传同一常量，禁止另写模型名。
-- 确定性测试提供者只允许存在于 `_test.go` 测试编译单元，不得进入 compose 服务命令行或交付二进制。
+- 确定性测试提供者只允许存在于 `_test.go` 测试编译单元，不得进入 Compose 服务命令行、活栈数据、交付报告或交付二进制。
 - 异步流量推理不进本槽、不使用聊天模型网关。它由签名 `ModelProfile` 和 §21.5 的 Edge 邻近 `yufeng-modelside` 执行；Brain 不接收原始流量，也不反向拨号 ModelSide。聊天生成与流量推理分别认证、记账和限额。
 - 模型评测集、对抗语料、延迟 SLO 对比**不在本档**。
 
