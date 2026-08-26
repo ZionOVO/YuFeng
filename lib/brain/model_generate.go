@@ -152,8 +152,8 @@ func (s *OnboardingServer) Generate(ctx context.Context, req *connect.Request[mo
 	if err != nil {
 		return nil, err
 	}
-	if !view.completed() || !view.HasSecret {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("onboarding is incomplete or model secret is missing"))
+	if !view.completed() || strings.TrimSpace(view.BaseURL) == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("onboarding is incomplete or model endpoint is missing"))
 	}
 	if sensitive != nil {
 		if err := requireAbsoluteHTTPS(view.BaseURL); err != nil {

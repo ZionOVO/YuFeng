@@ -79,30 +79,30 @@ func TestOnboardingTransitionTable(t *testing.T) {
 		name        string
 		from        string
 		action      onboardingAction
-		hasSecret   bool
+		configured  bool
 		modelLive   bool
 		wantIllegal bool
 	}{
 		{name: "pending put", from: OnboardingStatePending, action: actionPutModelConfig},
 		{name: "pending complete", from: OnboardingStatePending, action: actionCompleteOnboarding},
-		{name: "pending test no secret", from: OnboardingStatePending, action: actionTestModel, wantIllegal: true},
+		{name: "pending test no endpoint", from: OnboardingStatePending, action: actionTestModel, wantIllegal: true},
 		{name: "pending specification", from: OnboardingStatePending, action: actionPutDeploymentSpec, wantIllegal: true},
-		{name: "configured test", from: OnboardingStateModelConfigured, action: actionTestModel, hasSecret: true},
-		{name: "configured specification", from: OnboardingStateModelConfigured, action: actionPutDeploymentSpec, hasSecret: true, wantIllegal: true},
-		{name: "live specification", from: OnboardingStateModelLive, action: actionPutDeploymentSpec, hasSecret: true, modelLive: true},
-		{name: "edge live specification", from: OnboardingStateEdgeLive, action: actionPutDeploymentSpec, hasSecret: true, modelLive: true},
-		{name: "failed put", from: OnboardingStateFailed, action: actionPutModelConfig, hasSecret: true},
-		{name: "failed test", from: OnboardingStateFailed, action: actionTestModel, hasSecret: true},
-		{name: "failed specification without live", from: OnboardingStateFailed, action: actionPutDeploymentSpec, hasSecret: true, wantIllegal: true},
-		{name: "failed specification after live", from: OnboardingStateFailed, action: actionPutDeploymentSpec, hasSecret: true, modelLive: true},
+		{name: "configured test", from: OnboardingStateModelConfigured, action: actionTestModel, configured: true},
+		{name: "configured specification", from: OnboardingStateModelConfigured, action: actionPutDeploymentSpec, configured: true, wantIllegal: true},
+		{name: "live specification", from: OnboardingStateModelLive, action: actionPutDeploymentSpec, configured: true, modelLive: true},
+		{name: "edge live specification", from: OnboardingStateEdgeLive, action: actionPutDeploymentSpec, configured: true, modelLive: true},
+		{name: "failed put", from: OnboardingStateFailed, action: actionPutModelConfig, configured: true},
+		{name: "failed test", from: OnboardingStateFailed, action: actionTestModel, configured: true},
+		{name: "failed specification without live", from: OnboardingStateFailed, action: actionPutDeploymentSpec, configured: true, wantIllegal: true},
+		{name: "failed specification after live", from: OnboardingStateFailed, action: actionPutDeploymentSpec, configured: true, modelLive: true},
 		{name: "completed put", from: OnboardingStateCompleted, action: actionPutModelConfig, wantIllegal: true},
-		{name: "completed test", from: OnboardingStateCompleted, action: actionTestModel, hasSecret: true, modelLive: true, wantIllegal: true},
-		{name: "completed specification", from: OnboardingStateCompleted, action: actionPutDeploymentSpec, hasSecret: true, modelLive: true, wantIllegal: true},
+		{name: "completed test", from: OnboardingStateCompleted, action: actionTestModel, configured: true, modelLive: true, wantIllegal: true},
+		{name: "completed specification", from: OnboardingStateCompleted, action: actionPutDeploymentSpec, configured: true, modelLive: true, wantIllegal: true},
 		{name: "completed complete", from: OnboardingStateCompleted, action: actionCompleteOnboarding, wantIllegal: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := onboardingEdgeError(tc.from, tc.action, tc.hasSecret, tc.modelLive)
+			err := onboardingEdgeError(tc.from, tc.action, tc.configured, tc.modelLive)
 			if tc.wantIllegal {
 				if err == nil || connect.CodeOf(err) != connect.CodeFailedPrecondition {
 					t.Fatalf("want failed_precondition, got %v", err)
@@ -173,11 +173,11 @@ func TestPutModelConfigHTTPSWriteOnly(t *testing.T) {
 	defer st.Close()
 	h := newOnboardHarness(t, st)
 	ob := NewOnboardingServer(st.Pool(), h.jarvisID)
-	bad := connect.NewRequest(&onboardingv1.PutModelConfigRequest{BaseUrl: "http://api.example.com/v1", Secret: "sk-x"})
+	bad := connect.NewRequest(&onboardingv1.PutModelConfigRequest{BaseUrl: "ftp://api.example.com/v1", Secret: "sk-x"})
 	bad.Header().Set("Authorization", "Bearer "+h.adminTok)
 	setTestIdempotency(bad)
 	if _, err := ob.PutModelConfig(ctx, bad); connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Fatalf("http base_url want invalid_argument, got %v", err)
+		t.Fatalf("ftp base_url want invalid_argument, got %v", err)
 	}
 	put := connect.NewRequest(&onboardingv1.PutModelConfigRequest{BaseUrl: "https://api.example.com/v1", Secret: "sk-plain-must-not-leak"})
 	put.Header().Set("Authorization", "Bearer "+h.adminTok)
@@ -226,6 +226,57 @@ func TestPutModelConfigHTTPSWriteOnly(t *testing.T) {
 	}
 	if mustGetOnboarding(t, ctx, ob, h.adminTok).GetState() != onboardingv1.OnboardingState_ONBOARDING_STATE_MODEL_CONFIGURED {
 		t.Fatal("overwrite secret must return MODEL_CONFIGURED")
+	}
+}
+
+func TestPutModelConfigAllowsHTTPWithoutSecret(t *testing.T) {
+	st, ctx := openTestStore(t)
+	defer st.Close()
+	h := newOnboardHarness(t, st)
+	ob := NewOnboardingServer(st.Pool(), h.jarvisID)
+
+	if _, err := ob.PutModelConfig(ctx, bearerReq(h.adminTok, &onboardingv1.PutModelConfigRequest{
+		BaseUrl: "http://model.internal:8000/v1",
+		Model:   "local-real-model",
+	})); err != nil {
+		t.Fatal(err)
+	}
+	configured := mustGetOnboarding(t, ctx, ob, h.adminTok)
+	if configured.GetState() != onboardingv1.OnboardingState_ONBOARDING_STATE_MODEL_CONFIGURED {
+		t.Fatalf("state=%s", configured.GetState())
+	}
+	if configured.GetHasSecret() || configured.GetBaseUrl() != "http://model.internal:8000/v1" {
+		t.Fatalf("projection=%v", configured)
+	}
+	var seenSecret string
+	ob.completeFn = func(_ context.Context, _ string, secret string, _ string, _ []chatMessage) (string, error) {
+		seenSecret = secret
+		return "real-upstream-pong", nil
+	}
+	if _, err := ob.TestModelConnectivity(ctx, bearerReq(h.adminTok, &onboardingv1.TestModelConnectivityRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if seenSecret != "" {
+		t.Fatalf("secret=%q want empty", seenSecret)
+	}
+	if got := mustGetOnboarding(t, ctx, ob, h.adminTok); got.GetState() != onboardingv1.OnboardingState_ONBOARDING_STATE_MODEL_LIVE || got.GetHasSecret() {
+		t.Fatalf("live projection=%v", got)
+	}
+}
+
+func TestPutModelConfigRejectsSecretAndClearTogether(t *testing.T) {
+	st, ctx := openTestStore(t)
+	defer st.Close()
+	h := newOnboardHarness(t, st)
+	ob := NewOnboardingServer(st.Pool(), h.jarvisID)
+
+	_, err := ob.PutModelConfig(ctx, bearerReq(h.adminTok, &onboardingv1.PutModelConfigRequest{
+		BaseUrl:     "http://model.internal:8000/v1",
+		Secret:      "key",
+		ClearSecret: true,
+	}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("secret plus clear want invalid_argument, got %v", err)
 	}
 }
 

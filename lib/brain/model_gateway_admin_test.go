@@ -42,7 +42,7 @@ func TestGetModelGatewayRequiresCompletedAdmin(t *testing.T) {
 	}
 }
 
-func TestUpdateModelGatewayKeepsCompletedAndEmptySecret(t *testing.T) {
+func TestUpdateModelGatewayKeepsCompletedAndManagesOptionalSecret(t *testing.T) {
 	st, ctx := openTestStore(t)
 	defer st.Close()
 	h := newOnboardHarness(t, st)
@@ -56,13 +56,13 @@ func TestUpdateModelGatewayKeepsCompletedAndEmptySecret(t *testing.T) {
 		t.Fatalf("completed PutModelConfig want failed_precondition, got %v", err)
 	}
 
-	bad := bearerReq(h.adminTok, &modelv1.UpdateModelGatewayRequest{BaseUrl: "http://api.example.com/v1"})
+	bad := bearerReq(h.adminTok, &modelv1.UpdateModelGatewayRequest{BaseUrl: "ftp://api.example.com/v1"})
 	if _, err := ob.UpdateModelGateway(ctx, bad); connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Fatalf("http want invalid_argument, got %v", err)
+		t.Fatalf("ftp want invalid_argument, got %v", err)
 	}
 
 	out, err := ob.UpdateModelGateway(ctx, bearerReq(h.adminTok, &modelv1.UpdateModelGatewayRequest{
-		BaseUrl: "https://api.openai.com/v1",
+		BaseUrl: "http://model.internal:8000/v1",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestUpdateModelGatewayKeepsCompletedAndEmptySecret(t *testing.T) {
 	if mustOnboardingState(t, ctx, st) != OnboardingStateCompleted {
 		t.Fatal("update must not change onboarding state")
 	}
-	if out.Msg.GetBaseUrl() != "https://api.openai.com/v1" {
+	if out.Msg.GetBaseUrl() != "http://model.internal:8000/v1" {
 		t.Fatalf("base_url=%s", out.Msg.GetBaseUrl())
 	}
 	if out.Msg.GetModel() != kernel.DefaultChatModel {
@@ -84,7 +84,7 @@ func TestUpdateModelGatewayKeepsCompletedAndEmptySecret(t *testing.T) {
 	}
 
 	rotated, err := ob.UpdateModelGateway(ctx, bearerReq(h.adminTok, &modelv1.UpdateModelGatewayRequest{
-		BaseUrl: "https://api.openai.com/v1",
+		BaseUrl: "http://model.internal:8000/v1",
 		Secret:  "sk-rotated-key",
 		Model:   "grok-custom",
 	}))
@@ -99,6 +99,55 @@ func TestUpdateModelGatewayKeepsCompletedAndEmptySecret(t *testing.T) {
 	}
 	if mustOnboardingState(t, ctx, st) != OnboardingStateCompleted {
 		t.Fatal("rotate must not change state")
+	}
+
+	if _, err := ob.UpdateModelGateway(ctx, bearerReq(h.adminTok, &modelv1.UpdateModelGatewayRequest{
+		BaseUrl:     "http://model.internal:8000/v1",
+		Secret:      "cannot-combine",
+		ClearSecret: true,
+	})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("secret plus clear want invalid_argument, got %v", err)
+	}
+	cleared, err := ob.UpdateModelGateway(ctx, bearerReq(h.adminTok, &modelv1.UpdateModelGatewayRequest{
+		BaseUrl:     "http://model.internal:8000/v1",
+		ClearSecret: true,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.Msg.GetHasSecret() {
+		t.Fatalf("clear_secret kept credential: %v", cleared.Msg)
+	}
+	if cleared.Msg.GetStatus() == modelv1.ModelGatewayStatus_MODEL_GATEWAY_STATUS_UNCONFIGURED {
+		t.Fatalf("keyless endpoint must stay configured: %v", cleared.Msg)
+	}
+}
+
+func TestProbeModelGatewayAllowsMissingSecret(t *testing.T) {
+	st, ctx := openTestStore(t)
+	defer st.Close()
+	h := newOnboardHarness(t, st)
+	ob := NewOnboardingServer(st.Pool(), h.jarvisID)
+	if err := writeOnboardingRow(ctx, ob.pool, OnboardingStateCompleted, h.local, "http://model.internal:8000/v1", kernel.DefaultChatModel, "", true); err != nil {
+		t.Fatal(err)
+	}
+	var secret string
+	ob.completeFn = func(_ context.Context, _ string, got string, _ string, _ []chatMessage) (string, error) {
+		secret = got
+		return "pong", nil
+	}
+	if _, err := ob.ProbeModelGateway(ctx, bearerReq(h.adminTok, &modelv1.ProbeModelGatewayRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if secret != "" {
+		t.Fatalf("secret=%q want empty", secret)
+	}
+	got, err := ob.GetModelGateway(ctx, bearerReq(h.adminTok, &modelv1.GetModelGatewayRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Msg.GetStatus() != modelv1.ModelGatewayStatus_MODEL_GATEWAY_STATUS_LIVE || got.Msg.GetHasSecret() {
+		t.Fatalf("gateway=%v", got.Msg)
 	}
 }
 
