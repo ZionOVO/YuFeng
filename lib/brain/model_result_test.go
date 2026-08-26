@@ -117,6 +117,15 @@ func TestModelResultIngestionIsAtomicIdempotentAndBounded(t *testing.T) {
 		t.Fatalf("alert response=%+v", response)
 	}
 	assertModelAlertLedger(t, ctx, st.Pool(), base, jarvisID)
+	var caseRepresentatives int
+	if err := st.Pool().QueryRow(ctx, `SELECT jsonb_array_length(c.representatives)
+		FROM investigation_cases c JOIN model_result_receipts r USING(case_id) WHERE r.result_id=$1`,
+		base.GetResultId()).Scan(&caseRepresentatives); err != nil {
+		t.Fatal(err)
+	}
+	if caseRepresentatives != 0 {
+		t.Fatalf("ModelResult must not be stored as ReviewCandidate, representatives=%d", caseRepresentatives)
+	}
 	var pinnedCertificate string
 	if err := st.Pool().QueryRow(ctx, `SELECT client_cert_sha256 FROM modelside_identities WHERE modelside_id='modelside-test'`).Scan(&pinnedCertificate); err != nil {
 		t.Fatal(err)
