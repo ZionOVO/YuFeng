@@ -542,7 +542,7 @@ export class ConnectClient implements ConsoleClient {
     const res = await this.call<{ entries?: AuditEntry[]; nextPageToken?: string }>('yufeng.audit.v1.AuditService', 'ListAuditEntries', {
       objectType: filter.objectType,
       objectId: filter.objectId,
-      actorId: filter.actor,
+      actor: filter.actor,
       since: filter.since,
       until: filter.until,
       pageSize: page.pageSize,
