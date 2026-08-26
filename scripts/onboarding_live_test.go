@@ -85,7 +85,10 @@ func TestOnboardingLiveStaticRejectsDataPlaneWithoutUnixSocket(t *testing.T) {
 	}
 }
 
-func TestOnboardingLiveKeycheckExitsTwoWithoutSecret(t *testing.T) {
+func TestOnboardingLiveKeycheckAllowsMissingSecret(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("POSIX shell checks run in the canonical Linux continuous integration job")
+	}
 	cmd := exec.Command("sh", onboardingLiveScript(t), "keycheck")
 	cmd.Dir = filepath.Dir(filepath.Dir(onboardingLiveScript(t)))
 	filtered := make([]string, 0, len(os.Environ()))
@@ -96,14 +99,10 @@ func TestOnboardingLiveKeycheckExitsTwoWithoutSecret(t *testing.T) {
 	}
 	cmd.Env = append(filtered, "YUFENG_SKIP_DOTENV=1")
 	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("missing key must exit 2: %s", out)
+	if err != nil {
+		t.Fatalf("missing optional key must be allowed: %v: %s", err, out)
 	}
-	exit, ok := err.(*exec.ExitError)
-	if !ok || exit.ExitCode() != 2 {
-		t.Fatalf("want exit 2, got %v: %s", err, out)
-	}
-	if !strings.Contains(string(out), "未设置模型密钥") {
+	if !strings.Contains(string(out), "will not send a provider authentication header") {
 		t.Fatalf("output=%s", out)
 	}
 }

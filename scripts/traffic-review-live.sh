@@ -42,8 +42,8 @@ if [ -z "$admin_pass" ]; then
   echo "YUFENG_ADMIN_PASS is required" >&2
   exit 2
 fi
-if [ -z "${YUFENG_MODEL_API_KEY:-}" ] || [ -z "${YUFENG_MODEL_BASE_URL:-}" ] || [ -z "${YUFENG_CHAT_MODEL:-}" ]; then
-  echo "本机 .env 必须提供真实模型地址、模型名和密钥" >&2
+if [ -z "${YUFENG_MODEL_BASE_URL:-}" ] || [ -z "${YUFENG_CHAT_MODEL:-}" ]; then
+  echo "本机 .env 必须提供真实模型地址和模型名；模型密钥可选" >&2
   exit 2
 fi
 if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
@@ -86,7 +86,7 @@ admin_user = os.environ["YUFENG_ADMIN_USER"]
 admin_pass = os.environ["YUFENG_ADMIN_PASS"]
 model_base_url = os.environ["YUFENG_MODEL_BASE_URL"]
 model_name = os.environ["YUFENG_CHAT_MODEL"]
-model_key = os.environ["YUFENG_MODEL_API_KEY"]
+model_key = os.environ.get("YUFENG_MODEL_API_KEY", "")
 edge_admin_port = os.environ["YUFENG_EDGE_ADMIN_PORT"]
 configured_asset_id = os.environ["YUFENG_EDGE_ASSET"]
 configured_unit_id = os.environ["YUFENG_EDGE_UNIT"]
@@ -319,7 +319,7 @@ try:
 
     rpc(
         "/yufeng.model.v1.ModelGatewayService/UpdateModelGateway",
-        {"baseUrl": model_base_url, "secret": model_key, "model": model_name},
+        {"baseUrl": model_base_url, "secret": model_key, "clearSecret": not bool(model_key), "model": model_name},
         admin_token,
         idempotent=True,
     )

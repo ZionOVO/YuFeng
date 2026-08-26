@@ -178,13 +178,16 @@ message GenerateResponse {
 // GetModelGatewayRequest 无字段。
 message GetModelGatewayRequest {}
 
-// UpdateModelGatewayRequest 覆盖端点；secret 空则保留旧钥。
+// UpdateModelGatewayRequest 覆盖端点；secret 空且不清除时保留旧钥。
 // dialect 为 UNSPECIFIED 则保留旧方言。
 message UpdateModelGatewayRequest {
   string base_url = 1;
+  // secret 非空时覆盖凭据槽。
   string secret = 2;
   string model = 3;
   ModelDialect dialect = 4;
+  // clear_secret 删除已有密钥；不得与非空 secret 同时提交。
+  bool clear_secret = 5;
 }
 
 // ProbeModelGatewayRequest 无字段。

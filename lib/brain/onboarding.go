@@ -391,6 +391,11 @@ func writeModelSecret(ctx context.Context, db dbTX, secret string) error {
 	return err
 }
 
+func clearModelSecret(ctx context.Context, db dbTX) error {
+	_, err := db.Exec(ctx, `DELETE FROM credential_slots WHERE slot_id=$1`, modelCredentialSlot)
+	return err
+}
+
 func sealModelSecret(plain string) (hash string, ct []byte, hint string, err error) {
 	hash = hashToken(plain)
 	hint = modelSecretHint(plain)
@@ -454,7 +459,7 @@ const (
 )
 
 // onboardingEdgeError 判定写远程过程调用是否允许从当前状态出发；非法边不改库。
-func onboardingEdgeError(state string, action onboardingAction, hasSecret, modelLive bool) error {
+func onboardingEdgeError(state string, action onboardingAction, modelConfigured, modelLive bool) error {
 	if state == OnboardingStateCompleted {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("onboarding already completed"))
 	}
@@ -462,8 +467,8 @@ func onboardingEdgeError(state string, action onboardingAction, hasSecret, model
 	case actionPutModelConfig:
 		return nil
 	case actionTestModel:
-		if !hasSecret {
-			return connect.NewError(connect.CodeFailedPrecondition, errors.New("model secret is missing"))
+		if !modelConfigured {
+			return connect.NewError(connect.CodeFailedPrecondition, errors.New("model endpoint is missing"))
 		}
 		return nil
 	case actionPutDeploymentSpec:

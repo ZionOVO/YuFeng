@@ -202,7 +202,7 @@ func providerCountOf(win gatewayWindow, currentBase string) int32 {
 }
 
 func projectModelGateway(view onboardingView, win gatewayWindow) *modelv1.GetModelGatewayResponse {
-	configured := view.HasSecret && strings.TrimSpace(view.BaseURL) != ""
+	configured := strings.TrimSpace(view.BaseURL) != ""
 	resp := &modelv1.GetModelGatewayResponse{
 		BaseUrl:       view.BaseURL,
 		Model:         view.Model,

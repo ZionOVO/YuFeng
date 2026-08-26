@@ -192,13 +192,13 @@ export interface ConsoleClient {
 
   /* ----- OnboardingService（docs/api.md §19） ----- */
   getOnboarding(): Promise<Onboarding>
-  putModelConfig(req: { baseUrl: string; secret: string; model?: string; dialect?: ModelDialect }): Promise<void>
+  putModelConfig(req: { baseUrl: string; secret?: string; clearSecret?: boolean; model?: string; dialect?: ModelDialect }): Promise<void>
   testModelConnectivity(): Promise<void>
   completeOnboarding(): Promise<void>
 
   /* ----- ModelGatewayService（docs/api.md §19.4；仅管理员；引导完成后） ----- */
   getModelGateway(): Promise<ModelGateway>
-  updateModelGateway(req: { baseUrl: string; secret?: string; model?: string; dialect?: ModelDialect }): Promise<ModelGateway>
+  updateModelGateway(req: { baseUrl: string; secret?: string; clearSecret?: boolean; model?: string; dialect?: ModelDialect }): Promise<ModelGateway>
   probeModelGateway(): Promise<{ ok: boolean; lastError: string }>
 
   /* ----- GovernService.ProposeArtifact（生产只收 intent） ----- */

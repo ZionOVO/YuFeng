@@ -105,16 +105,16 @@ func (s *OnboardingServer) PutModelConfig(ctx context.Context, req *connect.Requ
 		if err != nil {
 			return err
 		}
-		if err := onboardingEdgeError(view.State, actionPutModelConfig, view.HasSecret, view.ModelLive); err != nil {
+		if err := onboardingEdgeError(view.State, actionPutModelConfig, strings.TrimSpace(view.BaseURL) != "", view.ModelLive); err != nil {
 			return err
 		}
 		baseURL := strings.TrimSpace(req.Msg.GetBaseUrl())
-		if err := requireAbsoluteHTTPS(baseURL); err != nil {
+		if err := requireAbsoluteModelURL(baseURL); err != nil {
 			return connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		secret := req.Msg.GetSecret()
-		if strings.TrimSpace(secret) == "" {
-			return connect.NewError(connect.CodeInvalidArgument, errors.New("secret is required"))
+		if req.Msg.GetClearSecret() && strings.TrimSpace(secret) != "" {
+			return connect.NewError(connect.CodeInvalidArgument, errors.New("secret and clear_secret cannot be combined"))
 		}
 		model := strings.TrimSpace(req.Msg.GetModel())
 		if model == "" {
@@ -127,8 +127,14 @@ func (s *OnboardingServer) PutModelConfig(ctx context.Context, req *connect.Requ
 		if dialect == "" {
 			dialect = modelDialectOpenAIChat
 		}
-		if err := writeModelSecret(ctx, tx, secret); err != nil {
-			return err
+		if req.Msg.GetClearSecret() {
+			if err := clearModelSecret(ctx, tx); err != nil {
+				return err
+			}
+		} else if strings.TrimSpace(secret) != "" {
+			if err := writeModelSecret(ctx, tx, secret); err != nil {
+				return err
+			}
 		}
 		if err := writeOnboardingRow(ctx, tx, OnboardingStateModelConfigured, view.LocalAssetID, baseURL, model, "", false); err != nil {
 			return err
@@ -163,7 +169,7 @@ func (s *OnboardingServer) TestModelConnectivity(ctx context.Context, req *conne
 		if err != nil {
 			return err
 		}
-		return onboardingEdgeError(view.State, actionTestModel, view.HasSecret, view.ModelLive)
+		return onboardingEdgeError(view.State, actionTestModel, strings.TrimSpace(view.BaseURL) != "", view.ModelLive)
 	})
 	if err != nil {
 		return nil, err
@@ -181,7 +187,7 @@ func (s *OnboardingServer) TestModelConnectivity(ctx context.Context, req *conne
 	if locked.State == OnboardingStateCompleted || onboardingSlotChanged(view, locked) {
 		return nil, connect.NewError(connect.CodeAborted, errors.New("onboarding changed during probe"))
 	}
-	if err := onboardingEdgeError(locked.State, actionTestModel, locked.HasSecret, locked.ModelLive); err != nil {
+	if err := onboardingEdgeError(locked.State, actionTestModel, strings.TrimSpace(locked.BaseURL) != "", locked.ModelLive); err != nil {
 		return nil, err
 	}
 	var callErr error
@@ -244,7 +250,7 @@ func (s *OnboardingServer) CompleteOnboarding(ctx context.Context, req *connect.
 	if err != nil {
 		return nil, err
 	}
-	if err := onboardingEdgeError(view.State, actionCompleteOnboarding, view.HasSecret, view.ModelLive); err != nil {
+	if err := onboardingEdgeError(view.State, actionCompleteOnboarding, strings.TrimSpace(view.BaseURL) != "", view.ModelLive); err != nil {
 		return nil, err
 	}
 	missing := missingCompletePredicates(ctx, tx, completeCheck{
@@ -284,8 +290,8 @@ func (s *OnboardingServer) CompleteChat(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, err
 	}
-	if !view.completed() || !view.HasSecret {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("onboarding is incomplete or model secret is missing"))
+	if !view.completed() || strings.TrimSpace(view.BaseURL) == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("onboarding is incomplete or model endpoint is missing"))
 	}
 	var msgs []chatMessage
 	for _, m := range req.Msg.GetMessages() {
@@ -336,10 +342,18 @@ func (s *OnboardingServer) UpdateModelGateway(ctx context.Context, req *connect.
 			return onboardingIncompleteError()
 		}
 		baseURL := strings.TrimSpace(req.Msg.GetBaseUrl())
-		if err := requireAbsoluteHTTPS(baseURL); err != nil {
+		if err := requireAbsoluteModelURL(baseURL); err != nil {
 			return connect.NewError(connect.CodeInvalidArgument, err)
 		}
-		if secret := req.Msg.GetSecret(); strings.TrimSpace(secret) != "" {
+		secret := req.Msg.GetSecret()
+		if req.Msg.GetClearSecret() && strings.TrimSpace(secret) != "" {
+			return connect.NewError(connect.CodeInvalidArgument, errors.New("secret and clear_secret cannot be combined"))
+		}
+		if req.Msg.GetClearSecret() {
+			if err := clearModelSecret(ctx, tx); err != nil {
+				return err
+			}
+		} else if strings.TrimSpace(secret) != "" {
 			if err := writeModelSecret(ctx, tx, secret); err != nil {
 				return err
 			}
@@ -390,8 +404,8 @@ func (s *OnboardingServer) ProbeModelGateway(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, err
 	}
-	if !view.HasSecret {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("model secret is missing"))
+	if strings.TrimSpace(view.BaseURL) == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("model endpoint is missing"))
 	}
 	started := time.Now()
 	text, err := s.completeChat(ctx, view, []chatMessage{{Role: "user", Content: "ping"}})
@@ -484,9 +498,20 @@ func (s *OnboardingServer) requireAdmin(ctx context.Context, req interface{ Head
 	return user, nil
 }
 
-func requireAbsoluteHTTPS(raw string) error {
+func requireAbsoluteModelURL(raw string) error {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.Host == "" || !u.IsAbs() {
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || !u.IsAbs() {
+		return errors.New("base_url must be an absolute http or https url")
+	}
+	return nil
+}
+
+func requireAbsoluteHTTPS(raw string) error {
+	if err := requireAbsoluteModelURL(raw); err != nil {
+		return err
+	}
+	u, _ := url.Parse(raw)
+	if u.Scheme != "https" {
 		return errors.New("base_url must be an absolute https url")
 	}
 	return nil

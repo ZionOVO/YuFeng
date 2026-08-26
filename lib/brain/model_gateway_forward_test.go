@@ -158,6 +158,84 @@ func TestPostModelCompletionDialects(t *testing.T) {
 	}
 }
 
+func TestPostModelCompletionWithoutSecretOmitsAuthentication(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		dialect string
+		reply   string
+	}{
+		{name: "openai chat", dialect: modelDialectOpenAIChat, reply: `{"choices":[{"message":{"content":"chat-real"}}]}`},
+		{name: "openai responses", dialect: modelDialectOpenAIResponses, reply: `{"output_text":"responses-real"}`},
+		{name: "claude messages", dialect: modelDialectClaudeMessages, reply: `{"content":[{"type":"text","text":"claude-real"}]}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			calls := 0
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if got := r.Header.Get("Authorization"); got != "" {
+					t.Errorf("authorization=%q want omitted", got)
+				}
+				if got := r.Header.Get("x-api-key"); got != "" {
+					t.Errorf("x-api-key=%q want omitted", got)
+				}
+				if tc.dialect == modelDialectClaudeMessages && r.Header.Get("anthropic-version") != anthropicAPIVersion {
+					t.Errorf("anthropic-version=%q", r.Header.Get("anthropic-version"))
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(tc.reply))
+			}))
+			t.Cleanup(up.Close)
+			text, err := postModelCompletion(context.Background(), up.Client(), modelSlot{
+				BaseURL: up.URL + "/v1",
+				Model:   "real-model",
+				Dialect: tc.dialect,
+			}, []chatMessage{{Role: "user", Content: "ping"}}, chatCompletionSpec{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.TrimSpace(text) == "" || calls != 1 {
+				t.Fatalf("text=%q calls=%d", text, calls)
+			}
+		})
+	}
+}
+
+func TestPostModelCompletionRejectsInvalidUpstreamWithoutFallback(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{name: "non success", status: http.StatusBadGateway, body: `{"choices":[{"message":{"content":"must-not-be-used"}}]}`},
+		{name: "invalid json", status: http.StatusOK, body: `not-json`},
+		{name: "empty text", status: http.StatusOK, body: `{"choices":[{"message":{"content":""}}]}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			calls := 0
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				calls++
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			t.Cleanup(up.Close)
+			text, err := postModelCompletion(context.Background(), up.Client(), modelSlot{
+				BaseURL: up.URL,
+				Model:   "real-model",
+				Dialect: modelDialectOpenAIChat,
+			}, []chatMessage{{Role: "user", Content: "ping"}}, chatCompletionSpec{})
+			if err == nil || text != "" || calls != 1 {
+				t.Fatalf("text=%q error=%v calls=%d", text, err, calls)
+			}
+		})
+	}
+}
+
 func TestPostModelCompletionResponsesOutputBlocks(t *testing.T) {
 	t.Parallel()
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

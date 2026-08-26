@@ -99,8 +99,8 @@ PY
 
 keycheck() {
   if [ -z "${YUFENG_MODEL_API_KEY:-}" ]; then
-    echo "未设置模型密钥，活栈模型连通性标为人工门禁"
-    exit 2
+    echo "model key omitted; Brain will not send a provider authentication header"
+    return
   fi
   echo "model key present (not printed)"
 }
@@ -334,7 +334,7 @@ token=$(login)
 onboarding=$(rpc "/yufeng.onboarding.v1.OnboardingService/GetOnboarding" "{}" "$token")
 state=$(printf '%s' "$onboarding" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body"].get("state", ""))')
 if [ "$state" != "ONBOARDING_STATE_COMPLETED" ]; then
-  model_body=$(MODEL_URL="$model_url" MODEL_SECRET="$YUFENG_MODEL_API_KEY" MODEL_NAME="$model" python3 -c 'import json,os; print(json.dumps({"baseUrl":os.environ["MODEL_URL"],"secret":os.environ["MODEL_SECRET"],"model":os.environ["MODEL_NAME"]}))')
+  model_body=$(MODEL_URL="$model_url" MODEL_SECRET="${YUFENG_MODEL_API_KEY:-}" MODEL_NAME="$model" python3 -c 'import json,os; secret=os.environ["MODEL_SECRET"]; print(json.dumps({"baseUrl":os.environ["MODEL_URL"],"secret":secret,"clearSecret":not bool(secret),"model":os.environ["MODEL_NAME"]}))')
   rpc "/yufeng.onboarding.v1.OnboardingService/PutModelConfig" "$model_body" "$token" 1 | require_ok "model configuration"
   rpc "/yufeng.onboarding.v1.OnboardingService/TestModelConnectivity" "{}" "$token" 1 | require_ok "model connectivity"
   wait_for_jarvis "$token"

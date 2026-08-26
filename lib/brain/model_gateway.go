@@ -264,9 +264,6 @@ func prepareModelSlot(slot *modelSlot) error {
 	if strings.TrimSpace(slot.BaseURL) == "" {
 		return errors.New("model base_url is empty")
 	}
-	if strings.TrimSpace(slot.Secret) == "" {
-		return errors.New("model secret is missing")
-	}
 	if strings.TrimSpace(slot.Model) == "" {
 		slot.Model = kernel.DefaultChatModel
 	}
@@ -329,9 +326,11 @@ func postModelJSON(ctx context.Context, client *http.Client, endpoint, secret st
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if claude {
-		req.Header.Set("x-api-key", secret)
+		if strings.TrimSpace(secret) != "" {
+			req.Header.Set("x-api-key", secret)
+		}
 		req.Header.Set("anthropic-version", anthropicAPIVersion)
-	} else {
+	} else if strings.TrimSpace(secret) != "" {
 		req.Header.Set("Authorization", "Bearer "+secret)
 	}
 	resp, err := clientCopy.Do(req)

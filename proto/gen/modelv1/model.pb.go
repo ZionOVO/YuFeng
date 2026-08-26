@@ -1355,14 +1355,17 @@ func (*GetModelGatewayRequest) Descriptor() ([]byte, []int) {
 	return file_yufeng_model_v1_model_proto_rawDescGZIP(), []int{13}
 }
 
-// UpdateModelGatewayRequest 覆盖端点；secret 空则保留旧钥。
+// UpdateModelGatewayRequest 覆盖端点；secret 空且不清除时保留旧钥。
 // dialect 为 UNSPECIFIED 则保留旧方言。
 type UpdateModelGatewayRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BaseUrl       string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
-	Secret        string                 `protobuf:"bytes,2,opt,name=secret,proto3" json:"secret,omitempty"`
-	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	Dialect       ModelDialect           `protobuf:"varint,4,opt,name=dialect,proto3,enum=yufeng.model.v1.ModelDialect" json:"dialect,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	BaseUrl string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	// secret 非空时覆盖凭据槽。
+	Secret  string       `protobuf:"bytes,2,opt,name=secret,proto3" json:"secret,omitempty"`
+	Model   string       `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	Dialect ModelDialect `protobuf:"varint,4,opt,name=dialect,proto3,enum=yufeng.model.v1.ModelDialect" json:"dialect,omitempty"`
+	// clear_secret 删除已有密钥；不得与非空 secret 同时提交。
+	ClearSecret   bool `protobuf:"varint,5,opt,name=clear_secret,json=clearSecret,proto3" json:"clear_secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1423,6 +1426,13 @@ func (x *UpdateModelGatewayRequest) GetDialect() ModelDialect {
 		return x.Dialect
 	}
 	return ModelDialect_MODEL_DIALECT_UNSPECIFIED
+}
+
+func (x *UpdateModelGatewayRequest) GetClearSecret() bool {
+	if x != nil {
+		return x.ClearSecret
+	}
+	return false
 }
 
 // ProbeModelGatewayRequest 无字段。
@@ -1971,12 +1981,13 @@ const file_yufeng_model_v1_model_proto_rawDesc = "" +
 	"\x1aoptional_reasoning_summary\x18\t \x01(\tR\x18optionalReasoningSummary\x12,\n" +
 	"\x12next_item_sequence\x18\n" +
 	" \x01(\x03R\x10nextItemSequence\"\x18\n" +
-	"\x16GetModelGatewayRequest\"\x9d\x01\n" +
+	"\x16GetModelGatewayRequest\"\xc0\x01\n" +
 	"\x19UpdateModelGatewayRequest\x12\x19\n" +
 	"\bbase_url\x18\x01 \x01(\tR\abaseUrl\x12\x16\n" +
 	"\x06secret\x18\x02 \x01(\tR\x06secret\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x127\n" +
-	"\adialect\x18\x04 \x01(\x0e2\x1d.yufeng.model.v1.ModelDialectR\adialect\"\x1a\n" +
+	"\adialect\x18\x04 \x01(\x0e2\x1d.yufeng.model.v1.ModelDialectR\adialect\x12!\n" +
+	"\fclear_secret\x18\x05 \x01(\bR\vclearSecret\"\x1a\n" +
 	"\x18ProbeModelGatewayRequest\"J\n" +
 	"\x19ProbeModelGatewayResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x1d\n" +

@@ -588,11 +588,11 @@ export class ConnectClient implements ConsoleClient {
     }
   }
 
-  async putModelConfig(req: { baseUrl: string; secret: string; model?: string; dialect?: ModelDialect }): Promise<void> {
+  async putModelConfig(req: { baseUrl: string; secret?: string; clearSecret?: boolean; model?: string; dialect?: ModelDialect }): Promise<void> {
     await this.call(
       'yufeng.onboarding.v1.OnboardingService',
       'PutModelConfig',
-      { baseUrl: req.baseUrl, secret: req.secret, model: req.model, dialect: req.dialect },
+      { baseUrl: req.baseUrl, secret: req.secret ?? '', clearSecret: req.clearSecret === true, model: req.model, dialect: req.dialect },
       { idempotent: true },
     )
   }
@@ -610,11 +610,11 @@ export class ConnectClient implements ConsoleClient {
     return normalizeModelGateway(res)
   }
 
-  async updateModelGateway(req: { baseUrl: string; secret?: string; model?: string; dialect?: ModelDialect }): Promise<ModelGateway> {
+  async updateModelGateway(req: { baseUrl: string; secret?: string; clearSecret?: boolean; model?: string; dialect?: ModelDialect }): Promise<ModelGateway> {
     const res = await this.call<Partial<ModelGateway>>(
       'yufeng.model.v1.ModelGatewayService',
       'UpdateModelGateway',
-      { baseUrl: req.baseUrl, secret: req.secret ?? '', model: req.model ?? '', dialect: req.dialect },
+      { baseUrl: req.baseUrl, secret: req.secret ?? '', clearSecret: req.clearSecret === true, model: req.model ?? '', dialect: req.dialect },
       { idempotent: true },
     )
     return normalizeModelGateway(res)

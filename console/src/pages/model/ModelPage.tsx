@@ -2,7 +2,7 @@
 // 同时只接一条模型供应商槽，不是多供应商并行路由。
 
 import { useEffect, useState } from 'react'
-import { Button, Input, Select, SelectItem, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react'
+import { Button, Checkbox, Input, Select, SelectItem, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react'
 import { isApiError } from '../../api/errors'
 import { MODEL_DIALECTS, normalizeDialect } from '../../api/modelDialect'
 import type { ModelDialect, ModelGatewayStatus } from '../../api/types'
@@ -41,6 +41,7 @@ export function ModelPage() {
   const [model, setModel] = useState('')
   const [dialect, setDialect] = useState<ModelDialect>('MODEL_DIALECT_OPENAI_CHAT')
   const [secret, setSecret] = useState('')
+  const [clearSecret, setClearSecret] = useState(false)
   const [busy, setBusy] = useState<'save' | 'probe' | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [probeNote, setProbeNote] = useState<string | null>(null)
@@ -52,6 +53,7 @@ export function ModelPage() {
     setBaseUrl(gate.data.baseUrl)
     setModel(gate.data.model)
     setDialect(normalizeDialect(gate.data.dialect))
+    setClearSecret(false)
   }, [gate.data])
 
   if (gate.status === 'loading' && gate.data === null) {
@@ -78,8 +80,9 @@ export function ModelPage() {
     setFormError(null)
     setProbeNote(null)
     try {
-      await client.updateModelGateway({ baseUrl, secret, model, dialect })
+      await client.updateModelGateway({ baseUrl, secret, clearSecret, model, dialect })
       setSecret('')
+      setClearSecret(false)
       gate.reload()
     } catch (e) {
       setFormError(isApiError(e) ? `${e.message}（${e.code}）` : '保存失败，请重试')
@@ -186,7 +189,7 @@ export function ModelPage() {
         <div className="fs-panel-head">
           <div>
             <p className="fs-panel-title">调整配置</p>
-            <p className="fs-panel-sub">保存只改当前槽，不退引导状态。密钥留空则保留已保存值。</p>
+            <p className="fs-panel-sub">保存只改当前槽，不退引导状态。密钥可选；无 Key 时不发送供应商认证头。</p>
           </div>
         </div>
         <div className="model-config-form">
@@ -214,10 +217,26 @@ export function ModelPage() {
               type="password"
               radius="md"
               value={secret}
-              onValueChange={setSecret}
+              onValueChange={(value) => {
+                setSecret(value)
+                if (value !== '') setClearSecret(false)
+              }}
+              isDisabled={clearSecret}
               autoComplete="off"
-              description={g.hasSecret ? `已保存 ${g.secretHint}，覆盖请重新输入` : '只写不回读'}
+              description={g.hasSecret ? `已保存 ${g.secretHint}；留空则保留，或显式清除` : '可留空；只写不回读'}
             />
+            {g.hasSecret && (
+              <Checkbox
+                isSelected={clearSecret}
+                onValueChange={(selected) => {
+                  setClearSecret(selected)
+                  if (selected) setSecret('')
+                }}
+              >
+                清除已保存密钥
+              </Checkbox>
+            )}
+            <p className="text-xs leading-5 text-[#8b98a1]">允许受控网络使用 HTTP；公网和任何敏感证据生成应使用 HTTPS。</p>
           </div>
           <div className="model-config-feedback" aria-live="polite">
             {formError !== null && <p className="text-xs text-[#ff746c]">{formError}</p>}
@@ -227,7 +246,7 @@ export function ModelPage() {
             <Button color="primary" radius="md" isLoading={busy === 'save'} isDisabled={busy !== null || baseUrl === ''} onPress={() => void save()}>
               保存配置
             </Button>
-            <Button variant="bordered" radius="md" isLoading={busy === 'probe'} isDisabled={busy !== null || !g.hasSecret} onPress={() => void probe()}>
+            <Button variant="bordered" radius="md" isLoading={busy === 'probe'} isDisabled={busy !== null || baseUrl.trim() === ''} onPress={() => void probe()}>
               探测连通
             </Button>
           </div>
