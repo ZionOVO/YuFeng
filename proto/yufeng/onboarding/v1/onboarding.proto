@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// 初次配置引导：部署一行状态机、模型凭据与贾维斯在线确认。
+// 初次配置引导：部署一行状态机、模型配置与贾维斯在线确认。
 package yufeng.onboarding.v1;
 
 import "google/protobuf/timestamp.proto";
@@ -14,7 +14,7 @@ option go_package = "yufeng/proto/gen/onboardingv1";
 service OnboardingService {
   // GetOnboarding 返回引导投影，不含密钥明文。
   rpc GetOnboarding(GetOnboardingRequest) returns (GetOnboardingResponse);
-  // PutModelConfig 把模型端点与密钥写入凭据槽。
+  // PutModelConfig 保存模型端点与可选密钥。
   rpc PutModelConfig(PutModelConfigRequest) returns (PutModelConfigResponse);
   // TestModelConnectivity 由 brain 出网发一次最小聊天补全。
   rpc TestModelConnectivity(TestModelConnectivityRequest) returns (TestModelConnectivityResponse);
@@ -35,14 +35,14 @@ enum OnboardingState {
   ONBOARDING_STATE_UNSPECIFIED = 0;
   // 刚装完，未配模型。
   ONBOARDING_STATE_PENDING = 1;
-  // 密钥已存，探测尚未成功。
+  // 模型坐标已存，探测尚未成功。
   ONBOARDING_STATE_MODEL_CONFIGURED = 2;
   // 探测成功。
   ONBOARDING_STATE_MODEL_LIVE = 3;
   ONBOARDING_STATE_DATAPLANE_LIVE = 4 [deprecated = true];
   // 引导结束，主控制台开放。
   ONBOARDING_STATE_COMPLETED = 5;
-  // 最近一步失败，保留原因与已配密钥。
+  // 最近一步失败，保留原因与已配模型坐标和可选密钥。
   ONBOARDING_STATE_FAILED = 6;
   // 旧 Edge 引导状态只保留线缆编码，不再写入。
   ONBOARDING_STATE_EDGE_LIVE = 7 [deprecated = true];
@@ -78,13 +78,16 @@ message GetOnboardingResponse {
   uint64 expected_listen_plan_version = 17 [deprecated = true];
 }
 
-// PutModelConfigRequest 写入模型端点与密钥。
+// PutModelConfigRequest 写入模型端点与可选密钥。
 // dialect 省略或 UNSPECIFIED 则写入 MODEL_DIALECT_OPENAI_CHAT。
 message PutModelConfigRequest {
   string base_url = 1;
+  // secret 非空时覆盖凭据槽；空值不会阻止无 Key 配置。
   string secret = 2;
   string model = 3;
   yufeng.model.v1.ModelDialect dialect = 4;
+  // clear_secret 删除已有密钥；不得与非空 secret 同时提交。
+  bool clear_secret = 5;
 }
 
 // PutModelConfigResponse 无字段。

@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: yufeng/onboarding/v1/onboarding.proto
 
-// 初次配置引导：部署一行状态机、模型凭据与贾维斯在线确认。
+// 初次配置引导：部署一行状态机、模型配置与贾维斯在线确认。
 
 package onboardingv1
 
@@ -34,7 +34,7 @@ const (
 	OnboardingState_ONBOARDING_STATE_UNSPECIFIED OnboardingState = 0
 	// 刚装完，未配模型。
 	OnboardingState_ONBOARDING_STATE_PENDING OnboardingState = 1
-	// 密钥已存，探测尚未成功。
+	// 模型坐标已存，探测尚未成功。
 	OnboardingState_ONBOARDING_STATE_MODEL_CONFIGURED OnboardingState = 2
 	// 探测成功。
 	OnboardingState_ONBOARDING_STATE_MODEL_LIVE OnboardingState = 3
@@ -42,7 +42,7 @@ const (
 	OnboardingState_ONBOARDING_STATE_DATAPLANE_LIVE OnboardingState = 4
 	// 引导结束，主控制台开放。
 	OnboardingState_ONBOARDING_STATE_COMPLETED OnboardingState = 5
-	// 最近一步失败，保留原因与已配密钥。
+	// 最近一步失败，保留原因与已配模型坐标和可选密钥。
 	OnboardingState_ONBOARDING_STATE_FAILED OnboardingState = 6
 	// 旧 Edge 引导状态只保留线缆编码，不再写入。
 	//
@@ -421,14 +421,17 @@ func (x *GetOnboardingResponse) GetExpectedListenPlanVersion() uint64 {
 	return 0
 }
 
-// PutModelConfigRequest 写入模型端点与密钥。
+// PutModelConfigRequest 写入模型端点与可选密钥。
 // dialect 省略或 UNSPECIFIED 则写入 MODEL_DIALECT_OPENAI_CHAT。
 type PutModelConfigRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BaseUrl       string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
-	Secret        string                 `protobuf:"bytes,2,opt,name=secret,proto3" json:"secret,omitempty"`
-	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	Dialect       modelv1.ModelDialect   `protobuf:"varint,4,opt,name=dialect,proto3,enum=yufeng.model.v1.ModelDialect" json:"dialect,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	BaseUrl string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	// secret 非空时覆盖凭据槽；空值不会阻止无 Key 配置。
+	Secret  string               `protobuf:"bytes,2,opt,name=secret,proto3" json:"secret,omitempty"`
+	Model   string               `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	Dialect modelv1.ModelDialect `protobuf:"varint,4,opt,name=dialect,proto3,enum=yufeng.model.v1.ModelDialect" json:"dialect,omitempty"`
+	// clear_secret 删除已有密钥；不得与非空 secret 同时提交。
+	ClearSecret   bool `protobuf:"varint,5,opt,name=clear_secret,json=clearSecret,proto3" json:"clear_secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -489,6 +492,13 @@ func (x *PutModelConfigRequest) GetDialect() modelv1.ModelDialect {
 		return x.Dialect
 	}
 	return modelv1.ModelDialect(0)
+}
+
+func (x *PutModelConfigRequest) GetClearSecret() bool {
+	if x != nil {
+		return x.ClearSecret
+	}
+	return false
 }
 
 // PutModelConfigResponse 无字段。
@@ -1341,12 +1351,13 @@ const file_yufeng_onboarding_v1_onboarding_proto_rawDesc = "" +
 	"\x16deployment_spec_digest\x18\x0e \x01(\tB\x02\x18\x01R\x14deploymentSpecDigest\x128\n" +
 	"\x16expected_generation_id\x18\x0f \x01(\tB\x02\x18\x01R\x14expectedGenerationId\x12:\n" +
 	"\x17expected_generation_seq\x18\x10 \x01(\x03B\x02\x18\x01R\x15expectedGenerationSeq\x12C\n" +
-	"\x1cexpected_listen_plan_version\x18\x11 \x01(\x04B\x02\x18\x01R\x19expectedListenPlanVersion\"\x99\x01\n" +
+	"\x1cexpected_listen_plan_version\x18\x11 \x01(\x04B\x02\x18\x01R\x19expectedListenPlanVersion\"\xbc\x01\n" +
 	"\x15PutModelConfigRequest\x12\x19\n" +
 	"\bbase_url\x18\x01 \x01(\tR\abaseUrl\x12\x16\n" +
 	"\x06secret\x18\x02 \x01(\tR\x06secret\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x127\n" +
-	"\adialect\x18\x04 \x01(\x0e2\x1d.yufeng.model.v1.ModelDialectR\adialect\"\x18\n" +
+	"\adialect\x18\x04 \x01(\x0e2\x1d.yufeng.model.v1.ModelDialectR\adialect\x12!\n" +
+	"\fclear_secret\x18\x05 \x01(\bR\vclearSecret\"\x18\n" +
 	"\x16PutModelConfigResponse\"\x1e\n" +
 	"\x1cTestModelConnectivityRequest\"\x1f\n" +
 	"\x1dTestModelConnectivityResponse\"\xc9\x02\n" +

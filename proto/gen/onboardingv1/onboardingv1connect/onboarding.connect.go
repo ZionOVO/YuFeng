@@ -2,7 +2,7 @@
 //
 // Source: yufeng/onboarding/v1/onboarding.proto
 
-// 初次配置引导：部署一行状态机、模型凭据与贾维斯在线确认。
+// 初次配置引导：部署一行状态机、模型配置与贾维斯在线确认。
 package onboardingv1connect
 
 import (
@@ -58,7 +58,7 @@ const (
 type OnboardingServiceClient interface {
 	// GetOnboarding 返回引导投影，不含密钥明文。
 	GetOnboarding(context.Context, *connect.Request[onboardingv1.GetOnboardingRequest]) (*connect.Response[onboardingv1.GetOnboardingResponse], error)
-	// PutModelConfig 把模型端点与密钥写入凭据槽。
+	// PutModelConfig 保存模型端点与可选密钥。
 	PutModelConfig(context.Context, *connect.Request[onboardingv1.PutModelConfigRequest]) (*connect.Response[onboardingv1.PutModelConfigResponse], error)
 	// TestModelConnectivity 由 brain 出网发一次最小聊天补全。
 	TestModelConnectivity(context.Context, *connect.Request[onboardingv1.TestModelConnectivityRequest]) (*connect.Response[onboardingv1.TestModelConnectivityResponse], error)
@@ -174,7 +174,7 @@ func (c *onboardingServiceClient) CompleteOnboarding(ctx context.Context, req *c
 type OnboardingServiceHandler interface {
 	// GetOnboarding 返回引导投影，不含密钥明文。
 	GetOnboarding(context.Context, *connect.Request[onboardingv1.GetOnboardingRequest]) (*connect.Response[onboardingv1.GetOnboardingResponse], error)
-	// PutModelConfig 把模型端点与密钥写入凭据槽。
+	// PutModelConfig 保存模型端点与可选密钥。
 	PutModelConfig(context.Context, *connect.Request[onboardingv1.PutModelConfigRequest]) (*connect.Response[onboardingv1.PutModelConfigResponse], error)
 	// TestModelConnectivity 由 brain 出网发一次最小聊天补全。
 	TestModelConnectivity(context.Context, *connect.Request[onboardingv1.TestModelConnectivityRequest]) (*connect.Response[onboardingv1.TestModelConnectivityResponse], error)
