@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -528,16 +527,11 @@ func attachModelResultToCase(ctx context.Context, tx pgx.Tx, result *modelsidev1
 		return "", err
 	}
 	var caseID, state string
-	var representatives []byte
-	err := tx.QueryRow(ctx, `SELECT case_id,state,representatives FROM investigation_cases
+	err := tx.QueryRow(ctx, `SELECT case_id,state FROM investigation_cases
 		WHERE asset_id=$1 AND module_id='traffic-interception' AND cluster_id=$2
 		  AND state NOT IN ('resolved','failed','evidence_expired')
-		ORDER BY created_at LIMIT 1 FOR UPDATE`, result.GetAssetId(), clusterID).Scan(&caseID, &state, &representatives)
+		ORDER BY created_at LIMIT 1 FOR UPDATE`, result.GetAssetId(), clusterID).Scan(&caseID, &state)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return "", err
-	}
-	resultRaw, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(result)
-	if err != nil {
 		return "", err
 	}
 	priority := int(math.Round(result.GetScore() * 100))
@@ -549,15 +543,11 @@ func attachModelResultToCase(ctx context.Context, tx pgx.Tx, result *modelsidev1
 		if err != nil {
 			return "", err
 		}
-		representativeJSON, err := json.Marshal([]json.RawMessage{resultRaw})
-		if err != nil {
-			return "", err
-		}
 		title := fmt.Sprintf("%s %s 模型旁路复核", strings.ToUpper(result.GetMethod()), result.GetRoute())
 		if _, err := tx.Exec(ctx, `INSERT INTO investigation_cases(
-			case_id,module_id,asset_id,cluster_id,state,priority,title,summary,representatives)
-			VALUES($1,'traffic-interception',$2,$3,'open',$4,$5,$6,$7::jsonb)`,
-			caseID, result.GetAssetId(), clusterID, priority, title, "Edge 邻近模型的无原文异步结果", representativeJSON); err != nil {
+			case_id,module_id,asset_id,cluster_id,state,priority,title,summary)
+			VALUES($1,'traffic-interception',$2,$3,'open',$4,$5,$6)`,
+			caseID, result.GetAssetId(), clusterID, priority, title, "Edge 邻近模型的无原文异步结果"); err != nil {
 			return "", err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO case_activities(case_id,kind,ref_id,summary)
@@ -569,28 +559,9 @@ func attachModelResultToCase(ctx context.Context, tx pgx.Tx, result *modelsidev1
 	if state != "open" {
 		return caseID, nil
 	}
-	var current []json.RawMessage
-	if len(representatives) > 0 {
-		if err := json.Unmarshal(representatives, &current); err != nil {
-			return "", fmt.Errorf("decode model case representatives: %w", err)
-		}
-	}
-	replace := len(current) == 0
-	if len(current) > 0 {
-		var previous modelsidev1.ModelResult
-		if protojson.Unmarshal(current[0], &previous) != nil || result.GetScore() > previous.GetScore() {
-			replace = true
-		}
-	}
-	if replace {
-		next, err := json.Marshal([]json.RawMessage{resultRaw})
-		if err != nil {
-			return "", err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE investigation_cases SET priority=GREATEST(priority,$2),
-			representatives=$3::jsonb,updated_at=now() WHERE case_id=$1`, caseID, priority, next); err != nil {
-			return "", err
-		}
+	if _, err := tx.Exec(ctx, `UPDATE investigation_cases SET priority=GREATEST(priority,$2),
+		updated_at=now() WHERE case_id=$1`, caseID, priority); err != nil {
+		return "", err
 	}
 	return caseID, nil
 }

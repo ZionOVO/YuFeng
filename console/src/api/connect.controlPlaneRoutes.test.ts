@@ -102,4 +102,22 @@ describe('ConnectClient 控制面真实路由', () => {
       '/yufeng.asset.v1.AssetService/UpdateModelIngressWindow',
     ])
   })
+
+  it('审计操作者筛选使用契约字段 actor', async () => {
+    let requestBody: Record<string, unknown> = {}
+    const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      return Response.json({ entries: [] })
+    })
+    const client = new ConnectClient({
+      getToken: () => 'session-token',
+      onUnauthenticated: () => undefined,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    })
+
+    await client.listAuditEntries({ actor: 'operator-chen' })
+
+    expect(requestBody.actor).toBe('operator-chen')
+    expect(requestBody).not.toHaveProperty('actorId')
+  })
 })

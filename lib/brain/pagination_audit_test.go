@@ -1,13 +1,18 @@
 package brain
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"strconv"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	auditv1 "yufeng/proto/gen/auditv1"
 	authv1 "yufeng/proto/gen/authv1"
@@ -193,5 +198,78 @@ func TestAuditPaginationAppliesVisibilityBeforePageBoundary(t *testing.T) {
 	}
 	if len(second.Msg.Entries) != 1 || second.Msg.Entries[0].Action != "visible.old" || second.Msg.NextPageToken != "" {
 		t.Fatalf("unexpected second visible page: %+v", second.Msg)
+	}
+}
+
+type auditListQueryCounter struct {
+	queries atomic.Int32
+}
+
+func (c *auditListQueryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	if strings.Contains(data.SQL, "FROM audit_entries a") {
+		c.queries.Add(1)
+	}
+	return ctx
+}
+
+func (*auditListQueryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+
+func TestAuditVisibilityFilteringUsesOneDatabaseQuery(t *testing.T) {
+	st, ctx := openTestStore(t)
+	defer st.Close()
+	username := "audit-query-" + newTestSuffix()
+	if err := EnsureBootstrapAdmin(ctx, st.Pool(), username, "Admin12345"); err != nil {
+		t.Fatal(err)
+	}
+	login, err := NewAuthServer(st.Pool(), time.Hour, false, 8).Login(ctx, connect.NewRequest(&authv1.LoginRequest{
+		Username: username, Password: "Admin12345",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	visible := "asset-query-visible-" + newTestSuffix()
+	hidden := "asset-query-hidden-" + newTestSuffix()
+	if _, err := st.Pool().Exec(ctx, `INSERT INTO assets(asset_id,display_name,max_auto_tier)
+		VALUES($1,$1,'L1'),($2,$2,'L1')`, visible, hidden); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeAdminSystemGrant(ctx, st.Pool(), login.Msg.User.UserId, visible); err != nil {
+		t.Fatal(err)
+	}
+	if err := SeedOnboardingState(ctx, st.Pool(), OnboardingStateCompleted, visible); err != nil {
+		t.Fatal(err)
+	}
+	if err := appendAudit(ctx, st.Pool(), "user", "visible-actor", "visible", "asset", visible, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Pool().Exec(ctx, `INSERT INTO audit_entries(
+		actor_type,actor_id,action,object_type,object_id,previous_hash,entry_hash)
+		SELECT 'system','hidden-actor','hidden','asset',$1,'',format('hidden-%s',n)
+		FROM generate_series(1,120) AS n`, hidden); err != nil {
+		t.Fatal(err)
+	}
+
+	counter := &auditListQueryCounter{}
+	config, err := pgxpool.ParseConfig(brainPostgresTests.schemaDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.ConnConfig.Tracer = counter
+	tracedPool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tracedPool.Close()
+	request := connect.NewRequest(&auditv1.ListAuditEntriesRequest{PageSize: 1})
+	request.Header().Set("Authorization", "Bearer "+login.Msg.Token)
+	response, err := NewAuditServer(tracedPool).ListAuditEntries(ctx, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Msg.GetEntries()) != 1 || response.Msg.GetEntries()[0].GetAction() != "visible" {
+		t.Fatalf("entries=%+v", response.Msg.GetEntries())
+	}
+	if got := counter.queries.Load(); got != 1 {
+		t.Fatalf("audit list database queries=%d want 1", got)
 	}
 }

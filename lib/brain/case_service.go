@@ -204,6 +204,18 @@ func scanInvestigationCase(row pgx.Row) (*casev1.InvestigationCase, error) {
 		}
 	}
 	for _, raw := range representatives {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &fields); err != nil {
+			return nil, err
+		}
+		// 旧版 ModelSide 写入曾把 ModelResult 放进只允许 ReviewCandidate 的列；
+		// 结果本体已由模型推理账和接收回执持久化，案件投影必须忽略这份重复错型数据。
+		if _, legacy := fields["result_id"]; legacy {
+			continue
+		}
+		if _, legacy := fields["resultId"]; legacy {
+			continue
+		}
 		candidate := &telemetryv1.ReviewCandidate{}
 		if err := protojson.Unmarshal(raw, candidate); err != nil {
 			return nil, err
