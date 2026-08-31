@@ -7,7 +7,9 @@ param(
     [int]$Count = 5,
 
     [ValidateNotNullOrEmpty()]
-    [int[]]$ProcessorCounts = @(1, 32)
+    [int[]]$ProcessorCounts = @(1, 32),
+
+    [string]$ResumeDirectory = ''
 )
 
 Set-StrictMode -Version Latest
@@ -112,9 +114,9 @@ function Convert-BenchmarkLines {
             $benchmark = $Matches[1]
             $processors = [int]$Matches[2]
         }
-        elseif ($ConfiguredProcessors.Count -eq 1) {
+        elseif ($ConfiguredProcessors -contains 1) {
             $benchmark = $benchmarkWithProcessors
-            $processors = $ConfiguredProcessors[0]
+            $processors = 1
         }
         else {
             throw "benchmark line has no processor suffix for a multi-processor run: $line"
@@ -198,68 +200,97 @@ $ProcessorCounts = @($ProcessorCounts | Sort-Object -Unique)
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repositoryRoot = (Resolve-Path (Join-Path $scriptRoot '..')).Path
-$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$outputRoot = Join-Path $repositoryRoot ".tmp/coraza-benchmark-$timestamp"
-if (Test-Path -LiteralPath $outputRoot) {
-    throw "benchmark output already exists: $outputRoot"
+$sourceCommit = @(& git -C $repositoryRoot rev-parse HEAD 2>&1 | ForEach-Object { $_.ToString() }) -join ''
+$sourceCommit = $sourceCommit.Trim()
+$resuming = -not [string]::IsNullOrWhiteSpace($ResumeDirectory)
+if ($resuming) {
+    $outputRoot = (Resolve-Path -LiteralPath $ResumeDirectory).Path
+    $temporaryRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot '.tmp'))
+    if (-not $outputRoot.StartsWith($temporaryRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "resume directory must be inside $temporaryRoot"
+    }
+    $previousEnvironmentPath = Join-Path $outputRoot 'environment.json'
+    if (-not (Test-Path -LiteralPath $previousEnvironmentPath)) {
+        throw "resume environment is missing: $previousEnvironmentPath"
+    }
+    $previousEnvironment = Get-Content -Raw -LiteralPath $previousEnvironmentPath | ConvertFrom-Json
+    if ($previousEnvironment.source_commit -ne $sourceCommit -or
+        $previousEnvironment.benchtime -ne $Benchtime -or
+        [int]$previousEnvironment.repeats -ne $Count -or
+        (($previousEnvironment.processor_counts -join ',') -ne ($ProcessorCounts -join ','))) {
+        throw 'resume configuration does not match the current source and benchmark parameters'
+    }
 }
-New-Item -ItemType Directory -Path $outputRoot | Out-Null
-
-$archivePath = Join-Path $outputRoot 'yufeng-source.zip'
-# git archive 只复制当前提交中的跟踪文件，不读取其它工作树或本地 Coraza 目录。
-Invoke-RequiredNative -FilePath 'git' -Arguments @('archive', '--format=zip', "--output=$archivePath", 'HEAD') -WorkingDirectory $repositoryRoot | Out-Null
+else {
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $outputRoot = Join-Path $repositoryRoot ".tmp/coraza-benchmark-$timestamp"
+    if (Test-Path -LiteralPath $outputRoot) {
+        throw "benchmark output already exists: $outputRoot"
+    }
+    New-Item -ItemType Directory -Path $outputRoot | Out-Null
+}
 
 $officialSource = Join-Path $outputRoot 'official-source'
 $maintainedSource = Join-Path $outputRoot 'maintained-source'
-Expand-Archive -LiteralPath $archivePath -DestinationPath $officialSource
-Expand-Archive -LiteralPath $archivePath -DestinationPath $maintainedSource
-
-# 官方临时副本等价执行 go mod edit -dropreplace；正式源码仍保留远端不可变替换。
-Invoke-RequiredNative -FilePath 'go' -Arguments @('mod', 'edit', '-dropreplace=github.com/corazawaf/coraza/v3') -WorkingDirectory $officialSource | Out-Null
-$officialCorazaPath = Join-Path $officialSource 'lib/edgecore/coraza.go'
-$officialCorazaSource = [System.IO.File]::ReadAllText($officialCorazaPath)
-$officialCorazaSourceWithoutDirective = [regex]::Replace($officialCorazaSource, '(?m)^SecRxPreFilter Off\r?\n', '', 1)
-if ($officialCorazaSourceWithoutDirective -eq $officialCorazaSource) {
-    throw 'official source copy did not contain SecRxPreFilter Off'
+if ($resuming) {
+    if (-not (Test-Path -LiteralPath $officialSource) -or -not (Test-Path -LiteralPath $maintainedSource)) {
+        throw 'resume source copies are incomplete'
+    }
 }
-Write-Utf8Text -Path $officialCorazaPath -Text $officialCorazaSourceWithoutDirective
-Invoke-RequiredNative -FilePath 'go' -Arguments @('mod', 'tidy') -WorkingDirectory $officialSource | Out-Null
+else {
+    $archivePath = Join-Path $outputRoot 'yufeng-source.zip'
+    # git archive 只复制当前提交中的跟踪文件，不读取其它工作树或本地 Coraza 目录。
+    Invoke-RequiredNative -FilePath 'git' -Arguments @('archive', '--format=zip', "--output=$archivePath", 'HEAD') -WorkingDirectory $repositoryRoot | Out-Null
+    Expand-Archive -LiteralPath $archivePath -DestinationPath $officialSource
+    Expand-Archive -LiteralPath $archivePath -DestinationPath $maintainedSource
+
+    # 官方临时副本等价执行 go mod edit -dropreplace；正式源码仍保留远端不可变替换。
+    Invoke-RequiredNative -FilePath 'go' -Arguments @('mod', 'edit', '-dropreplace=github.com/corazawaf/coraza/v3') -WorkingDirectory $officialSource | Out-Null
+    $officialCorazaPath = Join-Path $officialSource 'lib/edgecore/coraza.go'
+    $officialCorazaSource = [System.IO.File]::ReadAllText($officialCorazaPath)
+    $officialCorazaSourceWithoutDirective = [regex]::Replace($officialCorazaSource, '(?m)^SecRxPreFilter Off\r?\n', '', 1)
+    if ($officialCorazaSourceWithoutDirective -eq $officialCorazaSource) {
+        throw 'official source copy did not contain SecRxPreFilter Off'
+    }
+    Write-Utf8Text -Path $officialCorazaPath -Text $officialCorazaSourceWithoutDirective
+    Invoke-RequiredNative -FilePath 'go' -Arguments @('mod', 'tidy') -WorkingDirectory $officialSource | Out-Null
+}
 
 # 两份源码都执行 go mod verify，确保下载内容与校验和一致。
 Invoke-RequiredNative -FilePath 'go' -Arguments @('mod', 'verify') -WorkingDirectory $officialSource | Out-Null
 Invoke-RequiredNative -FilePath 'go' -Arguments @('mod', 'verify') -WorkingDirectory $maintainedSource | Out-Null
 
-$operatingSystem = Get-CimInstance Win32_OperatingSystem
-$processor = Get-CimInstance Win32_Processor | Select-Object -First 1
-$powerPlan = @(& powercfg /getactivescheme 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
-$goVersion = @(& go version 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
-$goEnvironment = @(& go env GOOS GOARCH CGO_ENABLED 2>&1 | ForEach-Object { $_.ToString() })
-$sourceCommit = @(& git -C $repositoryRoot rev-parse HEAD 2>&1 | ForEach-Object { $_.ToString() }) -join ''
-
-$environment = [ordered]@{
-    captured_at               = (Get-Date).ToString('o')
-    source_commit             = $sourceCommit.Trim()
-    operating_system          = $operatingSystem.Caption
-    operating_system_version  = $operatingSystem.Version
-    operating_system_arch     = $operatingSystem.OSArchitecture
-    processor                 = $processor.Name.Trim()
-    physical_cores            = $processor.NumberOfCores
-    logical_processors        = $processor.NumberOfLogicalProcessors
-    visible_memory_gib        = [math]::Round($operatingSystem.TotalVisibleMemorySize / 1MB, 1)
-    power_plan                = $powerPlan.Trim()
-    go_version                = $goVersion.Trim()
-    goos                      = $goEnvironment[0]
-    goarch                    = $goEnvironment[1]
-    cgo_enabled               = $goEnvironment[2]
-    official_module           = $officialModule
-    maintained_module         = $maintainedModule
-    sec_rx_prefilter          = 'Off'
-    benchtime                 = $Benchtime
-    repeats                   = $Count
-    processor_counts          = $ProcessorCounts
-    benchmark_pattern         = $benchmarkPattern
+if (-not $resuming) {
+    $operatingSystem = Get-CimInstance Win32_OperatingSystem
+    $processor = Get-CimInstance Win32_Processor | Select-Object -First 1
+    $powerPlan = @(& powercfg /getactivescheme 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+    $goVersion = @(& go version 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+    $goEnvironment = @(& go env GOOS GOARCH CGO_ENABLED 2>&1 | ForEach-Object { $_.ToString() })
+    $environment = [ordered]@{
+        captured_at               = (Get-Date).ToString('o')
+        source_commit             = $sourceCommit
+        operating_system          = $operatingSystem.Caption
+        operating_system_version  = $operatingSystem.Version
+        operating_system_arch     = $operatingSystem.OSArchitecture
+        processor                 = $processor.Name.Trim()
+        physical_cores            = $processor.NumberOfCores
+        logical_processors        = $processor.NumberOfLogicalProcessors
+        visible_memory_gib        = [math]::Round($operatingSystem.TotalVisibleMemorySize / 1MB, 1)
+        power_plan                = $powerPlan.Trim()
+        go_version                = $goVersion.Trim()
+        goos                      = $goEnvironment[0]
+        goarch                    = $goEnvironment[1]
+        cgo_enabled               = $goEnvironment[2]
+        official_module           = $officialModule
+        maintained_module         = $maintainedModule
+        sec_rx_prefilter          = 'Off'
+        benchtime                 = $Benchtime
+        repeats                   = $Count
+        processor_counts          = $ProcessorCounts
+        benchmark_pattern         = $benchmarkPattern
+    }
+    Write-Utf8Text -Path (Join-Path $outputRoot 'environment.json') -Text (($environment | ConvertTo-Json -Depth 5) + "`n")
 }
-Write-Utf8Text -Path (Join-Path $outputRoot 'environment.json') -Text (($environment | ConvertTo-Json -Depth 5) + "`n")
 
 $variants = @(
     [pscustomobject]@{ Name = 'official'; Source = $officialSource },
@@ -284,11 +315,20 @@ foreach ($variant in $variants) {
 
     Write-Host "Running capacity benchmark for $($variant.Name)"
     $benchmarkOutput = Join-Path $outputRoot "$($variant.Name)-benchmark.txt"
-    $benchmark = Invoke-RequiredNative -FilePath 'go' -Arguments @(
-        'test', './lib/edgecore', '-run', '^$', '-bench', $benchmarkPattern,
-        "-benchtime=$Benchtime", "-count=$Count", "-cpu=$processorArgument"
-    ) -WorkingDirectory $variant.Source -OutputPath $benchmarkOutput
-    $benchmarkRows += Convert-BenchmarkLines -Variant $variant.Name -Lines $benchmark.Lines -ConfiguredProcessors $ProcessorCounts
+    if ($resuming -and (Test-Path -LiteralPath $benchmarkOutput)) {
+        Write-Host "Reusing completed capacity benchmark for $($variant.Name)"
+        $benchmarkLines = @(Get-Content -LiteralPath $benchmarkOutput)
+    }
+    else {
+        $benchmark = Invoke-RequiredNative -FilePath 'go' -Arguments @(
+            'test', './lib/edgecore', '-run', '^$', '-bench', $benchmarkPattern,
+            "-benchtime=$Benchtime", "-count=$Count", "-cpu=$processorArgument"
+        ) -WorkingDirectory $variant.Source -OutputPath $benchmarkOutput
+        $benchmarkLines = $benchmark.Lines
+    }
+    $variantRows = @(Convert-BenchmarkLines -Variant $variant.Name -Lines $benchmarkLines -ConfiguredProcessors $ProcessorCounts)
+    Get-BenchmarkMedians -Rows $variantRows -ExpectedCount $Count | Out-Null
+    $benchmarkRows += $variantRows
 }
 
 $medians = Get-BenchmarkMedians -Rows $benchmarkRows -ExpectedCount $Count

@@ -11,6 +11,7 @@ func TestCorazaBenchmarkUsesIsolatedOfficialAndMaintainedSources(t *testing.T) {
 		"[string]$Benchtime = '3s'",
 		"[int]$Count = 5",
 		"[int[]]$ProcessorCounts = @(1, 32)",
+		"[string]$ResumeDirectory = ''",
 		"git archive",
 		".tmp",
 		"github.com/corazawaf/coraza/v3",
@@ -21,6 +22,8 @@ func TestCorazaBenchmarkUsesIsolatedOfficialAndMaintainedSources(t *testing.T) {
 		"median_ns_per_operation",
 		"requests_per_second",
 		"requests_per_second_change_percent",
+		"elseif ($ConfiguredProcessors -contains 1)",
+		"Reusing completed capacity benchmark",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Coraza benchmark script missing %q", want)
