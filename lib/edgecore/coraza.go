@@ -3,12 +3,12 @@ package edgecore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/url"
 	"path"
 	"strings"
-	"sync"
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
@@ -18,20 +18,6 @@ import (
 	"yufeng/lib/kernel"
 	commonv1 "yufeng/proto/gen/commonv1"
 )
-
-var (
-	sharedCRSOnce sync.Once
-	sharedCRS     *CorazaDetector
-	sharedCRSErr  error
-)
-
-// SharedCoraza 返回进程内共享的 DetectionOnly 核心规则集检测器。
-func SharedCoraza() (*CorazaDetector, error) {
-	sharedCRSOnce.Do(func() {
-		sharedCRS, sharedCRSErr = NewCorazaDetector()
-	})
-	return sharedCRS, sharedCRSErr
-}
 
 const corazaDetectorID = "crs"
 
@@ -114,6 +100,7 @@ func NewCorazaDetector() (*CorazaDetector, error) {
 	directives := `
 Include @coraza.conf-recommended
 SecRuleEngine DetectionOnly
+SecRxPreFilter Off
 SecRequestBodyAccess On
 SecRequestBodyInMemoryLimit 65536
 SecRequestBodyLimit 65536
@@ -135,6 +122,22 @@ Include @owasp_crs/REQUEST-942-APPLICATION-ATTACK-SQLI.conf
 		return nil, fmt.Errorf("create coraza waf: %w", err)
 	}
 	return &CorazaDetector{waf: waf}, nil
+}
+
+// Close 释放检测器持有的 Coraza 编译缓存与日志资源。
+// 调用方必须等待该检测器创建的事务结束后再关闭；重复关闭是安全的。
+func (d *CorazaDetector) Close() error {
+	if d == nil || d.waf == nil {
+		return nil
+	}
+	closer, ok := d.waf.(interface{ Close() error })
+	if !ok {
+		return nil
+	}
+	if err := closer.Close(); err != nil {
+		return fmt.Errorf("close coraza waf: %w", err)
+	}
+	return nil
 }
 
 // ID 返回 Coraza 检查器的稳定标识。
@@ -177,11 +180,13 @@ func (d *CorazaDetector) Evaluate(ctx context.Context, req Request) (Verdict, er
 }
 
 // Detect 返回检测键级发现。
-func (d *CorazaDetector) Detect(req Request) ([]Detection, error) {
+func (d *CorazaDetector) Detect(req Request) (out []Detection, err error) {
 	tx := d.waf.NewTransaction()
 	defer func() {
 		tx.ProcessLogging()
-		_ = tx.Close()
+		if closeErr := tx.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close coraza transaction: %w", closeErr))
+		}
 	}()
 	src := req.ClientAddress.Unmap().String()
 	if !req.ClientAddress.IsValid() {
@@ -228,7 +233,6 @@ func (d *CorazaDetector) Detect(req Request) ([]Detection, error) {
 	if _, err := tx.ProcessRequestBody(); err != nil {
 		return nil, err
 	}
-	var out []Detection
 	seen := map[string]bool{}
 	for _, matched := range tx.MatchedRules() {
 		rid := matched.Rule().ID()

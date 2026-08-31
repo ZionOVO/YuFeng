@@ -215,10 +215,7 @@ func modelBypassPerformanceWindows() []modelBypassPerformanceWindow {
 
 func modelBypassPerformanceFixture(t *testing.T, body []byte) (*ReleaseSet, Request) {
 	t.Helper()
-	crs, err := SharedCoraza()
-	if err != nil {
-		t.Fatal(err)
-	}
+	crs := newOwnedCorazaForTest(t)
 	profile := kernel.DefaultModelProfile()
 	profile.AllowedHeaders = []string{"content-type", "user-agent"}
 	set := NewReleaseSet()

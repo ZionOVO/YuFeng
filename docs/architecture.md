@@ -294,7 +294,7 @@ AgentThread
 | 数据访问生成层 | **sqlc（不引对象关系映射框架）** | 显式 SQL + 代码生成 | 已落地（生成层暂无业务调用方；新查询只进 `query.sql`，存量逐步迁移） |
 | 数据库迁移 | goose（SQL 嵌入自迁移） | `pressly/goose/v3` | 已落地 |
 | 任务编排 | 长轮询编排走专用租约表；中台内部背景任务走 River（ADR-025） | `riverqueue/river`（仅内部 job）+ `agent_instructions` / `work_items` / `commands` | 长轮询专用表已落地。River **尚未引入**；调度滴答 / 发件箱 / 模型派发仍是进程内循环。本档不强制引入 River |
-| 签名检测 | Coraza v3.7.0 + 开放全球应用安全项目核心规则集 4.25.0（永远 DetectionOnly） | `github.com/corazawaf/coraza/v3`、`coraza-coreruleset/v4@v4.25.0` | 已冻结并引入；引擎命中本身不 403 |
+| 签名检测 | 自维护 Coraza `151f051001b8` + 开放全球应用安全项目核心规则集 4.25.0（永远 DetectionOnly） | 保留 `github.com/corazawaf/coraza/v3` 导入路径，通过 `go.mod` 固定替换到 `github.com/ZionOVO/coraza/v3@v3.7.1-0.20260831022307-151f051001b8`；官方 v3.7.0 只作对照基线 | 已冻结并引入；`SecRxPreFilter Off`，引擎命中本身不 403 |
 | 画像检测 | 纯 Go 画像核（safeshield 算法移植） | Aho-Corasick 自实现 | 已选定未引入 |
 | 资产侧 L2 链 | nftables（live）→ LSM-BPF（live）→ seccomp（spawn-time）→ LD_PRELOAD（spawn-time）；免重启承诺只由 live 手段承担 | `google/nftables`、`elastic/go-seccomp`、`cilium/ebpf` | 已选定未引入 |
 | 进程沙箱 | Linux Landlock + seccomp；macOS Seatbelt 受限配置；Windows 受限令牌 + AppContainer + 作业对象；资源限制只作资源上限 | 系统调用与平台沙箱 | Linux 使用系统调用架构校验、seccomp 明确允许列表、Landlock 默认无文件访问与 `no_new_privs`；macOS 使用默认拒绝配置，只放行当前执行文件并拒绝用户数据读取、写入、联网和派生执行。Windows 命名管道、受限令牌和作业对象已落地，AppContainer 尚未落地，因此服务端拒绝向 Windows worker 派发流量调查。生产 L2/L3 危险 Procedure 在 Linux 沙箱与控制组硬内存边界缺失时必须失败关闭 |
@@ -310,6 +310,8 @@ AgentThread
 | 生产测试工具 | 完整竞态、热路径基准、Docker Compose 活路径、故障脚本 | 测试与静态分析工具链 | golangci-lint 在持续集成中统一承载 errcheck、govet、ineffassign 与 staticcheck；完整竞态、热路径基准和 Docker Compose 活路径是可重复的部署验收与定向诊断入口，不参与 Git 分支合并谱系。`scripts/onboarding-live.sh`、`production-end-to-end.sh`、`fault-injection-end-to-end.sh` 和其它 `*-live.sh` 保留定向诊断职责 |
 | 制品与能力令牌签名 | Ed25519 | Go 标准库 | 已落地 |
 | JSON Web Token 编解码库 | `golang-jwt/jwt/v5` | 第三方令牌库 | 已选定未引入；当前能力令牌由标准库手写编解码 |
+
+**Coraza 平行仓维护（架构决策记录 041）**：御锋保留上游模块导入路径，只以远端不可变伪版本替换到自维护仓，不使用本地目录或浮动分支。自维护仓先用独立拉取请求同步上游，再用独立拉取请求承载性能修改；御锋只有在检测键差分、核心规则集回归、模糊测试、构建和同口径性能基准全部通过后才更新固定提交。当前生产规则显式保持 `SecRxPreFilter Off`；平行仓开启正则表达式预筛选得到的数据只能作为实验结果，不能记作 `yufeng-edge` 生产吞吐。规则集版本、装载范围、`DetectionOnly` 和 Gate 语义不因替换引擎来源而改变。
 
 **软件发布验收（架构决策记录 038）**：仓库采用 `main` 单主干和短命工作分支。版本变更通过普通拉取请求冻结本次[发布验收合同](glossary.md#release-acceptance-contract)；合同只允许预先声明的安全边界、数据完整性、网络契约、构建失败和制品不可用问题阻断发布。智能代理后来发现但不违反冻结合同的问题必须报告并进入后续版本，不能自行扩大发布范围。
 
@@ -439,6 +441,7 @@ L1 生产数据面不变量见 §4，网络结果与失败语义见 [`api.md`](a
 | 038 | `main` 单主干、冻结验收合同、一次构建并提升精确软件制品，部署证据独立 | 分支只管理源码；发布任务验证并上传同一批不可变文件。新发现不得由智能代理自动扩大发布范围；门禁缺陷先停止发布并作为独立变更修复 |
 | 039 | Edge 模型输入使用可配置易失最新窗口，ModelSide 只保留浅层批次交接 | 中央期望写进签名单元监听计划，本机配置只收窄条数、保留字节和排队年龄；窗口不落盘、不重试、不阻塞请求。只有在 2000 请求/秒、第 99 百分位增量、中央处理器和 512 MiB 内存硬门槛全部通过时保留内置实现，否则另立外部消息队列设计 |
 | 040 | 初次配置只建立模型网关与贾维斯控制面，所有数据面资产在主控制台人工接入 | 进入主控制台不应依赖尚未登记的资产或 Edge；Brain 只签发配置制品，技术人员负责安装，逐资产接入状态取代全局 `edge_ready`，同时允许零资产管理员从主控制台创建第一项资产 |
+| 041 | Coraza 由固定远端伪版本的自维护平行仓提供，保留上游模块导入路径 | 上游同步、性能修改与御锋依赖更新分别评审；检测等价、模糊测试和同口径基准同时约束升级，避免本地替换或实验配置成为不可复现的生产依赖 |
 
 ---
 

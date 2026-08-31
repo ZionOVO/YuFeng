@@ -17,6 +17,11 @@ func TestPolicyReplayBlocksDetectionKeyOnR5Corpus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		if err := det.Close(); err != nil {
+			t.Errorf("close Coraza detector: %v", err)
+		}
+	})
 	sample := edgecore.Request{Method: "GET", Path: "/api/items", Query: "id=1+UNION+SELECT+password"}
 	dets, err := det.Detect(sample)
 	if err != nil || len(dets) == 0 {

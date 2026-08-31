@@ -200,12 +200,16 @@ func putGrant(ctx context.Context, grants grantv1connect.GrantServiceClient, adm
 	return err
 }
 
-func corpusAttackKeys() ([]*commonv1.DetectionKey, error) {
-	crs, err := edgecore.SharedCoraza()
+func corpusAttackKeys() (keys []*commonv1.DetectionKey, err error) {
+	crs, err := edgecore.NewCorazaDetector()
 	if err != nil {
 		return nil, err
 	}
-	var keys []*commonv1.DetectionKey
+	defer func() {
+		if closeErr := crs.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close coraza detector: %w", closeErr))
+		}
+	}()
 	seen := map[string]bool{}
 	for _, req := range []edgecore.Request{
 		{Method: "GET", Path: "/api/items", Query: "id=1+UNION+SELECT+password"},

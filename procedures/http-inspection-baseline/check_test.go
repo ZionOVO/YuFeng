@@ -23,6 +23,8 @@ func TestCoreRuleSetManifestIsPinned(t *testing.T) {
 		Paranoia      int      `json:"paranoia"`
 		IncludeFiles  []string `json:"include_files"`
 		GoModule      string   `json:"go_module"`
+		Engine        string   `json:"engine"`
+		RxPrefilter   string   `json:"sec_rx_prefilter"`
 	}
 	if err := json.Unmarshal(raw, &man); err != nil {
 		t.Fatal(err)
@@ -38,6 +40,12 @@ func TestCoreRuleSetManifestIsPinned(t *testing.T) {
 	}
 	if man.GoModule != kernel.CRSGoModule {
 		t.Fatalf("go module=%s", man.GoModule)
+	}
+	if man.Engine != "github.com/ZionOVO/coraza/v3@v3.7.1-0.20260831022307-151f051001b8" {
+		t.Fatalf("engine=%s", man.Engine)
+	}
+	if man.RxPrefilter != "Off" {
+		t.Fatalf("sec_rx_prefilter=%s", man.RxPrefilter)
 	}
 	if len(man.IncludeFiles) != 9 {
 		t.Fatalf("include_files=%d", len(man.IncludeFiles))

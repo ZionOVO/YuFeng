@@ -201,10 +201,7 @@ func TestReleaseProxyPolicyEnforceBlocksDetectionKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	crs, err := SharedCoraza()
-	if err != nil {
-		t.Fatal(err)
-	}
+	crs := newOwnedCorazaForTest(t)
 	req := Request{Method: "GET", Path: "/api/items", Query: "id=1+UNION+SELECT+pw"}
 	view := Canonicalize(req.Method, req.Path, req.Query, nil, nil, DefaultInspectionProfile())
 	inspection, err := crs.Inspect(context.Background(), InspectionInput{View: view})

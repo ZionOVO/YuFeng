@@ -103,10 +103,15 @@ func runProductionPolicyEnforcePass(t *testing.T) {
 	}
 	put(op.Msg.User.UserId, []string{"govern.propose", "govern.gate", "govern.start_shadow"})
 	put(officer.Msg.User.UserId, []string{"govern.promote_canary", "govern.promote_enforce", "govern.retire"})
-	crs, err := edgecore.SharedCoraza()
+	crs, err := edgecore.NewCorazaDetector()
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		if err := crs.Close(); err != nil {
+			t.Errorf("close Coraza detector: %v", err)
+		}
+	})
 	attack := edgecore.Request{Method: "GET", Path: "/api/items", Query: "id=1+UNION+SELECT+password"}
 	view := edgecore.Canonicalize(attack.Method, attack.Path, attack.Query, nil, nil, edgecore.DefaultInspectionProfile())
 	inspection, err := crs.Inspect(context.Background(), edgecore.InspectionInput{View: view})
