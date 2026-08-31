@@ -331,7 +331,7 @@ func corazaCompatibilityCases(t *testing.T) []corazaCompatibilityCase {
 			t.Fatal(err)
 		}
 	}
-	for _, fixture := range []corazaCompatibilityCase{
+	cases = append(cases, []corazaCompatibilityCase{
 		{id: "capacity-json-4-kib-benign", request: corazaCapacityRequest("application/json", corazaJSONBody(4<<10))},
 		{id: "capacity-simple-64-kib-benign", request: corazaCapacityRequest("application/octet-stream", bytes.Repeat([]byte("x"), 64<<10))},
 		{id: "capacity-natural-text-64-kib-benign", request: corazaCapacityRequest("text/plain", corazaNaturalTextBody(64<<10))},
@@ -339,9 +339,7 @@ func corazaCompatibilityCases(t *testing.T) []corazaCompatibilityCase {
 		{id: "capacity-binary-64-kib-benign", request: corazaCapacityRequest("application/octet-stream", corazaBinaryBody(64<<10))},
 		{id: "capacity-attack-64-kib-head", request: corazaCapacityRequest("application/octet-stream", corazaAttackBody(64<<10, true))},
 		{id: "capacity-attack-64-kib-tail", request: corazaCapacityRequest("application/octet-stream", corazaAttackBody(64<<10, false))},
-	} {
-		cases = append(cases, fixture)
-	}
+	}...)
 	return cases
 }
 
