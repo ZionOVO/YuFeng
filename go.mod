@@ -2,7 +2,7 @@ module yufeng
 
 go 1.27.0
 
-replace github.com/corazawaf/coraza/v3 => github.com/ZionOVO/coraza/v3 v3.7.1-0.20260831022307-151f051001b8
+replace github.com/corazawaf/coraza/v3 => github.com/ZionOVO/coraza/v3 v3.7.1-0.20260831090414-fb78ccd84730
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260709200747-435963d16310.1
@@ -24,9 +24,9 @@ require (
 )
 
 require (
+	github.com/ZionOVO/libinjection-go v0.3.3-0.20260831081844-f15e7b4112de // indirect
 	github.com/antithesishq/antithesis-sdk-go v0.7.2-default-no-op // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/corazawaf/libinjection-go v0.3.2 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
