@@ -48,10 +48,7 @@ func (w *corazaBenchmarkResponseWriter) reset() {
 
 // BenchmarkCorazaDetectorSerial 测量单工作协程的 Coraza 检查耗时与分配。
 func BenchmarkCorazaDetectorSerial(b *testing.B) {
-	detector, err := NewCorazaDetector()
-	if err != nil {
-		b.Fatal(err)
-	}
+	detector := newOwnedCorazaForTest(b)
 	for _, fixture := range corazaCapacityBenchmarks() {
 		b.Run(fixture.name, func(b *testing.B) {
 			validateCorazaCapacityBenchmark(b, detector, fixture)
@@ -74,10 +71,7 @@ func BenchmarkCorazaDetectorSerial(b *testing.B) {
 
 // BenchmarkCorazaDetectorParallel 测量共享 Coraza 实例在 32 个逻辑处理器下的聚合完成间隔。
 func BenchmarkCorazaDetectorParallel(b *testing.B) {
-	detector, err := NewCorazaDetector()
-	if err != nil {
-		b.Fatal(err)
-	}
+	detector := newOwnedCorazaForTest(b)
 	for _, fixture := range corazaCapacityBenchmarks() {
 		b.Run(fixture.name, func(b *testing.B) {
 			validateCorazaCapacityBenchmark(b, detector, fixture)
@@ -106,10 +100,7 @@ func BenchmarkCorazaDetectorParallel(b *testing.B) {
 
 // BenchmarkCorazaReleaseProxyCapacityParallel 测量生产核心请求壳，不包含套接字与上游网络抖动。
 func BenchmarkCorazaReleaseProxyCapacityParallel(b *testing.B) {
-	detector, err := NewCorazaDetector()
-	if err != nil {
-		b.Fatal(err)
-	}
+	detector := newOwnedCorazaForTest(b)
 	set := NewReleaseSet()
 	set.inspectors = []Inspector{detector}
 	set.SetPosture(commonReverseProxyPosture())

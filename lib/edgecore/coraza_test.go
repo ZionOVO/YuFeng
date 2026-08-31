@@ -13,6 +13,20 @@ import (
 	"testing"
 )
 
+func newOwnedCorazaForTest(t testing.TB) *CorazaDetector {
+	t.Helper()
+	detector, err := NewCorazaDetector()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := detector.Close(); err != nil {
+			t.Errorf("close Coraza detector: %v", err)
+		}
+	})
+	return detector
+}
+
 func TestCorazaRootFSNormalizesWindowsSeparators(t *testing.T) {
 	raw, err := fs.ReadFile(newCorazaRootFS(), `@owasp_crs\REQUEST-930-APPLICATION-ATTACK-LFI.conf`)
 	if err != nil {
@@ -34,10 +48,7 @@ func TestCorazaRulePathNormalizationDoesNotDependOnOperatingSystem(t *testing.T)
 }
 
 func TestCorazaDetectionOnlyNoBlock(t *testing.T) {
-	d, err := NewCorazaDetector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	d := newOwnedCorazaForTest(t)
 	v, err := d.Evaluate(t.Context(), Request{Method: "GET", Path: "/api/items", Query: "id=1+UNION+SELECT+password"})
 	if err != nil {
 		t.Fatal(err)
@@ -55,10 +66,7 @@ func TestCorazaDetectionOnlyNoBlock(t *testing.T) {
 }
 
 func TestCorazaUsesClientSourceWithoutChangingDetectionKey(t *testing.T) {
-	d, err := NewCorazaDetector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	d := newOwnedCorazaForTest(t)
 	base := Request{Method: "GET", Path: "/api/items", Query: "id=1+UNION+SELECT+password"}
 	first := base
 	first.ClientAddress = netip.MustParseAddr("198.51.100.4")
@@ -78,10 +86,7 @@ func TestCorazaUsesClientSourceWithoutChangingDetectionKey(t *testing.T) {
 }
 
 func TestCorazaCoreRuleSetCorpus(t *testing.T) {
-	d, err := NewCorazaDetector()
-	if err != nil {
-		t.Fatal(err)
-	}
+	d := newOwnedCorazaForTest(t)
 	dir := inspectionBaselineDir(t)
 	mal := readJSONL(t, filepath.Join(dir, "corpus", "malicious.jsonl"))
 	for _, row := range mal {

@@ -2,6 +2,7 @@ package replay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -16,7 +17,7 @@ const policySchema = "policy/v1"
 const shapeSchema = "shape/v1"
 
 // RunPolicy 用同一规范视图 + 同一引擎发现按检测键回放。
-func RunPolicy(ctx context.Context, artifact *artifactv1.Artifact, corpus []Case, det *edgecore.CorazaDetector) (*artifactv1.ReplayReport, error) {
+func RunPolicy(ctx context.Context, artifact *artifactv1.Artifact, corpus []Case, det *edgecore.CorazaDetector) (report *artifactv1.ReplayReport, err error) {
 	if artifact == nil || artifact.PayloadSchema != policySchema {
 		return nil, fmt.Errorf("replay policy requires %s", policySchema)
 	}
@@ -28,13 +29,17 @@ func RunPolicy(ctx context.Context, artifact *artifactv1.Artifact, corpus []Case
 		return nil, fmt.Errorf("policy predicate detection_keys required")
 	}
 	if det == nil {
-		var err error
 		det, err = edgecore.NewCorazaDetector()
 		if err != nil {
 			return nil, err
 		}
+		defer func() {
+			if closeErr := det.Close(); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("close coraza detector: %w", closeErr))
+			}
+		}()
 	}
-	report := &artifactv1.ReplayReport{CorpusRef: "r5:policy/v1"}
+	report = &artifactv1.ReplayReport{CorpusRef: "r5:policy/v1"}
 	for _, c := range corpus {
 		view := edgecore.Canonicalize(c.Request.Method, c.Request.Path, c.Request.Query, c.Request.Headers, c.Request.Body, edgecore.DefaultInspectionProfile())
 		if !edgecore.PolicyCandidateApplies(&cand, c.Request, view) {

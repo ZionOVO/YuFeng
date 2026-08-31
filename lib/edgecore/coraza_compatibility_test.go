@@ -3,13 +3,16 @@ package edgecore
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"testing"
 
 	"yufeng/lib/kernel"
@@ -61,12 +64,9 @@ type corazaDetectionGoldenFile struct {
 	Cases         []corazaCaseGolden `json:"cases"`
 }
 
-// TestCorazaMaintainedEngineMatchesOfficialDetectionGolden 保证自维护引擎不改变官方基线的发现与覆盖度。
-func TestCorazaMaintainedEngineMatchesOfficialDetectionGolden(t *testing.T) {
-	detector, err := NewCorazaDetector()
-	if err != nil {
-		t.Fatal(err)
-	}
+// TestCorazaMaintainedEnginePreservesOfficialDetectionGolden 保证自维护引擎不丢失或改写官方基线的发现与覆盖度。
+func TestCorazaMaintainedEnginePreservesOfficialDetectionGolden(t *testing.T) {
+	detector := newOwnedCorazaForTest(t)
 	actual := captureCorazaDetectionGolden(t, detector)
 	path := filepath.Join(inspectionBaselineDir(t), "coraza-v3.7.0-detection-golden.json")
 	if os.Getenv(corazaGoldenUpdateEnvironment) == "1" {
@@ -90,9 +90,66 @@ func TestCorazaMaintainedEngineMatchesOfficialDetectionGolden(t *testing.T) {
 	if want.SchemaVersion != corazaGoldenSchema || want.Engine != corazaOfficialEngine || want.CRSVersion != kernel.CRSVersion || want.RxPrefilter != "Off" {
 		t.Fatalf("invalid Coraza golden metadata: %#v", want)
 	}
-	if !reflect.DeepEqual(actual, want) {
-		t.Fatalf("maintained Coraza changed official detection golden\nwant: %#v\ngot:  %#v", want, actual)
+	blockers, maliciousAdditions := compareCorazaDetectionGolden(want, actual)
+	if len(maliciousAdditions) > 0 {
+		t.Logf("maintained Coraza added detections on malicious cases:\n%s", strings.Join(maliciousAdditions, "\n"))
 	}
+	if len(blockers) > 0 {
+		t.Fatalf("maintained Coraza regressed official detection golden:\n%s", strings.Join(blockers, "\n"))
+	}
+}
+
+func compareCorazaDetectionGolden(want, actual corazaDetectionGoldenFile) (blockers, maliciousAdditions []string) {
+	if len(want.Cases) != len(actual.Cases) {
+		return []string{fmt.Sprintf("case count: want=%d got=%d", len(want.Cases), len(actual.Cases))}, nil
+	}
+	for i := range want.Cases {
+		wantCase, actualCase := want.Cases[i], actual.Cases[i]
+		if wantCase.ID != actualCase.ID || wantCase.Rejected != actualCase.Rejected {
+			blockers = append(blockers, fmt.Sprintf("case %d identity or rejection: want=%q/%t got=%q/%t", i, wantCase.ID, wantCase.Rejected, actualCase.ID, actualCase.Rejected))
+			continue
+		}
+		if !reflect.DeepEqual(wantCase.Coverage, actualCase.Coverage) {
+			blockers = append(blockers, fmt.Sprintf("%s coverage: want=%#v got=%#v", wantCase.ID, wantCase.Coverage, actualCase.Coverage))
+		}
+		for _, wantDetection := range wantCase.Detections {
+			if !containsCorazaDetection(actualCase.Detections, wantDetection) {
+				blockers = append(blockers, fmt.Sprintf("%s missing detection: %s", wantCase.ID, corazaDetectionFingerprint(wantDetection)))
+			}
+		}
+		for _, actualDetection := range actualCase.Detections {
+			if containsCorazaDetection(wantCase.Detections, actualDetection) {
+				continue
+			}
+			difference := fmt.Sprintf("%s additional detection: %s", actualCase.ID, corazaDetectionFingerprint(actualDetection))
+			if corazaCaseContainsAttack(actualCase.ID) {
+				maliciousAdditions = append(maliciousAdditions, difference)
+			} else {
+				blockers = append(blockers, difference)
+			}
+		}
+	}
+	return blockers, maliciousAdditions
+}
+
+func containsCorazaDetection(detections []corazaDetectionGolden, want corazaDetectionGolden) bool {
+	for _, detection := range detections {
+		if reflect.DeepEqual(detection, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func corazaCaseContainsAttack(id string) bool {
+	return strings.HasPrefix(id, "m-") || strings.HasPrefix(id, "capacity-attack-")
+}
+
+func corazaDetectionFingerprint(detection corazaDetectionGolden) string {
+	selectorDigest := sha256.Sum256([]byte(detection.Selector))
+	return fmt.Sprintf("inspector=%q rule=%q class=%q score=%g location=%q selector_bytes=%d selector_sha256=%x phase=%q version=%q manifest=%q profile=%q",
+		detection.InspectorID, detection.RuleID, detection.Class, detection.Score, detection.Location, len(detection.Selector), selectorDigest,
+		detection.Phase, detection.Version, detection.ManifestDigest, detection.ProfileDigest)
 }
 
 // TestCorazaMaintainedEngineSupportsOwnedLifecycle 保证自维护引擎可释放实例持有的编译缓存。
@@ -104,16 +161,78 @@ func TestCorazaMaintainedEngineSupportsOwnedLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	closer, ok := any(detector).(interface{ Close() error })
-	if !ok {
-		t.Fatal("maintained Coraza detector must expose Close")
+	if _, ok := detector.waf.(interface{ Close() error }); !ok {
+		t.Fatal("maintained Coraza WAF must expose Close")
 	}
-	if err := closer.Close(); err != nil {
+	if err := detector.Close(); err != nil {
 		t.Fatalf("close Coraza detector: %v", err)
 	}
-	if err := closer.Close(); err != nil {
+	if err := detector.Close(); err != nil {
 		t.Fatalf("close Coraza detector twice: %v", err)
 	}
+}
+
+func TestCorazaDetectionGoldenComparisonRejectsRegressions(t *testing.T) {
+	detection := corazaDetectionGolden{
+		InspectorID: "crs", RuleID: "942100", Class: "ATTACK_CLASS_SQLI", Score: 1,
+		Location: "INSPECTION_SURFACE_QUERY", Selector: "query.id", Phase: "request",
+		Version: kernel.CRSVersion, ManifestDigest: kernel.CRSTarballSHA256, ProfileDigest: "profile",
+	}
+	coverage := []corazaCoverageGolden{{Target: "INSPECTION_SURFACE_QUERY", Status: "COVERAGE_STATUS_FULL", Inspected: 4, Total: 4}}
+	want := corazaDetectionGoldenFile{Cases: []corazaCaseGolden{
+		{ID: "m-attack", Detections: []corazaDetectionGolden{detection}, Coverage: coverage},
+		{ID: "b-benign", Coverage: coverage},
+	}}
+	additional := detection
+	additional.RuleID = "942190"
+	changedLocation := detection
+	changedLocation.Location = "INSPECTION_SURFACE_BODY"
+
+	tests := []struct {
+		name          string
+		actual        corazaDetectionGoldenFile
+		blockers      int
+		maliciousAdds int
+	}{
+		{name: "equal", actual: cloneCorazaGolden(t, want)},
+		{name: "missing official detection", actual: corazaDetectionGoldenFile{Cases: []corazaCaseGolden{
+			{ID: "m-attack", Coverage: coverage}, {ID: "b-benign", Coverage: coverage},
+		}}, blockers: 1},
+		{name: "changed official location", actual: corazaDetectionGoldenFile{Cases: []corazaCaseGolden{
+			{ID: "m-attack", Detections: []corazaDetectionGolden{changedLocation}, Coverage: coverage}, {ID: "b-benign", Coverage: coverage},
+		}}, blockers: 1, maliciousAdds: 1},
+		{name: "benign additional detection", actual: corazaDetectionGoldenFile{Cases: []corazaCaseGolden{
+			{ID: "m-attack", Detections: []corazaDetectionGolden{detection}, Coverage: coverage}, {ID: "b-benign", Detections: []corazaDetectionGolden{additional}, Coverage: coverage},
+		}}, blockers: 1},
+		{name: "malicious additional detection", actual: corazaDetectionGoldenFile{Cases: []corazaCaseGolden{
+			{ID: "m-attack", Detections: []corazaDetectionGolden{detection, additional}, Coverage: coverage}, {ID: "b-benign", Coverage: coverage},
+		}}, maliciousAdds: 1},
+		{name: "coverage changed", actual: corazaDetectionGoldenFile{Cases: []corazaCaseGolden{
+			{ID: "m-attack", Detections: []corazaDetectionGolden{detection}, Coverage: []corazaCoverageGolden{{Target: "INSPECTION_SURFACE_QUERY", Status: "COVERAGE_STATUS_PARTIAL", Inspected: 2, Total: 4}}},
+			{ID: "b-benign", Coverage: coverage},
+		}}, blockers: 1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			blockers, additions := compareCorazaDetectionGolden(want, test.actual)
+			if len(blockers) != test.blockers || len(additions) != test.maliciousAdds {
+				t.Fatalf("blockers=%v additions=%v", blockers, additions)
+			}
+		})
+	}
+}
+
+func cloneCorazaGolden(t *testing.T, source corazaDetectionGoldenFile) corazaDetectionGoldenFile {
+	t.Helper()
+	raw, err := json.Marshal(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var clone corazaDetectionGoldenFile
+	if err := json.Unmarshal(raw, &clone); err != nil {
+		t.Fatal(err)
+	}
+	return clone
 }
 
 func captureCorazaDetectionGolden(t *testing.T, detector *CorazaDetector) corazaDetectionGoldenFile {

@@ -75,10 +75,15 @@ func seedProposalTaxonomy(t *testing.T, ctx context.Context, pool *pgxpool.Pool,
 
 func proposalDetectionKeys(t *testing.T, ctx context.Context, method, path, query string) []*commonv1.DetectionKey {
 	t.Helper()
-	crs, err := edgecore.SharedCoraza()
+	crs, err := edgecore.NewCorazaDetector()
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		if err := crs.Close(); err != nil {
+			t.Errorf("close Coraza detector: %v", err)
+		}
+	})
 	view := edgecore.Canonicalize(method, path, query, nil, nil, edgecore.DefaultInspectionProfile())
 	inspection, err := crs.Inspect(ctx, edgecore.InspectionInput{View: view})
 	if err != nil {

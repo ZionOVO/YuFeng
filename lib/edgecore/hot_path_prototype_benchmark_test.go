@@ -374,10 +374,7 @@ func BenchmarkReleaseProxyParallelHotPath(b *testing.B) {
 }
 
 func BenchmarkCorazaReleaseProxyParallel(b *testing.B) {
-	crs, err := SharedCoraza()
-	if err != nil {
-		b.Fatal(err)
-	}
+	crs := newOwnedCorazaForTest(b)
 	ctx := context.Background()
 	requestIDs := benchmarkRequestIDs()
 	req := Request{
@@ -456,10 +453,7 @@ func BenchmarkCorazaReleaseProxyParallel(b *testing.B) {
 }
 
 func BenchmarkCorazaSharedCanonicalRequestPrototype(b *testing.B) {
-	crs, err := SharedCoraza()
-	if err != nil {
-		b.Fatal(err)
-	}
+	crs := newOwnedCorazaForTest(b)
 	cases := []struct {
 		name  string
 		query string
@@ -519,10 +513,7 @@ func BenchmarkCorazaSharedCanonicalRequestPrototype(b *testing.B) {
 }
 
 func BenchmarkCorazaParallelCapacity(b *testing.B) {
-	crs, err := SharedCoraza()
-	if err != nil {
-		b.Fatal(err)
-	}
+	crs := newOwnedCorazaForTest(b)
 	cases := []struct {
 		name  string
 		query string
@@ -562,14 +553,16 @@ func BenchmarkCorazaParallelCapacity(b *testing.B) {
 }
 
 func BenchmarkCorazaRegexPrefilter(b *testing.B) {
-	current, err := SharedCoraza()
-	if err != nil {
-		b.Fatal(err)
-	}
+	current := newOwnedCorazaForTest(b)
 	prefiltered, err := newBenchmarkCorazaWithRegexPrefilter()
 	if err != nil {
 		b.Fatal(err)
 	}
+	b.Cleanup(func() {
+		if err := prefiltered.Close(); err != nil {
+			b.Errorf("close prefiltered Coraza detector: %v", err)
+		}
+	})
 	verifyCorazaPrefilterDetections(b, current, prefiltered)
 
 	for _, bodySize := range []int{1 << 10, 4 << 10, 64 << 10} {
@@ -610,10 +603,7 @@ func BenchmarkCorazaRegexPrefilter(b *testing.B) {
 }
 
 func BenchmarkCorazaBodyProcessorCost(b *testing.B) {
-	crs, err := SharedCoraza()
-	if err != nil {
-		b.Fatal(err)
-	}
+	crs := newOwnedCorazaForTest(b)
 	const bodySize = 4 << 10
 	cases := []struct {
 		name        string
