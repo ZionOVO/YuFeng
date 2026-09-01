@@ -1,6 +1,6 @@
 # Coraza Windows 检测等价与性能基准
 
-本报告保存 2026-08-31 在 `SecRxPreFilter Off` 下完成的历史检测等价与容量门禁。结果满足把实现固定到自维护 Coraza 的条件：没有丢失或改写官方发现，没有新增良性命中，小请求与混合负载最差每秒请求数回退 6.54%，多个 64 KiB（二进制千字节）生产正文形态提升超过 20%。当前 `yufeng-edge` 已切换到自维护发布 `v3.7.0-zion.1` 并启用实验性的 `SecRxPreFilter On`；本文数字仍是 `Off` 对照，不能当作当前 `On` 配置的容量承诺。每次切换预筛选模式都必须单独重跑等价与容量门禁。
+本报告保存 2026-08-31 在 `SecRxPreFilter Off` 下完成的历史检测等价与容量门禁。结果满足把实现固定到自维护 Coraza 的条件：没有丢失或改写官方发现，没有新增良性命中，小请求与混合负载最差每秒请求数回退 6.54%，多个 64 KiB（二进制千字节）生产正文形态提升超过 20%。当前 `yufeng-edge` 已切换到自维护发布 `v3.7.0-zion.1` 并启用实验性的 `SecRxPreFilter On`；本文数字仍是 `Off` 对照，不能当作当前 `On` 配置的容量承诺。`On` 的独立结果见 [`coraza-windows-prefilter-on-performance.md`](coraza-windows-prefilter-on-performance.md)。每次切换预筛选模式都必须单独重跑等价与容量门禁。
 
 这些数字是同机、无网络抖动的核心路径容量结果，不是企业部署容量证明。架构依赖策略见 [`architecture.md`](../../architecture.md) 的架构决策记录 041。
 
