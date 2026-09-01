@@ -16,7 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $officialModule = 'github.com/corazawaf/coraza/v3@v3.7.0'
-$maintainedModule = 'github.com/ZionOVO/coraza/v3@v3.7.1-0.20260831022307-151f051001b8'
+$maintainedModule = 'github.com/ZionOVO/coraza/v3@v3.7.0-zion.1'
 $benchmarkPattern = '^BenchmarkCoraza(DetectorSerial|DetectorParallel|ReleaseProxyCapacityParallel)$'
 $goldenPattern = '^TestCorazaMaintainedEngine(PreservesOfficialDetectionGolden|SupportsOwnedLifecycle)$'
 $utf8 = [System.Text.UTF8Encoding]::new($false)
@@ -248,9 +248,9 @@ else {
     Invoke-RequiredNative -FilePath 'go' -Arguments @('mod', 'edit', '-dropreplace=github.com/corazawaf/coraza/v3') -WorkingDirectory $officialSource | Out-Null
     $officialCorazaPath = Join-Path $officialSource 'lib/edgecore/coraza.go'
     $officialCorazaSource = [System.IO.File]::ReadAllText($officialCorazaPath)
-    $officialCorazaSourceWithoutDirective = [regex]::Replace($officialCorazaSource, '(?m)^SecRxPreFilter Off\r?\n', '', 1)
+    $officialCorazaSourceWithoutDirective = [regex]::Replace($officialCorazaSource, '(?m)^SecRxPreFilter On\r?\n', '', 1)
     if ($officialCorazaSourceWithoutDirective -eq $officialCorazaSource) {
-        throw 'official source copy did not contain SecRxPreFilter Off'
+        throw 'official source copy did not contain SecRxPreFilter On'
     }
     Write-Utf8Text -Path $officialCorazaPath -Text $officialCorazaSourceWithoutDirective
     Invoke-RequiredNative -FilePath 'go' -Arguments @('mod', 'tidy') -WorkingDirectory $officialSource | Out-Null
@@ -283,7 +283,7 @@ if (-not $resuming) {
         cgo_enabled               = $goEnvironment[2]
         official_module           = $officialModule
         maintained_module         = $maintainedModule
-        sec_rx_prefilter          = 'Off'
+        sec_rx_prefilter          = 'On'
         benchtime                 = $Benchtime
         repeats                   = $Count
         processor_counts          = $ProcessorCounts

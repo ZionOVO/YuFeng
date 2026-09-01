@@ -18,11 +18,14 @@ import (
 	"yufeng/lib/kernel"
 )
 
-const corazaGoldenUpdateEnvironment = "YUFENG_UPDATE_CORAZA_GOLDEN"
-
-const corazaGoldenSchema = "coraza-detection-golden/v1"
-
-const corazaOfficialEngine = "github.com/corazawaf/coraza/v3@v3.7.0"
+const (
+	corazaGoldenUpdateEnvironment = "YUFENG_UPDATE_CORAZA_GOLDEN"
+	corazaGoldenSchema            = "coraza-detection-golden/v1"
+	corazaOfficialEngine          = "github.com/corazawaf/coraza/v3@v3.7.0"
+	corazaOfficialRxPrefilter     = "Off"
+	corazaMaintainedEngine        = "github.com/ZionOVO/coraza/v3@v3.7.0-zion.1"
+	corazaMaintainedRxPrefilter   = "On"
+)
 
 type corazaCompatibilityCase struct {
 	id      string
@@ -67,7 +70,12 @@ type corazaDetectionGoldenFile struct {
 // TestCorazaMaintainedEnginePreservesOfficialDetectionGolden 保证自维护引擎不丢失或改写官方基线的发现与覆盖度。
 func TestCorazaMaintainedEnginePreservesOfficialDetectionGolden(t *testing.T) {
 	detector := newOwnedCorazaForTest(t)
-	actual := captureCorazaDetectionGolden(t, detector)
+	actualEngine, actualRxPrefilter := corazaMaintainedEngine, corazaMaintainedRxPrefilter
+	if corazaUsesOfficialBaseline() {
+		// 官方对照副本会移除实验性指令。
+		actualEngine, actualRxPrefilter = corazaOfficialEngine, corazaOfficialRxPrefilter
+	}
+	actual := captureCorazaDetectionGolden(t, detector, actualEngine, actualRxPrefilter)
 	path := filepath.Join(inspectionBaselineDir(t), "coraza-v3.7.0-detection-golden.json")
 	if os.Getenv(corazaGoldenUpdateEnvironment) == "1" {
 		assertOfficialCorazaBaseline(t)
@@ -87,8 +95,11 @@ func TestCorazaMaintainedEnginePreservesOfficialDetectionGolden(t *testing.T) {
 	if err := json.Unmarshal(raw, &want); err != nil {
 		t.Fatal(err)
 	}
-	if want.SchemaVersion != corazaGoldenSchema || want.Engine != corazaOfficialEngine || want.CRSVersion != kernel.CRSVersion || want.RxPrefilter != "Off" {
+	if want.SchemaVersion != corazaGoldenSchema || want.Engine != corazaOfficialEngine || want.CRSVersion != kernel.CRSVersion || want.RxPrefilter != corazaOfficialRxPrefilter {
 		t.Fatalf("invalid Coraza golden metadata: %#v", want)
+	}
+	if actual.SchemaVersion != corazaGoldenSchema || actual.Engine != actualEngine || actual.CRSVersion != kernel.CRSVersion || actual.RxPrefilter != actualRxPrefilter {
+		t.Fatalf("invalid maintained Coraza metadata: %#v", actual)
 	}
 	blockers, maliciousAdditions := compareCorazaDetectionGolden(want, actual)
 	if len(maliciousAdditions) > 0 {
@@ -235,13 +246,13 @@ func cloneCorazaGolden(t *testing.T, source corazaDetectionGoldenFile) corazaDet
 	return clone
 }
 
-func captureCorazaDetectionGolden(t *testing.T, detector *CorazaDetector) corazaDetectionGoldenFile {
+func captureCorazaDetectionGolden(t *testing.T, detector *CorazaDetector, engine, rxPrefilter string) corazaDetectionGoldenFile {
 	t.Helper()
 	golden := corazaDetectionGoldenFile{
 		SchemaVersion: corazaGoldenSchema,
-		Engine:        corazaOfficialEngine,
+		Engine:        engine,
 		CRSVersion:    kernel.CRSVersion,
-		RxPrefilter:   "Off",
+		RxPrefilter:   rxPrefilter,
 	}
 	for _, fixture := range corazaCompatibilityCases(t) {
 		view := Canonicalize(fixture.request.Method, fixture.request.Path, fixture.request.Query, fixture.request.Headers, fixture.request.Body, DefaultInspectionProfile())

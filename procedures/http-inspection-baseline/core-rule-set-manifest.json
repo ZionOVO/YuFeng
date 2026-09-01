@@ -6,9 +6,9 @@
   "go_module": "github.com/corazawaf/coraza-coreruleset/v4@v4.25.0",
   "go_sum_h1": "tqFO1lfVpTiyWtlN618OXpZMfw+nnN0Q4///W5W+/HM=",
   "paranoia": 1,
-  "engine": "github.com/ZionOVO/coraza/v3@v3.7.1-0.20260831022307-151f051001b8",
+  "engine": "github.com/ZionOVO/coraza/v3@v3.7.0-zion.1",
   "sec_rule_engine": "DetectionOnly",
-  "sec_rx_prefilter": "Off",
+  "sec_rx_prefilter": "On",
   "include_files": [
     "@coraza.conf-recommended",
     "@crs-setup.conf.example",
