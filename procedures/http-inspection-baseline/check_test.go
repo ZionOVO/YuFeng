@@ -41,10 +41,10 @@ func TestCoreRuleSetManifestIsPinned(t *testing.T) {
 	if man.GoModule != kernel.CRSGoModule {
 		t.Fatalf("go module=%s", man.GoModule)
 	}
-	if man.Engine != "github.com/ZionOVO/coraza/v3@v3.7.1-0.20260831022307-151f051001b8" {
+	if man.Engine != "github.com/ZionOVO/coraza/v3@v3.7.0-zion.1" {
 		t.Fatalf("engine=%s", man.Engine)
 	}
-	if man.RxPrefilter != "Off" {
+	if man.RxPrefilter != "On" {
 		t.Fatalf("sec_rx_prefilter=%s", man.RxPrefilter)
 	}
 	if len(man.IncludeFiles) != 9 {

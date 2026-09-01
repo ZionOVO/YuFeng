@@ -26,7 +26,7 @@
 | 检测器接口（进程内，微秒级同步档） | `lib/edgecore/inspector.go` + `release_set.go` `Gate` | 活路径是 `Inspector`（无 `Action`）+ `Gate`。`Detector` 只作演示 KIND_RULE 匹配器 |
 | 能力令牌声明结构 | `lib/kernel/claims.go` | 已建（字段契约） |
 | 生成的 Go 契约代码 | `proto/gen/`（`make generate` 产出，含 Connect service，随仓库提交） | 已生成 |
-| 检测器实现 | 规则检测器：`lib/edgecore/rule.go`；Coraza DetectionOnly：`lib/edgecore/coraza.go`（自维护提交 `151f051001b8`，核心规则集 4.25.0，`SecRxPreFilter Off`）；规范化视图与覆盖度已建。**画像核未装载** | 部分已建 |
+| 检测器实现 | 规则检测器：`lib/edgecore/rule.go`；Coraza DetectionOnly：`lib/edgecore/coraza.go`（自维护发布 `v3.7.0-zion.1`，核心规则集 4.25.0，实验性 `SecRxPreFilter On`）；规范化视图与覆盖度已建。**画像核未装载** | 部分已建 |
 | 初次配置与人工数据面接入 | 引导契约 `docs/api.md` §19；资产接入契约 §9；协议 `proto/yufeng/onboarding/v1` 与 `proto/yufeng/asset/v1`；库表 `deployment_onboarding`、`credential_slots`、`edge_enrollments`；服务 `lib/brain/onboarding_service.go`、`asset_edge_enrollment.go` | 引导只配置/探测模型网关并确认贾维斯在线；旧部署远程过程调用固定退役。主控制台按资产签发 Edge 监听计划、保留既有策略的新世代和 ModelSide 身份，不创建数据面进程或容器 |
 | Edge 人工接入 | 契约 `docs/api.md` §9 与 §19.3；Brain 签发 `lib/brain/asset_edge_enrollment.go`、`baseline_generation.go`；迁移 `lib/store/migrations/00046_manual_edge_enrollments.sql`；原生交付 `deploy/edge/`；容器交付 `deploy/edge.Dockerfile`、`deploy/compose.edge-modelside.yaml` | 管理员先登记资产，再由 `PutEdgeEnrollment` 创建或更新监听计划、保留已有非相关策略的新资产世代、模型档案和预声明 ModelSide 身份；技术人员手动安装、启动、升级和卸载 Edge，Edge 主动注册、拉取与回执；旧引导部署方法固定返回 `unimplemented` |
 | 可选本机 Edge 监督器 | 入口 `cmd/yufeng-dataplane`；只读状态库 `lib/dataplane` | 仅供技术人员手动启动，读取本机服务状态；不持 Docker、不创建或重建 Edge，不接受 Brain 或 Agent 控制 |

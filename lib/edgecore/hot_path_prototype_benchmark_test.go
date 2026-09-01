@@ -553,8 +553,16 @@ func BenchmarkCorazaParallelCapacity(b *testing.B) {
 }
 
 func BenchmarkCorazaRegexPrefilter(b *testing.B) {
-	current := newOwnedCorazaForTest(b)
-	prefiltered, err := newBenchmarkCorazaWithRegexPrefilter()
+	current, err := newBenchmarkCorazaWithRegexPrefilter(false)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() {
+		if err := current.Close(); err != nil {
+			b.Errorf("close non-prefiltered Coraza detector: %v", err)
+		}
+	})
+	prefiltered, err := newBenchmarkCorazaWithRegexPrefilter(true)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -572,7 +580,7 @@ func BenchmarkCorazaRegexPrefilter(b *testing.B) {
 			Body:    bytes.Repeat([]byte("x"), bodySize), ClientAddress: netip.MustParseAddr("192.0.2.10"),
 		}
 		b.Run(fmt.Sprintf("body_%d_bytes", bodySize), func(b *testing.B) {
-			b.Run("current_regex_prefilter_off", func(b *testing.B) {
+			b.Run("regex_prefilter_off", func(b *testing.B) {
 				var detections []Detection
 				b.ReportAllocs()
 				b.ResetTimer()
@@ -585,7 +593,7 @@ func BenchmarkCorazaRegexPrefilter(b *testing.B) {
 				}
 				runtime.KeepAlive(detections)
 			})
-			b.Run("proposed_regex_prefilter_on", func(b *testing.B) {
+			b.Run("regex_prefilter_on", func(b *testing.B) {
 				var detections []Detection
 				b.ReportAllocs()
 				b.ResetTimer()
@@ -691,10 +699,14 @@ func inspectCorazaWithCanonicalRequest(detector *CorazaDetector, req Request, vi
 	return out, nil
 }
 
-func newBenchmarkCorazaWithRegexPrefilter() (*CorazaDetector, error) {
+func newBenchmarkCorazaWithRegexPrefilter(enabled bool) (*CorazaDetector, error) {
+	prefilter := "Off"
+	if enabled {
+		prefilter = "On"
+	}
 	directives := `
 Include @coraza.conf-recommended
-SecRxPreFilter On
+SecRxPreFilter ` + prefilter + `
 SecRuleEngine DetectionOnly
 SecRequestBodyAccess On
 SecRequestBodyInMemoryLimit 65536

@@ -97,10 +97,11 @@ func newCorazaRootFS() fs.FS { return corazaRootFS{FS: coreruleset.FS} }
 
 // NewCorazaDetector 按架构冻结清单装载核心规则集。
 func NewCorazaDetector() (*CorazaDetector, error) {
+	// 仅固定发布版本支持该实验性预筛选；兼容性黄金测试会与官方 Off 基线比较。
 	directives := `
 Include @coraza.conf-recommended
 SecRuleEngine DetectionOnly
-SecRxPreFilter Off
+SecRxPreFilter On
 SecRequestBodyAccess On
 SecRequestBodyInMemoryLimit 65536
 SecRequestBodyLimit 65536
