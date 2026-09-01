@@ -20,7 +20,8 @@
 2. [应用程序编程接口契约](api.md)：网络行为、状态语义和跨接口约束的唯一权威。
 3. [代码地图](development/code-map.md)：概念到实现的定位及当前完成状态。
 4. [模型打分与智能代理规则提炼数据集](development/testing/model-scoring-and-agent-rule-datasets.md)：公开测试材料的选择、展开和验收约束。
-5. [开发规范](../AGENTS.md)：开发流程、代码风格、测试、分支和语义化定位规则。
+5. [Coraza 预筛选开启性能基准](development/testing/coraza-windows-prefilter-on-performance.md)：当前维护版发布与实验性预筛选配置的独立检测等价和容量结果。
+6. [开发规范](../AGENTS.md)：开发流程、代码风格、测试、分支和语义化定位规则。
 
 ## 权威归属
 
